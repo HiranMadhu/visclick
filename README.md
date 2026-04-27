@@ -29,7 +29,7 @@ Vision-based GUI element detection and click automation for desktop applications
 
 **01** does: mount → clone / pull → subfolders → **CLAY** + **UI-Vision** → **C.2.1 RICO** (`wget -c` optional for official `unique_uis.tar.gz`, then `tar` extract; or upload that archive / legacy zip) → REPORT cell.
 
-**02** does: same bootstrap → **RICO** only if not already extracted in 01 → **Zenodo** download + unzip → **VINS** clone → full REPORT. Drive holds the data; a new Colab session is fine.
+**02** does: same bootstrap → **RICO** only if not already extracted in 01 → **Zenodo** (`train.zip` / `val.zip` / `test.zip` from record 19195885) → **VINS** clone → full REPORT. Drive holds the data; a new Colab session is fine.
 
 **Config helper (later, when training):** `python scripts/patch_colab_configs.py` with `VISCLICK_DRIVE=/content/drive/MyDrive/visclick` fills `configs/yolo_*_colab.yaml` from the templates in `configs/`.
 

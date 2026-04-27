@@ -15,8 +15,7 @@ Vision-based GUI element detection and click automation for desktop applications
 | 0 | done | GitHub repo, Drive folder `visclick`, Colab GPU |
 | 1 | done (you) | `01_pull_and_data.ipynb` — CLAY + UI-Vision |
 | **2** | **current** | `02_rico_zenodo_vins.ipynb` — RICO, Zenodo unified, VINS |
-| 3 | later | EDA, `source_train` assembly (plan C.4, C.5) |
-| 3 | later | Source-domain training (plan Part D) — *new notebook when you finish step 1–2* |
+| 3 | later | EDA + `source_train` assembly (C.4, C.5), then source training (Part D) |
 | … | later | Desktop fine-tune, experiments, eval (plan G–I) |
 
 ## Colab notebooks (run in order; each starts fresh: mount + `git pull`)

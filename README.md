@@ -27,7 +27,7 @@ Vision-based GUI element detection and click automation for desktop applications
 
 **Outputs for the project report:** each notebook includes **`REPORT ...` lines** (and a final digest). Copy those into **`VisClick_Report_Data_Form.md` §0** in `gui_temp/`, or paste the block in chat to have it filled in.
 
-**01** does: mount → clone / pull → subfolders → **CLAY** + **UI-Vision** → **C.2.1 RICO** (unzip `data/raw/rico_unique_uis.zip` if you uploaded it) → REPORT cell.
+**01** does: mount → clone / pull → subfolders → **CLAY** + **UI-Vision** → **C.2.1 RICO** (`wget -c` optional for official `unique_uis.tar.gz`, then `tar` extract; or upload that archive / legacy zip) → REPORT cell.
 
 **02** does: same bootstrap → **RICO** only if not already extracted in 01 → **Zenodo** download + unzip → **VINS** clone → full REPORT. Drive holds the data; a new Colab session is fine.
 

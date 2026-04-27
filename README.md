@@ -19,6 +19,16 @@ Full methodology: `VisClick_Detailed_Plan.md` in the project docs (sibling folde
 | 04 — Transfer experiments | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HiranMadhu/visclick/blob/main/notebooks/04_experiments_transfer.ipynb) |
 | 05 — Eval & ablations | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HiranMadhu/visclick/blob/main/notebooks/05_eval_and_ablations.ipynb) |
 
+## Colab notebooks
+
+The `notebooks/00`–`05` `.ipynb` files are **full runnable flows** (mount Drive, clone this repo, install deps, download / train / eval). To **regenerate** them from the template script after editing `scripts/generate_colab_notebooks.py`:
+
+```bash
+python scripts/generate_colab_notebooks.py
+```
+
+Then commit and push the updated `.ipynb` files.
+
 ## Local setup (Windows, click-bot)
 
 ```bash

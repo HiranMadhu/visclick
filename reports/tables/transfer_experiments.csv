@@ -1,0 +1,1 @@
+ID,Description,Train_time_h,mAP50,mAP5095,Precision,Recall,F1,Latency_T4_ms,Latency_WinCPU_ONNX_ms,PT_size_MB,ONNX_size_MB,Notes

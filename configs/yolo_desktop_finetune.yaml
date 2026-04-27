@@ -1,0 +1,9 @@
+# Point `path` at your desktop YOLO export root, e.g.:
+# /content/drive/MyDrive/visclick/data/desktop_labeled
+path: <DRIVE>/data/desktop_labeled
+train: images/train
+val: images/val
+test: images/test
+
+nc: 6
+names: [button, text, text_input, icon, menu, checkbox]

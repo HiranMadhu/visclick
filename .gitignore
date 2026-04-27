@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Project assets (large / binary — use Google Drive for these)
+data/
+weights/
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Local data dumps (optional)
+*.log
+screenshots/
+probe.png
+.cache/

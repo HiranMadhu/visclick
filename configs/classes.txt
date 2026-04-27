@@ -1,0 +1,6 @@
+0 button
+1 text
+2 text_input
+3 icon
+4 menu
+5 checkbox

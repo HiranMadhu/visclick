@@ -1,0 +1,9 @@
+# Point `path` at your Google Drive copy after mounting in Colab, e.g.:
+# /content/drive/MyDrive/visclick/data/source_train
+path: <DRIVE>/data/source_train
+train: images/train
+val: images/val
+test: images/test
+
+nc: 6
+names: [button, text, text_input, icon, menu, checkbox]

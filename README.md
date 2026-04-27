@@ -13,18 +13,24 @@ Vision-based GUI element detection and click automation for desktop applications
 | Step | Status | What |
 |------|--------|------|
 | 0 | done | GitHub repo, Drive folder `visclick`, Colab GPU |
-| **1** | **← you are here** | Open the notebook below: **pull** + first data downloads (Part C.2) |
-| 2 | later | RICO, Zenodo, VINS, EDA, `source_train` assembly (plan C.2, C.4, C.5) |
+| 1 | done (you) | `01_pull_and_data.ipynb` — CLAY + UI-Vision |
+| **2** | **current** | `02_rico_zenodo_vins.ipynb` — RICO, Zenodo unified, VINS |
+| 3 | later | EDA, `source_train` assembly (plan C.4, C.5) |
 | 3 | later | Source-domain training (plan Part D) — *new notebook when you finish step 1–2* |
 | … | later | Desktop fine-tune, experiments, eval (plan G–I) |
 
-## Colab — only notebook for now
+## Colab notebooks (run in order; each starts fresh: mount + `git pull`)
 
-| Step 1: pull repo + start data (Part C) | Open in Colab |
-|----------------------------------------|---------------|
-| `notebooks/01_pull_and_data.ipynb` | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HiranMadhu/visclick/blob/main/notebooks/01_pull_and_data.ipynb) |
+| Step | Open in Colab |
+|------|---------------|
+| 1 — CLAY + UI-Vision | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HiranMadhu/visclick/blob/main/notebooks/01_pull_and_data.ipynb) |
+| 2 — RICO, Zenodo unified, VINS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HiranMadhu/visclick/blob/main/notebooks/02_rico_zenodo_vins.ipynb) |
 
-**What it does (in order):** mount Drive → **clone or `git pull`** `main` into `/content/visclick` → create Drive subfolders → install `huggingface_hub` → **CLAY** + **UI-Vision** downloads. Stops there. Next phases stay in the written plan until you add the next notebook.
+**Outputs for the project report:** each notebook includes **`REPORT ...` lines** (and a final digest). Copy those into **`VisClick_Report_Data_Form.md` §0** in `gui_temp/`, or paste the block in chat to have it filled in.
+
+**01** does: mount → clone / pull → subfolders → **CLAY** + **UI-Vision** → optional REPORT cell.
+
+**02** does: same bootstrap → **RICO** (if you uploaded the zip) → **Zenodo** download + unzip → **VINS** clone → full REPORT. You do not need to keep the Colab session from 01; Drive holds the data.
 
 **Config helper (later, when training):** `python scripts/patch_colab_configs.py` with `VISCLICK_DRIVE=/content/drive/MyDrive/visclick` fills `configs/yolo_*_colab.yaml` from the templates in `configs/`.
 
@@ -43,7 +49,7 @@ python -m visclick.bot --instruction "click Save" --dry-run
 | Path | Purpose |
 |------|---------|
 | `src/visclick/` | Library: capture, detect, OCR, match, act, bot |
-| `notebooks/` | `01_pull_and_data.ipynb` only, until the next phase is added |
+| `notebooks/` | `01_pull_and_data.ipynb`, `02_rico_zenodo_vins.ipynb` (more phases as we go) |
 | `configs/` | YOLO templates (`<DRIVE>` placeholders); use `patch_colab_configs.py` in Colab |
 | `scripts/` | `patch_colab_configs.py`, `capture_screenshots.py` (Windows), `annotate_export_to_yolo.py`, `run_eval.py` |
 | `tests/` | Unit tests |

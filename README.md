@@ -40,6 +40,27 @@ python -m visclick.bot --instruction "click Save" --dry-run
 | `tests/` | Unit tests |
 | `reports/figures` , `reports/tables` | Figures and CSVs for the project report (git-tracked) |
 
+## Push to personal GitHub (when your PC defaults to a company account)
+
+This clone is configured so HTTPS uses the **HiranMadhu** username:
+
+- `credential.https://github.com.username=HiranMadhu`
+- `remote.origin.url=https://HiranMadhu@github.com/HiranMadhu/visclick.git`
+
+**Option A — one-shot push with a personal PAT** (does not store the token in Git config):
+
+1. Create a token: [GitHub → Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens) (enable **repo**).
+2. In a terminal (bash / Git Bash / WSL):
+
+```bash
+export GH_TOKEN=ghp_your_token_here
+bash scripts/push_personal.sh
+```
+
+**Option B — Windows Credential Manager:** remove any saved `github.com` entry, then `git push`; when prompted, sign in with the **personal** account (or paste the PAT as the password).
+
+**Option C — SSH second key:** add a key to your personal GitHub, then `git remote set-url origin git@github.com-personal:HiranMadhu/visclick.git` with a `~/.ssh/config` host alias (see GitHub docs for multiple accounts).
+
 ## License
 
 See repository settings on GitHub; default is all-rights reserved unless a `LICENSE` file is added.

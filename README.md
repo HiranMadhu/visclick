@@ -13,10 +13,14 @@ Vision-based GUI element detection and click automation for desktop applications
 | Step | Status | What |
 |------|--------|------|
 | 0 | done | GitHub repo, Drive folder `visclick`, Colab GPU |
-| 1 | done (you) | `01_pull_and_data.ipynb` — CLAY + UI-Vision |
-| **2** | **current** | `02_rico_zenodo_vins.ipynb` — RICO, Zenodo unified, VINS |
-| 3 | later | EDA + `source_train` assembly (C.4, C.5), then source training (Part D) |
-| … | later | Desktop fine-tune, experiments, eval (plan G–I) |
+| 1 | done | `01_pull_and_data.ipynb` — CLAY + UI-Vision |
+| 2 | done | `02_rico_zenodo_vins.ipynb` — RICO, Zenodo unified, VINS |
+| 3 | done | `03_eda.ipynb` — EDA |
+| 4 | done | `04_assemble_source.ipynb` — `source_train` assembly |
+| 5 | done | `05_train_source.ipynb` — YOLOv8s source training |
+| 6 | done | `06_finetune_desktop.ipynb` — desktop fine-tune (auto-labelled, head-only) |
+| **7** | **current** | `07_export_onnx.ipynb` — export `best_desktop_v8s.pt` → `.onnx` |
+| 8 | later | Windows prototype: capture → detect → OCR → match → click |
 
 ## Colab notebooks (run in order; each starts fresh: mount + `git pull`)
 
@@ -24,6 +28,11 @@ Vision-based GUI element detection and click automation for desktop applications
 |------|---------------|
 | 1 — CLAY + UI-Vision | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HiranMadhu/visclick/blob/main/notebooks/01_pull_and_data.ipynb) |
 | 2 — RICO, Zenodo unified, VINS | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HiranMadhu/visclick/blob/main/notebooks/02_rico_zenodo_vins.ipynb) |
+| 3 — EDA | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HiranMadhu/visclick/blob/main/notebooks/03_eda.ipynb) |
+| 4 — assemble source_train | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HiranMadhu/visclick/blob/main/notebooks/04_assemble_source.ipynb) |
+| 5 — train source YOLOv8s | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HiranMadhu/visclick/blob/main/notebooks/05_train_source.ipynb) |
+| 6 — desktop fine-tune | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HiranMadhu/visclick/blob/main/notebooks/06_finetune_desktop.ipynb) |
+| 7 — export ONNX | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/HiranMadhu/visclick/blob/main/notebooks/07_export_onnx.ipynb) |
 
 **Outputs for the project report:** each notebook includes **`REPORT ...` lines** (and a final digest). Copy those into **`VisClick_Report_Data_Form.md` §0** in `gui_temp/`, or paste the block in chat to have it filled in.
 
@@ -37,10 +46,28 @@ Vision-based GUI element detection and click automation for desktop applications
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate   # or source .venv/bin/activate on Linux
+.venv\Scripts\activate
 pip install -e .
-# Tesseract: https://github.com/UB-Mannheim/tesseract/wiki
-python -m visclick.bot --instruction "click Save" --dry-run
+# Tesseract: install from https://github.com/UB-Mannheim/tesseract/wiki  (default path is fine)
+git pull   # picks up weights/visclick.onnx committed by notebook 07
+```
+
+### Step-by-step verification (run before live use)
+
+Three tiny scripts isolate each layer of the bot, so a failure points at one place:
+
+```bash
+# 1. Capture: takes a screenshot, prints resolution & DPI
+python scripts/test_screen.py
+# 2. Click: moves to (x, y) and clicks. Test with a known coord first.
+python scripts/test_click.py 500 400
+# 3. Detection: runs the ONNX model on a saved screenshot, draws boxes
+python scripts/test_detector.py screenshots/test_screen.png
+# 4. Full pipeline (no click) on a saved screenshot
+python -m visclick.bot --instruction "click Save" --image screenshots/test_screen.png \
+    --dry-run --save-overlay screenshots/overlay.png
+# 5. Live click — only after the above all pass
+python -m visclick.bot --instruction "click Save"
 ```
 
 ## Layout

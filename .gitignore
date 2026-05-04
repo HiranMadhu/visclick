@@ -29,6 +29,11 @@ weights/
 *.pt
 *.pth
 *.ckpt
+# Allow the deployable ONNX model so a fresh clone can run the bot.
+# Notebook 07_export_onnx.ipynb writes it.
+!weights/
+!weights/visclick.onnx
+!weights/.gitkeep
 
 # Secrets
 .env

@@ -52,23 +52,38 @@ pip install -e .
 git pull   # picks up weights/visclick.onnx committed by notebook 07
 ```
 
-### Step-by-step verification (run before live use)
-
-Three tiny scripts isolate each layer of the bot, so a failure points at one place:
+### Daily use — the GUI
 
 ```bash
-# 1. Capture: takes a screenshot, prints resolution & DPI
-python scripts/test_screen.py
-# 2. Click: moves to (x, y) and clicks. Test with a known coord first.
-python scripts/test_click.py 500 400
-# 3. Detection: runs the ONNX model on a saved screenshot, draws boxes
-python scripts/test_detector.py screenshots/test_screen.png
-# 4. Full pipeline (no click) on a saved screenshot
-python -m visclick.bot --instruction "click Save" --image screenshots/test_screen.png \
-    --dry-run --save-overlay screenshots/overlay.png
-# 5. Live click — only after the above all pass
-python -m visclick.bot --instruction "click Save"
+python -m visclick
 ```
+
+Opens a window with: instruction text box, countdown spinbox, monitor selector, dry-run toggle, weights browser, and a log panel. Workflow: type the instruction (e.g. `click Save`) → press **Run** → countdown → window minimises → screenshot taken → element clicked → window restores with the result in the log.
+
+### Headless / scripting — the CLI
+
+```bash
+# 5-second countdown (give yourself time to switch windows):
+python -m visclick.bot --instruction "click Save" --countdown 5
+# Immediate (when you're already on the target window):
+python -m visclick.bot --instruction "click Save"
+# Dry-run on a saved screenshot (no click), with overlay output:
+python -m visclick.bot --instruction "click Save" --image screenshots/test.png \
+    --dry-run --save-overlay screenshots/overlay.png
+```
+
+### One-time verification on a new machine (skip if the GUI already works)
+
+Three diagnostic scripts isolate each pipeline layer so a failure points at one place. You only need them if something feels off — the GUI/CLI run end-to-end on its own.
+
+```bash
+python scripts/test_screen.py                  # capture: prints res, monitor layout
+python scripts/test_screen.py --list-monitors  # multi-monitor: see indices
+python scripts/test_click.py 500 400 --no-click  # click plumbing: move-only
+python scripts/test_detector.py screenshots/test_screen.png --bench 50  # ONNX: latency
+```
+
+The `test_detector.py --bench 50` rows feed §4.1 / §10.1 of the dissertation report.
 
 ## Layout
 

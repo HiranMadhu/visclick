@@ -1,13 +1,15 @@
 """CLI orchestrator: screenshot → detect → OCR → match → click.
 
 Examples:
-  # Live: capture screen, click "Save" (auto-picks the monitor whose
-  # size matches pyautogui's primary, so click coords are correct).
+  # Live with a 5-second countdown so you can switch to the target window:
+  python -m visclick.bot --instruction "click Save" --countdown 5
+
+  # Live, no countdown (immediate capture + click):
   python -m visclick.bot --instruction "click Save"
 
   # Multi-monitor: pick monitor 2 explicitly (run test_screen.py
   # --list-monitors to see the layout).
-  python -m visclick.bot --instruction "click Save" --monitor 2
+  python -m visclick.bot --instruction "click Save" --monitor 2 --countdown 5
 
   # Dry-run on a saved screenshot (no clicks)
   python -m visclick.bot --instruction "click Save" --image screenshots/test.png --dry-run
@@ -20,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import time
 from typing import List, Tuple
 
 import numpy as np
@@ -83,6 +86,10 @@ def main() -> int:
                     help="mss monitor index for screen capture (default: 0 = auto-pick "
                          "the monitor matching pyautogui's primary). Run "
                          "scripts/test_screen.py --list-monitors to see options.")
+    ap.add_argument("--countdown", type=int, default=0,
+                    help="Seconds to wait before capturing the screen. Useful when "
+                         "running from a terminal: gives you time to bring the target "
+                         "window to the front before the screenshot is taken.")
     ap.add_argument("--conf", type=float, default=0.25, help="Detection confidence threshold")
     ap.add_argument("--iou",  type=float, default=0.50, help="NMS IoU threshold")
     ap.add_argument("--dry-run", action="store_true", help="Do not send a real click")
@@ -108,6 +115,11 @@ def main() -> int:
         img = _load_image(args.image)
     else:
         set_dpi_awareness()
+        if args.countdown > 0:
+            print(f"Switch to your target window now.")
+            for i in range(args.countdown, 0, -1):
+                print(f"  capturing in {i}...")
+                time.sleep(1)
         mon_idx = args.monitor if args.monitor > 0 else find_pyautogui_primary()
         img, mleft, mtop = grab(mon_idx)
         monitor_offset = (mleft, mtop)

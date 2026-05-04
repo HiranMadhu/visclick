@@ -1,8 +1,13 @@
 """CLI orchestrator: screenshot → detect → OCR → match → click.
 
 Examples:
-  # Live: capture screen, click "Save"
+  # Live: capture screen, click "Save" (auto-picks the monitor whose
+  # size matches pyautogui's primary, so click coords are correct).
   python -m visclick.bot --instruction "click Save"
+
+  # Multi-monitor: pick monitor 2 explicitly (run test_screen.py
+  # --list-monitors to see the layout).
+  python -m visclick.bot --instruction "click Save" --monitor 2
 
   # Dry-run on a saved screenshot (no clicks)
   python -m visclick.bot --instruction "click Save" --image screenshots/test.png --dry-run
@@ -21,7 +26,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from visclick.act import click_box
-from visclick.capture import grab, set_dpi_awareness
+from visclick.capture import find_pyautogui_primary, grab, set_dpi_awareness
 from visclick.detect import CLASS_NAMES, Detector
 from visclick.match import best_box
 from visclick.ocr import ocr_box
@@ -74,6 +79,10 @@ def main() -> int:
                     help="Path to ONNX weights (default: weights/visclick.onnx)")
     ap.add_argument("--image", default=None,
                     help="Run on a saved screenshot instead of capturing screen")
+    ap.add_argument("--monitor", type=int, default=0,
+                    help="mss monitor index for screen capture (default: 0 = auto-pick "
+                         "the monitor matching pyautogui's primary). Run "
+                         "scripts/test_screen.py --list-monitors to see options.")
     ap.add_argument("--conf", type=float, default=0.25, help="Detection confidence threshold")
     ap.add_argument("--iou",  type=float, default=0.50, help="NMS IoU threshold")
     ap.add_argument("--dry-run", action="store_true", help="Do not send a real click")
@@ -90,6 +99,7 @@ def main() -> int:
               f"or git pull (notebook 07 commits weights/visclick.onnx)")
         return 2
 
+    monitor_offset = (0, 0)
     if args.image:
         if not os.path.isfile(args.image):
             print(f"ERROR: image not found: {args.image}")
@@ -98,8 +108,11 @@ def main() -> int:
         img = _load_image(args.image)
     else:
         set_dpi_awareness()
-        img = grab()
-        print(f"captured screen: {img.shape[1]}x{img.shape[0]}")
+        mon_idx = args.monitor if args.monitor > 0 else find_pyautogui_primary()
+        img, mleft, mtop = grab(mon_idx)
+        monitor_offset = (mleft, mtop)
+        print(f"captured monitor {mon_idx}: {img.shape[1]}x{img.shape[0]} "
+              f"at virtual-desktop offset ({mleft}, {mtop})")
 
     print(f"loading detector: {args.weights}")
     det = Detector(args.weights)
@@ -140,8 +153,14 @@ def main() -> int:
     score, cls, xyxy, conf, text = pick
     print(f"PICKED cls={CLASS_NAMES[cls]} text={text!r} det_conf={conf:.2f} match_score={score}")
 
+    cx_local = (xyxy[0] + xyxy[2]) / 2
+    cy_local = (xyxy[1] + xyxy[3]) / 2
+    cx_abs = cx_local + monitor_offset[0]
+    cy_abs = cy_local + monitor_offset[1]
+
     if args.dry_run:
-        print(f"DRY-RUN: would click center of xyxy={xyxy}")
+        print(f"DRY-RUN: would click monitor-local ({cx_local:.0f}, {cy_local:.0f}) "
+              f"= virtual-desktop ({cx_abs:.0f}, {cy_abs:.0f})")
         return 0
 
     if args.image:
@@ -149,8 +168,9 @@ def main() -> int:
               "may not match the image. Re-run live without --image, or add --dry-run.")
         return 0
 
-    click_box(xyxy)
-    print(f"CLICKED center of xyxy={xyxy}")
+    abs_xy = click_box(xyxy, offset=monitor_offset)
+    print(f"CLICKED virtual-desktop ({abs_xy[0]:.0f}, {abs_xy[1]:.0f}) "
+          f"[monitor-local ({cx_local:.0f}, {cy_local:.0f}) + offset {monitor_offset}]")
     return 0
 
 

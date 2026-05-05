@@ -48,7 +48,10 @@ Vision-based GUI element detection and click automation for desktop applications
 python -m venv .venv
 .venv\Scripts\activate
 pip install -e .
-# Tesseract: install from https://github.com/UB-Mannheim/tesseract/wiki  (default path is fine)
+# OCR: EasyOCR is included in pip install -e . (default engine).
+#      Tesseract is OPTIONAL — install only if you want the ~5 ms/box speed boost
+#      from https://github.com/UB-Mannheim/tesseract/wiki  (default install path
+#      is auto-detected; otherwise set TESSERACT_CMD env var).
 git pull   # picks up weights/visclick.onnx committed by notebook 07
 ```
 

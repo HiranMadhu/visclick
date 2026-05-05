@@ -36,7 +36,7 @@ from visclick.act import click_box, click_xy
 from visclick.capture import find_pyautogui_primary, grab, list_monitors, set_dpi_awareness
 from visclick.detect import CLASS_NAMES, Detector
 from visclick.match import _is_class_only_target, _target_phrase, best_box
-from visclick.ocr import ocr_box, text_ground
+from visclick.ocr import ocr_box, ocr_status, text_ground
 
 _DEFAULT_WEIGHTS = "weights/visclick.onnx"
 _OVERLAY_PATH = "screenshots/last_overlay.png"
@@ -148,7 +148,7 @@ class VisClickApp:
         self._populate_monitors()
 
         ttk.Label(frm, text="OCR").grid(row=4, column=0, sticky="w", pady=(8, 0))
-        self.ocr_var = tk.StringVar(value="tesseract")
+        self.ocr_var = tk.StringVar(value="easyocr")
         ttk.Combobox(
             frm, textvariable=self.ocr_var, state="readonly", width=14,
             values=["tesseract", "easyocr", "both", "none"],
@@ -210,6 +210,15 @@ class VisClickApp:
         self._log(f"weights: {self.weights_var.get()}")
         pa_w, pa_h = pyautogui.size()
         self._log(f"pyautogui screen size: {pa_w} x {pa_h}")
+        st = ocr_status()
+        for name in ("easyocr", "tesseract"):
+            info = st[name]
+            mark = "✓" if info.get("available") else "✗"
+            detail = info.get("version") or info.get("reason") or ""
+            self._log(f"OCR {name:9s}: {mark} {detail}")
+        if not st["easyocr"].get("available") and not st["tesseract"].get("available"):
+            self._log("WARNING: no OCR backend available. "
+                      "`pip install easyocr` is the simplest fix.")
         self._log("After each Run, an overlay PNG with all detected boxes is saved")
         self._log(f"  to {_OVERLAY_PATH} and opened automatically.")
 
@@ -292,7 +301,22 @@ class VisClickApp:
             self._set_busy(False)
             return
 
-        ocr_engine = self.ocr_var.get() or "tesseract"
+        ocr_engine = self.ocr_var.get() or "easyocr"
+        if ocr_engine != "none":
+            st = ocr_status()
+            if not st[ocr_engine].get("available"):
+                other = "easyocr" if ocr_engine == "tesseract" else "tesseract"
+                if st[other].get("available"):
+                    self._log(f"WARNING: OCR={ocr_engine} unavailable "
+                              f"({st[ocr_engine].get('reason', '')}); "
+                              f"auto-switching to {other}.")
+                    ocr_engine = other
+                    self.ocr_var.set(other)
+                else:
+                    self._log("WARNING: no OCR backend available; matching by "
+                              "class+conf only.")
+                    ocr_engine = "none"
+                    self.ocr_var.set("none")
         try:
             conf = float(self.conf_var.get())
         except (tk.TclError, ValueError):
@@ -400,7 +424,7 @@ class VisClickApp:
                 target = _target_phrase(instruction)
                 if target and not _is_class_only_target(target):
                     self._log(f"FALLBACK: detector miss; running full-image OCR for {target!r}…")
-                    eng = ocr_engine if ocr_engine != "none" else "tesseract"
+                    eng = ocr_engine if ocr_engine != "none" else "easyocr"
                     hits = text_ground(img, target, engine=eng, min_similarity=70)
                     self._log(f"  text_ground found {len(hits)} hit(s)")
                     for xyxy_h, text_h, sim_h, ocr_conf_h in hits[:5]:

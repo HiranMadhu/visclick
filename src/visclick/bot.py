@@ -34,7 +34,7 @@ from visclick.act import click_box, click_xy
 from visclick.capture import find_pyautogui_primary, grab, set_dpi_awareness
 from visclick.detect import CLASS_NAMES, Detector
 from visclick.match import _is_class_only_target, _target_phrase, best_box
-from visclick.ocr import ocr_box, text_ground
+from visclick.ocr import ocr_box, ocr_status, text_ground
 
 Box4 = Tuple[float, float, float, float]
 
@@ -143,11 +143,13 @@ def main() -> int:
                     help="If set, save annotated screenshot with all detection boxes "
                          "(picked one drawn thicker)")
     ap.add_argument("--ocr-engine", choices=["tesseract", "easyocr", "both", "none"],
-                    default="tesseract",
+                    default="easyocr",
                     help="Which OCR backend to use on detected boxes. "
-                         "'tesseract' (default) is fast and needs no downloads. "
-                         "'easyocr' is more robust but downloads ~95 MB on first use. "
-                         "'both' falls back to easyocr if tesseract fails. "
+                         "'easyocr' (default) is pure-Python, more robust on "
+                         "modern flat dark-mode UIs, downloads ~95 MB on first "
+                         "use. 'tesseract' is faster (~5 ms/box) but needs a "
+                         "separate Windows installer (UB-Mannheim). "
+                         "'both' tries tesseract then falls back to easyocr. "
                          "'none' skips OCR (match by class + confidence only).")
     ap.add_argument("--no-ocr", action="store_true",
                     help="Alias for --ocr-engine none.")
@@ -202,6 +204,25 @@ def main() -> int:
             print(f"saved empty overlay to {args.save_overlay}")
         return 1
 
+    if args.ocr_engine != "none":
+        st = ocr_status()
+        for name in ("tesseract", "easyocr"):
+            info = st[name]
+            if info.get("available"):
+                tag = info.get("version", "ok")
+                print(f"OCR {name:9s}: ✓ {tag}")
+            else:
+                print(f"OCR {name:9s}: ✗ {info.get('reason', 'unavailable')}")
+        if not st[args.ocr_engine].get("available"):
+            other = "easyocr" if args.ocr_engine == "tesseract" else "tesseract"
+            if st[other].get("available"):
+                print(f"WARNING: requested OCR={args.ocr_engine} is unavailable; "
+                      f"auto-switching to {other}.")
+                args.ocr_engine = other
+            else:
+                print(f"WARNING: no OCR backend is available; matching will use "
+                      f"class + confidence only.")
+                args.ocr_engine = "none"
     print(f"OCR engine: {args.ocr_engine}")
     boxes_with_text: List[Tuple[int, Box4, float, str]] = []
     for cls, xyxy, conf in raw:
@@ -220,7 +241,7 @@ def main() -> int:
             print(f"FALLBACK: detector miss; running full-image OCR for {target!r}…")
             hits = text_ground(img, target,
                                 engine=args.ocr_engine if args.ocr_engine != "none"
-                                       else "tesseract",
+                                       else "easyocr",
                                 min_similarity=70)
             print(f"  text_ground found {len(hits)} hit(s)")
             for xyxy_h, text_h, sim_h, ocr_conf_h in hits[:5]:

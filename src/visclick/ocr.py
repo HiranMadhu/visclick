@@ -10,27 +10,109 @@ The bot uses OCR for two distinct tasks:
    button) but the text label "Save" is clearly visible.
 
 Engines:
-- ``tesseract``  — fast, ~5 ms/box, no Python model download. Default.
-- ``easyocr``    — neural, ~50 ms/box; first use triggers ~95 MB download.
-- ``both``       — Tesseract; fall back to EasyOCR if empty (per box).
-- ``none``       — skip OCR entirely.
+- ``easyocr``    — DEFAULT. Pure-Python neural OCR, ~50 ms/box. Pip-installable;
+                    first use downloads ~95 MB of recognition / detection
+                    models, then cached forever in ``~/.EasyOCR``. Robust on
+                    the dark-mode flat buttons in modern Windows / VS Code /
+                    Chrome UIs that VisClick targets.
+- ``tesseract``  — Optional speed boost: ~5 ms/box but requires a separate
+                    Windows installer (UB-Mannheim build) and a working
+                    binary on PATH. If you have Tesseract installed, pass
+                    ``--ocr-engine tesseract`` for faster runs.
+- ``both``       — Try Tesseract; fall back to EasyOCR if it returns empty.
+- ``none``       — Skip OCR entirely (matcher uses class + conf only).
 """
 from __future__ import annotations
 
 import os
-from typing import List, Tuple
+import shutil
+import subprocess
+from typing import Any, Dict, List, Tuple
 
 import cv2
 import numpy as np
 
 TESSERACT = os.environ.get("TESSERACT_CMD", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
 _reader = None
+_tesseract_warned = False  # ensure we shout at most once per session
 
 ValidEngine = str  # "tesseract" | "easyocr" | "both" | "none"
 
 # Tuple returned by text_ground:
 #   ((x1, y1, x2, y2), found_text, similarity 0..100, ocr_conf 0..100)
 TextHit = Tuple[Tuple[int, int, int, int], str, float, float]
+
+
+# ---------- diagnostic ----------
+
+def _resolve_tesseract_path() -> str:
+    """Return a usable path to the tesseract binary, or empty string."""
+    if os.path.isfile(TESSERACT):
+        return TESSERACT
+    on_path = shutil.which("tesseract")
+    return on_path or ""
+
+
+def ocr_status() -> Dict[str, Dict[str, Any]]:
+    """Probe OCR backends and return a small structured report.
+
+    Used by the bot/GUI startup to print a banner and to auto-fallback
+    when the user-selected engine is not available.
+    """
+    out: Dict[str, Dict[str, Any]] = {"tesseract": {}, "easyocr": {}}
+
+    binary = _resolve_tesseract_path()
+    if binary:
+        out["tesseract"]["binary_path"] = binary
+        try:
+            r = subprocess.run([binary, "--version"],
+                                capture_output=True, text=True, timeout=5)
+            ver = (r.stdout or r.stderr).strip().splitlines()[0] if (r.stdout or r.stderr) else "unknown"
+            out["tesseract"]["version"] = ver
+            out["tesseract"]["available"] = True
+        except Exception as e:
+            out["tesseract"]["available"] = False
+            out["tesseract"]["reason"] = f"binary failed: {e}"
+    else:
+        out["tesseract"]["available"] = False
+        out["tesseract"]["binary_path"] = TESSERACT
+        out["tesseract"]["reason"] = ("binary not found at configured path "
+                                       "and not on PATH")
+    try:
+        import pytesseract  # noqa: F401
+        out["tesseract"]["pytesseract"] = True
+    except ImportError:
+        out["tesseract"]["pytesseract"] = False
+        out["tesseract"]["available"] = False
+        out["tesseract"]["reason"] = "pytesseract Python package missing"
+
+    try:
+        import easyocr  # noqa: F401
+        out["easyocr"]["available"] = True
+        out["easyocr"]["version"] = getattr(__import__("easyocr"), "__version__", "?")
+    except ImportError:
+        out["easyocr"]["available"] = False
+        out["easyocr"]["reason"] = "not installed (pip install easyocr)"
+
+    return out
+
+
+def _warn_tesseract_once(detail: str) -> None:
+    global _tesseract_warned
+    if _tesseract_warned:
+        return
+    _tesseract_warned = True
+    binary = _resolve_tesseract_path() or TESSERACT
+    print("WARNING: Tesseract OCR is not working — every OCR call will return empty.")
+    print(f"  configured path : {TESSERACT}")
+    print(f"  resolved binary : {binary if os.path.isfile(binary) else '(not found)'}")
+    print(f"  underlying error: {detail}")
+    print("  fix one of:")
+    print("    (1) install Tesseract from https://github.com/UB-Mannheim/tesseract/wiki")
+    print("        (the default install path matches the configured one above)")
+    print("    (2) set the TESSERACT_CMD environment variable to your install path")
+    print("    (3) use --ocr-engine easyocr  (or pick 'easyocr' in the GUI)")
+    print("        first run will download ~95 MB of EasyOCR models.")
 
 
 # ---------- per-box OCR ----------
@@ -40,7 +122,8 @@ def _tesseract(crop: np.ndarray) -> str:
         import pytesseract
         pytesseract.pytesseract.tesseract_cmd = TESSERACT
         return pytesseract.image_to_string(crop, config="--psm 7").strip()
-    except Exception:
+    except Exception as e:
+        _warn_tesseract_once(repr(e))
         return ""
 
 
@@ -59,7 +142,7 @@ def _easyocr(crop: np.ndarray) -> str:
 def ocr_box(
     img_rgb: np.ndarray,
     xyxy: Tuple[float, float, float, float],
-    engine: ValidEngine = "tesseract",
+    engine: ValidEngine = "easyocr",
 ) -> str:
     """OCR the rectangle region. Return stripped text (possibly empty)."""
     x1, y1, x2, y2 = (int(a) for a in xyxy)
@@ -87,7 +170,7 @@ def ocr_box(
 def text_ground(
     img_rgb: np.ndarray,
     target: str,
-    engine: ValidEngine = "tesseract",
+    engine: ValidEngine = "easyocr",
     min_similarity: int = 70,
 ) -> List[TextHit]:
     """Search the full image for words matching ``target``; return matches.
@@ -119,12 +202,14 @@ def _ground_tesseract(img_rgb: np.ndarray, target_lower: str, min_sim: int) -> L
     try:
         import pytesseract
         from rapidfuzz import fuzz
-    except ImportError:
+    except ImportError as e:
+        _warn_tesseract_once(repr(e))
         return []
     pytesseract.pytesseract.tesseract_cmd = TESSERACT
     try:
         data = pytesseract.image_to_data(img_rgb, output_type=pytesseract.Output.DICT)
-    except Exception:
+    except Exception as e:
+        _warn_tesseract_once(repr(e))
         return []
 
     hits: List[TextHit] = []

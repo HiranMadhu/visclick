@@ -739,6 +739,23 @@ This per-class breakdown is what motivates the §6 implementation discussion: th
 
 **O16 — Notebook 07 (ONNX export) is the artefact-release boundary.** Everything before 07 lives on Drive and is reproducible from the notebook chain; everything from 07 onward (including the prototype) consumes a *committed-to-git* artefact: `weights/visclick.onnx`. This is deliberate: the `.onnx` is small enough (~42 MB) to fit in the repo, opset-stable, and runtime-portable (CPU-only `onnxruntime`), so a fresh Windows checkout has everything it needs after `pip install -e . && git pull` without ever touching Drive. Document this in Chapter 6 as the "reproducibility cliff" between research and prototype.
 
+---
+
+### §13.1 — Outstanding work after the 5 May 2026 prototype review
+
+Cross-reference: see **`docs/VisClick_Detailed_Plan.md` Part L** for the full per-phase roadmap with time estimates and expected outputs. Summary for at-a-glance tracking:
+
+| Phase | Description | Duration | Status |
+|-------|-------------|----------|--------|
+| **L.1 Phase 1** | Defensible model-evaluation numbers: hand-correct 8 desktop test images, re-run val with both source baseline and desktop FT on the same hand-corrected test set, plus M1 (COCO direct) and M2 (head-only) ablations; mark M0/M5/M6/M7/M8 as `SKIPPED` with a reason. | ~1.5 h | `[PENDING]` |
+| **L.2 Phase 2** | Live prototype evidence: run T01–T20 in §9, latency NFR for §10.1, six prototype screenshots for §8.1, three preprocessing pairs for §3.1 (only if M5 is kept). | ~2 h | `[PENDING]` |
+| **L.3 Phase 3** | Demo video for §12 (single-take, 6–8 representative tasks including a refusal case). | ~1 h | `[PENDING]` |
+| **L.4 Phase 4 (optional)** | Better element coverage for icon-only / dropdown clickables: 4A class-specific conf thresholds (15 min), 4B hand-add icon-only boxes + re-fine-tune (3–4 h), 4C UI-Vision external test (4–5 h). | day-long | `[OPTIONAL]` |
+
+Phases 1–3 together = ~4.5 h of work and produce a complete, defensible submission. Phase 4 is a quality lever, not a requirement — §8.4 already documents the icon-coverage limitation as a deliberate scope decision aligned with the literature (UIED [L3], Apple Screen Recognition [L5], ScreenAI [L10]).
+
+When each phase is run, log new observations as **O17, O18, …** in this section so the dissertation discussion can cite them.
+
 **O11 — Pseudo-label class collapse on desktop screenshots.** The source-domain teacher (`best_source_v8s.pt`, mAP@.5 = 0.45 on Zenodo GT) was used to auto-label 50 personal desktop screenshots in `06` cell 6.1. Across all 50 images it produced **346 detections** distributed as: `text` 244 (70%), `icon` 90 (26%), `button` 8 (2%), `text_input` 4 (1%), `menu` **0**, `checkbox` **0**. The teacher does not fire on Windows menubars / Excel ribbons / dialog tickboxes — those classes were learned on web/mobile UIs that look very different. Head-only fine-tune (`freeze=10`, 20 epochs, AdamW `lr0=1e-3`, batch 8) cannot synthesise classes its supervision signal lacks, so the resulting `best_desktop_v8s.pt` reproduces the same blind spots. The 8-image test split contained only 24 instances (text 16 + icon 8), so the §4.1 headline mAP@.5 = 0.7176 is **self-consistency on text+icon**, not absolute desktop accuracy. Cleanest fix: hand-correct the 8 test images in Roboflow (~30 min) so menus/checkboxes are explicitly marked, then re-run `06` cell 6.6. See §4.1 ¹ + §4.6 + §2.3 caveat.
 
 **O12 — Ultralytics 8.4.46 `stream=True` rewrites `Result.path`.** When predicting with `model.predict(source=list_of_paths, stream=True)`, every `Result.path` was a stream-index name (`image0.jpg`, `image1.jpg`, ...) instead of the input path. `06` cell 6.1's first version derived label filenames from `r.path`, so all 50 labels were saved as `imageN.txt` and cell 6.3 reported `n_with_labels = 0/50`. **Fix in repo (commit `3683a3d`):** zip `to_run` with the predict iterator and use the input path's basename — order is preserved by Ultralytics. A one-shot rename helper based on alphabetical-sort ordering recovered the existing labels without re-running prediction. See §0.3 F10.

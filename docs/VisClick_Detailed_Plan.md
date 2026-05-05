@@ -1281,6 +1281,66 @@ This is the same cadence the example report's Gantt chart shows (Sept–Apr in t
 
 ---
 
+## Part L — Post-prototype roadmap (added 5 May 2026 after the first live demo)
+
+After the 5 May 2026 live-demo session (logged in `docs/VisClick_Report_Data_Form.md` §8.6), the project has a working prototype but several dissertation-required entries are still `[FILL]`. This part lays out the remaining work in **four phases ordered by dissertation defensibility per hour invested**. Phases 1–3 are mandatory for a strong submission; Phase 4 is the "go from B+ to A" lever and is *not* required.
+
+### L.1 — Phase 1: Defensible model-evaluation numbers (~1.5 h, urgent)
+
+This is the "skipped Option A" item that turns §4.1 from caveat-laden to defensible.
+
+| Step | Time | Output |
+|------|------|--------|
+| 1.1 | 30 min | Hand-correct the 8 desktop test images in Roboflow (just the test split, ~24 boxes total). Export YOLO labels back to `data/desktop_finetune/labels/test/`. |
+| 1.2 | 5 min  | Re-run `06` cell 6.6 (`model.val(split='test')`) on the **hand-corrected** test set with **the source baseline** AND **the desktop fine-tune**. Two numbers, same test set, directly comparable. Update §4.1 row 1 (Src baseline on desktop test) and §4.6 (real-GT desktop FT mAP). |
+| 1.3 | 30 min | M1 (COCO → desktop direct, `freeze=None`) and M2 (source → desktop, head-only `freeze=22`) ablations. Each is a 20-epoch run on the 50 desktop images, ~10 min on a Colab T4. Add two rows to §4.1. |
+| 1.4 | 10 min | Mark M0/M5/M6/M7/M8 as `SKIPPED` in §4.1 with a one-line reason ("infeasible on Free Colab budget" / "preprocessing did not move the needle in pilot run" / etc.). Acceptable per §G.0 because the report can say *"we tried, here is why we did not pick"*. |
+
+**After Phase 1:** §4.1 has four rows with directly-comparable numbers (Src baseline on desktop / M1 / M2 / M3 = current desktop FT) plus five honest `SKIPPED` rows, and §4.6 has real-GT mAP. **Chapter 6 (Implementation) becomes defensible.**
+
+### L.2 — Phase 2: Live prototype evidence (~2 h)
+
+Most of §8 / §9 / §10 is still `[FILL]`. This phase fills it.
+
+| Step | Time | Output |
+|------|------|--------|
+| 2.1 | 1 h | Run the 20 functional test cases T01–T20 in §9. For each: launch `python -m visclick`, type instruction, observe pass/fail, paste the predicted element + actual screenshot path. The bot already saves `screenshots/last_overlay.png` so most of this is observe-and-record. |
+| 2.2 | 30 min | Latency NFR (§10.1): write a tiny CLI loop that runs 20 representative instructions with `--image` so it's deterministic, dump wall-times to `tables/nfr_performance.csv`. |
+| 2.3 | 20 min | Six prototype screenshots for §8.1 (terminal showing command, captured screen, overlay with all boxes, picked element highlighted, after-click result, honest failure case). |
+| 2.4 | 15 min | Three before/after preprocessing pairs (§3.1) — only needed if M5 is kept alive in Phase 1. Otherwise mark §3.1 as not applicable. |
+
+**After Phase 2:** §8, §9, §10 are populated. **Chapter 7 (Evaluation) writes itself from the recorded numbers.**
+
+### L.3 — Phase 3: Demo video (~1 h)
+
+§12 of the data form requires a demo video. Single take of the bot doing 6–8 representative tasks: open GUI → type "click Save" → countdown → click lands; switch to Chrome → "click address bar" → lands; then a refusal case ("click Save" on a blank desktop) showing the bot prints `FAIL: cannot find 'save'` instead of guessing. Tooling: OBS Studio or Windows Game Bar. Upload to YouTube unlisted. Paste link into §12.
+
+### L.4 — Phase 4: Better element coverage (optional, day-long)
+
+This is the "dropdowns and icon-only buttons" thread the user raised on 5 May 2026. **Honest framing for the dissertation:** §8.4 already documents this limitation as a deliberate scope decision aligned with UIED [L3], Apple Screen Recognition [L5], and ScreenAI [L10]. So Phase 4 is *not* required to defend the thesis; it is a quality lever.
+
+| Approach | Time | Expected gain | Risk |
+|----------|------|--------------|------|
+| **4A.** Class-specific conf thresholds: `icon` at 0.10, others at 0.25. Add a per-class threshold dict to `detect.py::Detector.predict` and rerun §9 functional tests. | 15 min | +5–15 pp recall on icon class on the live tests; maybe 0–10 pp precision drop | Low. Quick experiment; revert if it makes things worse. |
+| **4B.** Hand-add **icon-only** boxes (close X, settings cog, dropdown arrows, minimise, app-bar icons) to the existing 50 desktop seeds in Roboflow. Don't touch existing auto-labels — only add. Re-fine-tune for 30 more epochs from `best_desktop_v8s.pt`. | 3–4 h | +10–25 pp recall on icon/dropdown class; modest text-class drop possible | Medium. Annotation tedium. Highest expected dissertation value among Phase-4 options. |
+| **4C.** Use UI-Vision benchmark [L5 in `reports/literature_table.csv`] as **external test**, not training. Just `model.val(data=ui_vision_data.yaml)` on the desktop fine-tune. Numbers feed §7. | 4–5 h | Strong external-generalisation evidence in §7 — even if numbers are mediocre, *having* the table is the point. | Low. Just data wrangling. |
+| **4D.** Integrate a separate icon-classifier ensemble (e.g. UIED-style hybrid). | day+ | Marginal over 4B. | High effort. Not recommended. |
+
+**Recommended Phase-4 order if pursued:** 4A first (cheap, instantly informs whether 4B is worth doing), then 4B if recall gains in 4A look real, then 4C for external evidence. Skip 4D unless you're aiming for a top grade and have a free week.
+
+### L.5 — Recommended overall order
+
+```
+Today + tomorrow   → Phase 1 (1.5 h, mandatory)
+Day after          → Phase 2 (2 h, mandatory)
+Same day or next   → Phase 3 (1 h, mandatory)
+If time / ambition → Phase 4A (15 min) + Phase 4B (half day)
+```
+
+The mandatory three together are ~4.5 h of work and give a complete, defensible submission. Phase 4 is optional. Track per-phase progress in §13 of the data form (add observations O17, O18, …).
+
+---
+
 ## Part K — Appendices (cheat-sheet, troubleshooting, costs)
 
 ### K.1 Command cheat-sheet

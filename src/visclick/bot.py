@@ -28,7 +28,9 @@ from typing import List, Tuple
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-from visclick.act import click_box
+import pyautogui
+
+from visclick.act import click_box, click_xy
 from visclick.capture import find_pyautogui_primary, grab, set_dpi_awareness
 from visclick.detect import CLASS_NAMES, Detector
 from visclick.match import best_box
@@ -75,9 +77,53 @@ def _save_overlay(
     pil.save(out_path)
 
 
+def _run_manual_xy(args) -> int:
+    """Manual coordinate click — verifies the click plumbing in isolation."""
+    set_dpi_awareness()
+    tx, ty = args.xy
+    pa_w, pa_h = pyautogui.size()
+    print(f"manual xy mode | target=({tx}, {ty}) | pyautogui screen={pa_w}x{pa_h}")
+    if args.countdown > 0:
+        print("Switch to your target window now.")
+        for i in range(args.countdown, 0, -1):
+            print(f"  capturing in {i}...")
+            time.sleep(1)
+    pre = pyautogui.position()
+    print(f"  cursor before move: ({pre.x}, {pre.y})")
+    print(f"  delta to target:    ({tx - pre.x:+d}, {ty - pre.y:+d}) pixels")
+    if args.dry_run:
+        print("DRY-RUN: no click sent.")
+        return 0
+    t0 = time.perf_counter()
+    click_xy(tx, ty, dwell=0.3)
+    dt_ms = (time.perf_counter() - t0) * 1000
+    post = pyautogui.position()
+    err = (post.x - tx, post.y - ty)
+    status = "OK" if abs(err[0]) <= 2 and abs(err[1]) <= 2 else "BAD — likely DPI scaling"
+    print(f"  cursor after click: ({post.x}, {post.y})")
+    print(f"  arrival error:      ({err[0]:+d}, {err[1]:+d}) pixels [{status}]")
+    print(f"  move + click took {dt_ms:.0f} ms")
+    return 0
+
+
+def _parse_xy(s: str) -> Tuple[int, int]:
+    """Accept '500,400', '500 400', or 'xy 500 400'."""
+    import re
+    m = re.match(r"^\s*(?:xy\s+)?(-?\d+)\s*[,\s]\s*(-?\d+)\s*$", s, re.IGNORECASE)
+    if not m:
+        raise argparse.ArgumentTypeError(
+            f"--xy must be 'X,Y' or 'X Y' (got {s!r})")
+    return int(m.group(1)), int(m.group(2))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="VisClick instruction-driven GUI click bot")
-    ap.add_argument("--instruction", required=True, help='e.g. "click Save"')
+    ap.add_argument("--instruction", default=None, help='e.g. "click Save"')
+    ap.add_argument("--xy", type=_parse_xy, default=None,
+                    help="Manual coordinate click. Skips capture/detection. "
+                         "Example: --xy 500,400 or --xy '500 400'. "
+                         "Coordinates are virtual-desktop (pyautogui-style). "
+                         "Useful for verifying mouse plumbing in isolation.")
     ap.add_argument("--weights", default="weights/visclick.onnx",
                     help="Path to ONNX weights (default: weights/visclick.onnx)")
     ap.add_argument("--image", default=None,
@@ -99,6 +145,11 @@ def main() -> int:
     ap.add_argument("--no-ocr", action="store_true",
                     help="Skip OCR (match against class names only — faster, less specific)")
     args = ap.parse_args()
+
+    if args.xy is not None:
+        return _run_manual_xy(args)
+    if not args.instruction:
+        ap.error("either --instruction or --xy is required")
 
     if not os.path.isfile(args.weights):
         print(f"ERROR: weights not found: {args.weights}")
@@ -144,7 +195,10 @@ def main() -> int:
         else:
             text = ocr_box(img, xyxy)
         boxes_with_text.append((cls, xyxy, conf, text))
-        print(f"  cls={CLASS_NAMES[cls]:11s} conf={conf:.2f} text={text!r}")
+        cxl = (xyxy[0] + xyxy[2]) / 2
+        cyl = (xyxy[1] + xyxy[3]) / 2
+        print(f"  cls={CLASS_NAMES[cls]:11s} center=({cxl:>6.0f},{cyl:>6.0f})  "
+              f"conf={conf:.2f} text={text!r}")
 
     pick = best_box(args.instruction, boxes_with_text)
     picked_index = -1
@@ -170,9 +224,11 @@ def main() -> int:
     cx_abs = cx_local + monitor_offset[0]
     cy_abs = cy_local + monitor_offset[1]
 
+    print(f"  monitor-local center: ({cx_local:.0f}, {cy_local:.0f})")
+    print(f"  virtual-desktop:      ({cx_abs:.0f}, {cy_abs:.0f})")
+
     if args.dry_run:
-        print(f"DRY-RUN: would click monitor-local ({cx_local:.0f}, {cy_local:.0f}) "
-              f"= virtual-desktop ({cx_abs:.0f}, {cy_abs:.0f})")
+        print(f"DRY-RUN: would click virtual-desktop ({cx_abs:.0f}, {cy_abs:.0f})")
         return 0
 
     if args.image:
@@ -180,7 +236,15 @@ def main() -> int:
               "may not match the image. Re-run live without --image, or add --dry-run.")
         return 0
 
+    pre = pyautogui.position()
+    print(f"  cursor before move:   ({pre.x}, {pre.y})  "
+          f"delta-to-target=({cx_abs - pre.x:+.0f}, {cy_abs - pre.y:+.0f})")
     abs_xy = click_box(xyxy, offset=monitor_offset)
+    post = pyautogui.position()
+    err = (post.x - cx_abs, post.y - cy_abs)
+    status = "OK" if abs(err[0]) <= 2 and abs(err[1]) <= 2 else "BAD — likely DPI scaling"
+    print(f"  cursor after click:   ({post.x}, {post.y})")
+    print(f"  arrival error:        ({err[0]:+.0f}, {err[1]:+.0f}) pixels [{status}]")
     print(f"CLICKED virtual-desktop ({abs_xy[0]:.0f}, {abs_xy[1]:.0f}) "
           f"[monitor-local ({cx_local:.0f}, {cy_local:.0f}) + offset {monitor_offset}]")
     return 0

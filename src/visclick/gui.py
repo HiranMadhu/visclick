@@ -20,15 +20,17 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
+import sys
 import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, ttk
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import pyautogui
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 from visclick.act import click_box, click_xy
 from visclick.capture import find_pyautogui_primary, grab, list_monitors, set_dpi_awareness
@@ -37,6 +39,54 @@ from visclick.match import best_box
 from visclick.ocr import ocr_box
 
 _DEFAULT_WEIGHTS = "weights/visclick.onnx"
+_OVERLAY_PATH = "screenshots/last_overlay.png"
+
+_COLORS = [
+    (255, 107, 107), (78, 205, 196), (255, 230, 109),
+    (160, 108, 213), (6, 167, 125), (255, 166, 43),
+]
+
+
+def _save_overlay(
+    img_rgb: np.ndarray,
+    boxes_with_text: List[Tuple[int, Tuple[float, float, float, float], float, str]],
+    picked_xyxy: Optional[Tuple[float, float, float, float]],
+    out_path: str,
+) -> str:
+    pil = Image.fromarray(img_rgb).copy()
+    draw = ImageDraw.Draw(pil)
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 14)
+    except OSError:
+        try:
+            font = ImageFont.truetype("arial.ttf", 14)
+        except OSError:
+            font = ImageFont.load_default()
+    for cls, xyxy, conf, text in boxes_with_text:
+        color = _COLORS[cls % len(_COLORS)]
+        x1, y1, x2, y2 = (int(round(v)) for v in xyxy)
+        is_picked = picked_xyxy is not None and tuple(xyxy) == tuple(picked_xyxy)
+        draw.rectangle([x1, y1, x2, y2], outline=color, width=4 if is_picked else 2)
+        label = f"{CLASS_NAMES[cls]} {conf:.2f}"
+        if text:
+            label += f" | {text[:30]}"
+        draw.text((x1, max(0, y1 - 16)), label, fill=color, font=font)
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    pil.save(out_path)
+    return str(Path(out_path).resolve())
+
+
+def _open_in_default_viewer(path: str) -> None:
+    """Open the given file with the OS's default app (Windows: image viewer)."""
+    try:
+        if sys.platform == "win32":
+            os.startfile(path)  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+    except Exception:
+        pass
 
 # Match instructions like "xy 500 400", "1234, 567", "click 100 200", "click xy 50,50".
 _MANUAL_RE = re.compile(
@@ -97,36 +147,37 @@ class VisClickApp:
                                 padx=(8, 0), pady=(8, 0))
         self._populate_monitors()
 
+        ttk.Label(frm, text="OCR").grid(row=4, column=0, sticky="w", pady=(8, 0))
+        self.ocr_var = tk.StringVar(value="tesseract")
+        ttk.Combobox(
+            frm, textvariable=self.ocr_var, state="readonly", width=14,
+            values=["tesseract", "easyocr", "both", "none"],
+        ).grid(row=4, column=1, sticky="w", padx=(8, 0), pady=(8, 0))
+
+        ttk.Label(frm, text="Conf threshold").grid(row=4, column=1, sticky="e", padx=(0, 80), pady=(8, 0))
+        self.conf_var = tk.DoubleVar(value=0.25)
+        ttk.Spinbox(frm, from_=0.05, to=0.90, increment=0.05, width=5,
+                    textvariable=self.conf_var, format="%.2f").grid(
+            row=4, column=2, sticky="w", pady=(8, 0))
+
         self.dry_run_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(frm, text="Dry run (don't actually click)",
-                        variable=self.dry_run_var).grid(row=4, column=0, columnspan=2,
+                        variable=self.dry_run_var).grid(row=5, column=0, columnspan=2,
                                                          sticky="w", pady=(8, 0))
+        self.show_overlay_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(frm, text="Open overlay PNG after run",
+                        variable=self.show_overlay_var).grid(row=5, column=1, columnspan=2,
+                                                              sticky="e", pady=(8, 0))
 
-        ttk.Label(frm, text="OCR").grid(row=4, column=1, sticky="e", padx=(0, 6), pady=(8, 0))
-        self.ocr_var = tk.StringVar(value="tesseract")
-        ocr_combo = ttk.Combobox(
-            frm,
-            textvariable=self.ocr_var,
-            state="readonly",
-            width=20,
-            values=[
-                "tesseract",
-                "easyocr",
-                "both",
-                "none",
-            ],
-        )
-        ocr_combo.grid(row=4, column=2, sticky="w", pady=(8, 0))
-
-        ttk.Label(frm, text="Weights").grid(row=5, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(frm, text="Weights").grid(row=6, column=0, sticky="w", pady=(8, 0))
         self.weights_var = tk.StringVar(value=_DEFAULT_WEIGHTS)
         ttk.Entry(frm, textvariable=self.weights_var).grid(
-            row=5, column=1, sticky="ew", padx=(8, 0), pady=(8, 0))
+            row=6, column=1, sticky="ew", padx=(8, 0), pady=(8, 0))
         ttk.Button(frm, text="…", width=3, command=self.on_browse_weights).grid(
-            row=5, column=2, sticky="w", padx=(4, 0), pady=(8, 0))
+            row=6, column=2, sticky="w", padx=(4, 0), pady=(8, 0))
 
         btn_row = ttk.Frame(frm)
-        btn_row.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(14, 4))
+        btn_row.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(14, 4))
         btn_row.columnconfigure(0, weight=1)
         btn_row.columnconfigure(1, weight=1)
         self.run_btn = ttk.Button(btn_row, text="Run", command=self.on_run)
@@ -137,14 +188,14 @@ class VisClickApp:
 
         self.status_var = tk.StringVar(value="Ready.")
         ttk.Label(frm, textvariable=self.status_var, anchor="w",
-                  foreground="#444").grid(row=7, column=0, columnspan=3, sticky="ew")
+                  foreground="#444").grid(row=8, column=0, columnspan=3, sticky="ew")
 
-        ttk.Label(frm, text="Log").grid(row=8, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(frm, text="Log").grid(row=9, column=0, sticky="w", pady=(8, 0))
         log_frame = ttk.Frame(frm)
-        log_frame.grid(row=9, column=0, columnspan=3, sticky="nsew", pady=(2, 0))
+        log_frame.grid(row=10, column=0, columnspan=3, sticky="nsew", pady=(2, 0))
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
-        frm.rowconfigure(9, weight=1)
+        frm.rowconfigure(10, weight=1)
         self.log = tk.Text(log_frame, height=14, wrap="word", state="disabled",
                            font=("Consolas", 9))
         self.log.grid(row=0, column=0, sticky="nsew")
@@ -159,6 +210,8 @@ class VisClickApp:
         self._log(f"weights: {self.weights_var.get()}")
         pa_w, pa_h = pyautogui.size()
         self._log(f"pyautogui screen size: {pa_w} x {pa_h}")
+        self._log("After each Run, an overlay PNG with all detected boxes is saved")
+        self._log(f"  to {_OVERLAY_PATH} and opened automatically.")
 
     def _populate_monitors(self) -> None:
         primary = find_pyautogui_primary()
@@ -240,11 +293,17 @@ class VisClickApp:
             return
 
         ocr_engine = self.ocr_var.get() or "tesseract"
+        try:
+            conf = float(self.conf_var.get())
+        except (tk.TclError, ValueError):
+            conf = 0.25
+        show_overlay = bool(self.show_overlay_var.get())
         self._log(f"DETECT mode: instruction={instruction!r}  countdown={countdown}s  "
-                  f"monitor={mon_idx or 'auto'}  ocr={ocr_engine}  dry_run={dry_run}")
+                  f"monitor={mon_idx or 'auto'}  ocr={ocr_engine}  conf={conf:.2f}  "
+                  f"dry_run={dry_run}")
         self._set_status("Switch to your target window…")
         self._countdown_then(countdown, lambda: self._do_pipeline(
-            instruction, weights, mon_idx, dry_run, ocr_engine))
+            instruction, weights, mon_idx, dry_run, ocr_engine, conf, show_overlay))
 
     def _countdown_then(self, remaining: int, action) -> None:
         if remaining > 0:
@@ -289,7 +348,8 @@ class VisClickApp:
     # ---------- detect → pick → click ----------
 
     def _do_pipeline(self, instruction: str, weights: str, mon_idx: int,
-                     dry_run: bool, ocr_engine: str = "tesseract") -> None:
+                     dry_run: bool, ocr_engine: str = "tesseract",
+                     conf: float = 0.25, show_overlay: bool = True) -> None:
         try:
             t0 = time.perf_counter()
             actual_mon = mon_idx if mon_idx > 0 else find_pyautogui_primary()
@@ -308,12 +368,16 @@ class VisClickApp:
                 self._detector_path = weights
             t_load = time.perf_counter()
 
-            raw = self._detector.predict(img, conf=0.25, iou=0.5)
+            raw = self._detector.predict(img, conf=conf, iou=0.5)
             t_det = time.perf_counter()
-            self._log(f"detector: {len(raw)} boxes in {(t_det - t_load)*1000:.0f} ms")
+            self._log(f"detector: {len(raw)} boxes (conf>={conf:.2f}) in {(t_det - t_load)*1000:.0f} ms")
 
             if not raw:
                 self._log("FAIL: detector found no candidates")
+                if show_overlay:
+                    p = _save_overlay(img, [], None, _OVERLAY_PATH)
+                    self._log(f"overlay saved: {p}")
+                    _open_in_default_viewer(p)
                 self._set_status("No candidates found.")
                 return
 
@@ -332,8 +396,20 @@ class VisClickApp:
 
             pick = best_box(instruction, boxes_with_text)
             if pick is None:
-                self._log("FAIL: no candidates after matching")
-                self._set_status("No match.")
+                target = instruction.lower().replace("click", "").strip().strip("'\"")
+                self._log(f"FAIL: no detected box's text resembles {target!r}.")
+                self._log("  Possible causes:")
+                self._log(f"  - the model didn't detect that element on this UI")
+                self._log(f"    (try lowering the Conf threshold and re-running)")
+                self._log(f"  - OCR couldn't read the text (try OCR=easyocr)")
+                self._log(f"  - that text isn't on screen at all")
+                self._log("  Workaround: hover the target, press 'Pick Coordinates (5 s)',")
+                self._log("              then Run with the auto-filled 'xy …' instruction.")
+                if show_overlay:
+                    p = _save_overlay(img, boxes_with_text, None, _OVERLAY_PATH)
+                    self._log(f"overlay saved: {p}")
+                    _open_in_default_viewer(p)
+                self._set_status(f"No box matches {target!r}.")
                 return
             score, cls, xyxy, cf, txt = pick
             cx_local = (xyxy[0] + xyxy[2]) / 2
@@ -347,6 +423,11 @@ class VisClickApp:
             pre = pyautogui.position()
             self._log(f"  cursor before move:   ({pre.x}, {pre.y})  "
                       f"delta-to-target=({cx_abs - pre.x:+.0f}, {cy_abs - pre.y:+.0f})")
+
+            if show_overlay:
+                p = _save_overlay(img, boxes_with_text, xyxy, _OVERLAY_PATH)
+                self._log(f"overlay saved: {p}")
+                _open_in_default_viewer(p)
 
             if dry_run:
                 self._log("DRY-RUN: no click sent.")

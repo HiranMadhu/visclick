@@ -221,7 +221,12 @@ def main() -> int:
         print(f"saved overlay to {args.save_overlay}")
 
     if pick is None:
-        print("FAIL: no candidates after matching")
+        target = (args.instruction or "").lower().replace("click", "").strip().strip("'\"")
+        print(f"FAIL: no detected box's text resembles {target!r}.")
+        print("  Try one of:")
+        print("    --conf 0.10   (lower threshold; show weaker detections)")
+        print("    --ocr-engine easyocr   (more robust text reading; one-time download)")
+        print("    --xy X,Y      (manual coordinate click as fallback)")
         return 1
     score, cls, xyxy, conf, text = pick
     print(f"PICKED cls={CLASS_NAMES[cls]} text={text!r} det_conf={conf:.2f} match_score={score}")

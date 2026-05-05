@@ -743,18 +743,60 @@ This per-class breakdown is what motivates the §6 implementation discussion: th
 
 ### §13.1 — Outstanding work after the 5 May 2026 prototype review
 
-Cross-reference: see **`docs/VisClick_Detailed_Plan.md` Part L** for the full per-phase roadmap with time estimates and expected outputs. Summary for at-a-glance tracking:
+Cross-reference: full per-step roadmap with deliverables and adopt-if-better triggers lives in **`docs/VisClick_Detailed_Plan.md` Part L**. The checkboxes below mirror it for at-a-glance progress tracking. **As each step is completed, change `- [ ]` to `- [x]` and commit with a message naming the step ID** (e.g. `Phase 1.A.1: hand-corrected 8 desktop test images`).
 
-| Phase | Description | Duration | Status |
-|-------|-------------|----------|--------|
-| **L.1 Phase 1** | Defensible model-evaluation numbers: hand-correct 8 desktop test images, re-run val with both source baseline and desktop FT on the same hand-corrected test set, plus M1 (COCO direct) and M2 (head-only) ablations; mark M0/M5/M6/M7/M8 as `SKIPPED` with a reason. | ~1.5 h | `[PENDING]` |
-| **L.2 Phase 2** | Live prototype evidence: run T01–T20 in §9, latency NFR for §10.1, six prototype screenshots for §8.1, three preprocessing pairs for §3.1 (only if M5 is kept). | ~2 h | `[PENDING]` |
-| **L.3 Phase 3** | Demo video for §12 (single-take, 6–8 representative tasks including a refusal case). | ~1 h | `[PENDING]` |
-| **L.4 Phase 4 (optional)** | Better element coverage for icon-only / dropdown clickables: 4A class-specific conf thresholds (15 min), 4B hand-add icon-only boxes + re-fine-tune (3–4 h), 4C UI-Vision external test (4–5 h). | day-long | `[OPTIONAL]` |
+#### Phase 1 — Comparison study + defensible numbers (~3–4 h, mandatory)
 
-Phases 1–3 together = ~4.5 h of work and produce a complete, defensible submission. Phase 4 is a quality lever, not a requirement — §8.4 already documents the icon-coverage limitation as a deliberate scope decision aligned with the literature (UIED [L3], Apple Screen Recognition [L5], ScreenAI [L10]).
+**1.A — Test-set hardening (prerequisite)**
+- [ ] **1.A.1** Hand-correct 8 desktop test images in Roboflow; export YOLO labels back into repo
+- [ ] **1.A.2** Verify exports; record per-class instance counts in §4.6b
 
-When each phase is run, log new observations as **O17, O18, …** in this section so the dissertation discussion can cite them.
+**1.B — ML transfer-learning ablations (Colab T4)**
+- [ ] **1.B.1** M0 — YOLOv8n trained from scratch on 50 desktop images
+- [ ] **1.B.2** M1 — YOLOv8s COCO weights → desktop fine-tune
+- [ ] **1.B.3** M2 — YOLOv8s source-pretrained → desktop, head-only `freeze=22`
+- [ ] **1.B.4** M3 — current headline; re-eval on hand-corrected test
+- [ ] **1.B.5** Update §4.1 with all five rows on the same test set; mark M4/M5/M6/M7/M8 as `SKIPPED`
+
+**1.C — Classical / non-ML baselines (local Windows)**
+- [ ] **1.C.1** `scripts/baseline_template.py` — SikuliX-style template matching
+- [ ] **1.C.2** `scripts/baseline_ocr_only.py` — OCR-only (no detection model)
+- [ ] **1.C.3** `scripts/baseline_pywinauto.py` — Windows accessibility-tree (optional)
+
+**1.D — Cross-method comparison**
+- [ ] **1.D.1** Aggregate `tables/method_comparison.csv` across all methods
+- [ ] **1.D.2** Bar charts: `figures/method_comparison_tsr.png` and `figures/method_comparison_map.png`
+- [ ] **1.D.3** Write observation **O17** (1–2 sentences: why VisClick wins or which baseline replaced it)
+
+**1.E — Honest skipping**
+- [ ] **1.E.1** §4.1: M4/M5/M6/M7/M8 marked `SKIPPED` with a one-line reason each
+
+#### Phase 2 — Live prototype evidence (~2 h, mandatory)
+
+- [ ] **2.1** Run T01–T20 with the VisClick full pipeline; fill §9
+- [ ] **2.2** Run T01–T20 with each Phase-1.C baseline; fill `tables/baseline_results.csv`
+- [ ] **2.3** Latency NFR over 20 instructions; fill §10.1 from `tables/nfr_performance.csv`
+- [ ] **2.4** Six prototype screenshots for §8.1
+- [ ] **2.5** (Optional) Three before/after preprocessing pairs for §3.1 (only if M5 was kept)
+
+#### Phase 3 — Demo video (~1 h, mandatory)
+
+- [ ] **3.1** Storyboard: 6–8 tasks including a refusal case
+- [ ] **3.2** OBS Studio / Windows Game Bar configured at 1080p 30fps
+- [ ] **3.3** Single-take recording
+- [ ] **3.4** Light edit: trims, four title cards (Capture / Detect / Match / Click)
+- [ ] **3.5** YouTube unlisted upload; link into §12
+
+#### Phase 4 — Better element coverage (day-long, optional)
+
+- [ ] **4.A** Class-specific conf thresholds (icon ≤ 0.10), re-run §9
+- [ ] **4.B** Hand-add icon-only boxes to existing 50 seeds; re-fine-tune 30 epochs
+- [ ] **4.C** UI-Vision external test (no training; `model.val()` only)
+- [ ] **4.D** Icon-classifier ensemble (NOT recommended unless aiming for distinction)
+
+**Adopt-if-better rule:** if any Phase-1.B alternative beats M3 by ≥ 3 pp mAP@.5, OR any Phase-1.C baseline beats VisClick by ≥ 3 pp TSR on T01–T20, the dissertation honestly switches the headline to that approach. (Almost certainly won't trigger, but the test must be honest — that is the point of having Phase 1.C in the first place.)
+
+**Logging convention:** when each phase is run, log a new observation **O17, O18, …** in §13 above so the dissertation discussion can cite it.
 
 **O11 — Pseudo-label class collapse on desktop screenshots.** The source-domain teacher (`best_source_v8s.pt`, mAP@.5 = 0.45 on Zenodo GT) was used to auto-label 50 personal desktop screenshots in `06` cell 6.1. Across all 50 images it produced **346 detections** distributed as: `text` 244 (70%), `icon` 90 (26%), `button` 8 (2%), `text_input` 4 (1%), `menu` **0**, `checkbox` **0**. The teacher does not fire on Windows menubars / Excel ribbons / dialog tickboxes — those classes were learned on web/mobile UIs that look very different. Head-only fine-tune (`freeze=10`, 20 epochs, AdamW `lr0=1e-3`, batch 8) cannot synthesise classes its supervision signal lacks, so the resulting `best_desktop_v8s.pt` reproduces the same blind spots. The 8-image test split contained only 24 instances (text 16 + icon 8), so the §4.1 headline mAP@.5 = 0.7176 is **self-consistency on text+icon**, not absolute desktop accuracy. Cleanest fix: hand-correct the 8 test images in Roboflow (~30 min) so menus/checkboxes are explicitly marked, then re-run `06` cell 6.6. See §4.1 ¹ + §4.6 + §2.3 caveat.
 

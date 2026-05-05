@@ -1283,61 +1283,130 @@ This is the same cadence the example report's Gantt chart shows (Sept–Apr in t
 
 ## Part L — Post-prototype roadmap (added 5 May 2026 after the first live demo)
 
-After the 5 May 2026 live-demo session (logged in `docs/VisClick_Report_Data_Form.md` §8.6), the project has a working prototype but several dissertation-required entries are still `[FILL]`. This part lays out the remaining work in **four phases ordered by dissertation defensibility per hour invested**. Phases 1–3 are mandatory for a strong submission; Phase 4 is the "go from B+ to A" lever and is *not* required.
+After the 5 May 2026 live-demo session (logged in `docs/VisClick_Report_Data_Form.md` §8.6), the project has a working prototype but several dissertation-required entries are still `[FILL]`. This part is the **single source of truth** for everything left to do — every step is a checkbox you can tick (`- [ ]` → `- [x]`) as it is completed, and every commit that closes a step should reference its ID (e.g. `Phase 1.B.2: M1 trained and evaluated`).
 
-### L.1 — Phase 1: Defensible model-evaluation numbers (~1.5 h, urgent)
+### Two design rules for this roadmap
 
-This is the "skipped Option A" item that turns §4.1 from caveat-laden to defensible.
+1. **Track per step, commit per step.** Each step below is a checkbox. Each one should produce one or more commits; the commit message should name the step ID (e.g. `Phase 1.A.1: hand-corrected 8 desktop test images`).
+2. **"Adopt if better" rule.** Any time a comparison method (Phase 1.C) or alternative approach (Phase 4) **beats the current headline by ≥ 3 pp on TSR or ≥ 5 pp on mAP@.5 with no major regression elsewhere**, the dissertation honestly switches to that as the headline. We are not married to YOLOv8s. The dissertation is stronger if "I tried X, Y, Z, and Y won" than if "I picked one and called it the headline".
 
-| Step | Time | Output |
-|------|------|--------|
-| 1.1 | 30 min | Hand-correct the 8 desktop test images in Roboflow (just the test split, ~24 boxes total). Export YOLO labels back to `data/desktop_finetune/labels/test/`. |
-| 1.2 | 5 min  | Re-run `06` cell 6.6 (`model.val(split='test')`) on the **hand-corrected** test set with **the source baseline** AND **the desktop fine-tune**. Two numbers, same test set, directly comparable. Update §4.1 row 1 (Src baseline on desktop test) and §4.6 (real-GT desktop FT mAP). |
-| 1.3 | 30 min | M1 (COCO → desktop direct, `freeze=None`) and M2 (source → desktop, head-only `freeze=22`) ablations. Each is a 20-epoch run on the 50 desktop images, ~10 min on a Colab T4. Add two rows to §4.1. |
-| 1.4 | 10 min | Mark M0/M5/M6/M7/M8 as `SKIPPED` in §4.1 with a one-line reason ("infeasible on Free Colab budget" / "preprocessing did not move the needle in pilot run" / etc.). Acceptable per §G.0 because the report can say *"we tried, here is why we did not pick"*. |
+### Status overview
 
-**After Phase 1:** §4.1 has four rows with directly-comparable numbers (Src baseline on desktop / M1 / M2 / M3 = current desktop FT) plus five honest `SKIPPED` rows, and §4.6 has real-GT mAP. **Chapter 6 (Implementation) becomes defensible.**
+- [ ] **Phase 1** — Comparison study + defensible numbers (~3–4 h). MANDATORY.
+- [ ] **Phase 2** — Live prototype evidence (~2 h). MANDATORY.
+- [ ] **Phase 3** — Demo video (~1 h). MANDATORY.
+- [ ] **Phase 4** — Better element coverage for icon-only / dropdown clickables (day-long). OPTIONAL.
+
+---
+
+### L.1 — Phase 1: Comparison study + defensible numbers (~3–4 h, urgent)
+
+The original "Option A" (just ablate M1 / M2) is too narrow. To defend the headline approach in the dissertation, Phase 1 is broadened into a proper **comparison study** that runs ML ablations *and* classical baselines on the **same hand-corrected test set**. After Phase 1 we have a single comparison table that says *"here is what every reasonable alternative scores; here is why we picked this one"*.
+
+#### L.1.A — Test-set hardening (~45 min, **prerequisite for everything else in Phase 1**)
+
+- [ ] **1.A.1** Hand-correct the 8 desktop test images in Roboflow. Open `data/desktop_finetune/images/test/`, fix wrong boxes, add missing boxes (especially Save / Cancel / OK / dropdowns the auto-labeler missed), keep the 6-class taxonomy. Export YOLO labels back to `data/desktop_finetune/labels/test/`. ~30 min.
+- [ ] **1.A.2** Verify exports: count files, check at least one label file by hand, count instances per class in the test split, paste counts into report §4.6b. ~15 min.
+
+**Deliverable:** a hand-corrected 8-image test split with ~30–40 real-GT boxes across the 6 classes. Every other Phase-1 evaluation runs on this set.
+
+#### L.1.B — ML transfer-learning ablations (~1.5 h on Colab T4)
+
+All four runs use **the same hand-corrected test split** so rows are directly comparable.
+
+- [ ] **1.B.1** **M0 — YOLOv8n trained from scratch on the 50 desktop images.** No transfer learning. ~50 epochs, batch=8, `imgsz=640`. *Expected: much worse than M3, ~5–15 pp mAP. Establishes that ANY transfer beats nothing.* ~15 min Colab time.
+- [ ] **1.B.2** **M1 — YOLOv8s with COCO weights → fine-tuned on desktop.** Standard "off-the-shelf" transfer. `freeze=None`, 30 epochs, AdamW `lr0=0.001`, cos_lr. *Expected: worse than M3 (no UI-domain pretraining) but better than M0. Establishes that source-domain (RICO/Zenodo) pretraining helps.* ~15 min.
+- [ ] **1.B.3** **M2 — YOLOv8s source-pretrained → desktop, head-only `freeze=22`.** Same recipe as M3 but only the head trains. *Expected: marginally worse or comparable to M3, faster to train. Establishes the freeze-depth trade-off.* ~10 min.
+- [ ] **1.B.4** **M3 — current headline (already trained).** Just re-run `model.val(split='test')` on the hand-corrected test set to get real-GT numbers. ~5 min.
+- [ ] **1.B.5** Update report §4.1 with rows for **Src on desktop**, **M0**, **M1**, **M2**, **M3** — all on the same hand-corrected test set. Mark M4/M5/M6/M7/M8 as `SKIPPED` with one-line reason each (e.g. "M5 preprocessing: pilot showed no measurable gain on RICO test", "M7 DINOv2: out of scope on Colab Free CPU budget"). ~15 min.
+
+**Notebook to author:** `notebooks/08_phase1_ablations.ipynb`. Single cell per method, all writing into `tables/transfer_experiments.csv` and saving `runs/M*/` artefacts to Drive.
+
+**Adopt-if-better trigger:** if M1 ≥ M3 + 3 pp mAP@.5 OR M2 ≥ M3 + 3 pp, the dissertation switches headline to that method. (Unlikely but possible.)
+
+#### L.1.C — Classical / non-ML baselines (~1.5 h, local Windows)
+
+This is the **single most important addition** to the original plan. To defend "we used a deep object-detection approach", we need to demonstrate that simpler approaches are worse on our task. SikuliX [L15] is cited in the literature review precisely so we can compare against its template-matching idea here.
+
+Each baseline runs as a standalone CLI script that takes the **same instruction set** (T01–T20 from §9) and reports a TSR (Task Success Rate). If a baseline beats VisClick in TSR, the dissertation honestly says so.
+
+- [ ] **1.C.1** **`scripts/baseline_template.py` — SikuliX-style template matching.** Capture reference PNGs of common Windows 11 / Chrome / VS Code controls (Save, Cancel, OK, search icon, address bar) into `samples/templates/`. The script does `cv2.matchTemplate(screenshot, template, TM_CCOEFF_NORMED)` for each named template, picks the best match if score > 0.7, clicks. *Expected: very high precision when the template matches exactly (same theme, same DPI), zero recall when the UI changes (dark mode, different scale, anti-aliasing).* ~1 h to write + capture references.
+- [ ] **1.C.2** **`scripts/baseline_ocr_only.py` — OCR-only.** No detection model at all. Run EasyOCR (or Tesseract) on the full screenshot, find the word matching the instruction's target via `rapidfuzz.partial_ratio`, click its bounding box centre. *Expected: succeeds on text-labeled buttons (Save, Cancel), fails completely on icon-only clickables (close X, settings cog, dropdown arrow). This is essentially "VisClick without the YOLO step".* ~30 min.
+- [ ] **1.C.3** **`scripts/baseline_pywinauto.py` — accessibility-tree.** Uses `pywinauto.Desktop().connect(active_only=True).find_element(name='Save')` to locate controls via the Windows accessibility API. *Expected: works on native Win32 dialogs (Notepad Save As, File Explorer), fails on Chrome / VS Code which have partial accessibility, fails completely on Electron apps that don't expose UIA. Demonstrates "if accessibility worked, we wouldn't need ML — but it doesn't".* ~30 min. **Optional**: skip if Windows accessibility is awkward.
+
+**Each baseline produces:** a CSV row in `tables/baseline_results.csv` with columns: `method`, `T01..T20` (✓/✗), `TSR`, `latency_p50_ms`, `dependencies` (one line), `lines_of_code`.
+
+**Adopt-if-better trigger:** if any baseline TSR > VisClick TSR on the 20 cases, the dissertation switches the headline. (Almost certainly won't happen, but the test must be honest.)
+
+#### L.1.D — Cross-method comparison table + bar chart (~30 min)
+
+- [ ] **1.D.1** Aggregate `tables/transfer_experiments.csv` (ML methods) and `tables/baseline_results.csv` (classical) into a single `tables/method_comparison.csv` with rows: `M0, M1, M2, M3, baseline_template, baseline_ocr_only, baseline_pywinauto, VisClick_full_pipeline`. Columns: `mAP@.5_test`, `TSR_T01_T20`, `latency_p50_ms`, `lines_of_code`, `external_dependencies`.
+- [ ] **1.D.2** One-figure summary: bar chart of TSR per method, saved to `figures/method_comparison_tsr.png` and a second bar chart of mAP@.5 saved to `figures/method_comparison_map.png`. Goes into report §4.1 / §6.
+- [ ] **1.D.3** Write 1–2 sentences in report §13 (new observation **O17**) explaining why VisClick wins (or, if a baseline won, why we adopted it).
+
+#### L.1.E — Honest skipping (~10 min)
+
+- [ ] **1.E.1** In report §4.1, mark each of M4 / M5 / M6 / M7 / M8 as `SKIPPED` with a one-line reason. Acceptable per detailed-plan §G.0 because the report can say *"we tried these other methods, here are the numbers, here is why we did not pick them as the headline approach"*.
+
+**After Phase 1:** §4.1 has 5 ML rows + 3 classical-baseline rows + 5 honest `SKIPPED` rows = 13 rows total, all eval'd on the same 8-image hand-corrected test set or T01–T20 cases. **Chapter 6 (Implementation) and Chapter 7 (Evaluation) both have a defensible quantitative spine.**
+
+---
 
 ### L.2 — Phase 2: Live prototype evidence (~2 h)
 
-Most of §8 / §9 / §10 is still `[FILL]`. This phase fills it.
+Phase 2 only starts once Phase 1.A (test-set hardening) and Phase 1.C (baselines) are done — the same T01–T20 cases drive both.
 
-| Step | Time | Output |
-|------|------|--------|
-| 2.1 | 1 h | Run the 20 functional test cases T01–T20 in §9. For each: launch `python -m visclick`, type instruction, observe pass/fail, paste the predicted element + actual screenshot path. The bot already saves `screenshots/last_overlay.png` so most of this is observe-and-record. |
-| 2.2 | 30 min | Latency NFR (§10.1): write a tiny CLI loop that runs 20 representative instructions with `--image` so it's deterministic, dump wall-times to `tables/nfr_performance.csv`. |
-| 2.3 | 20 min | Six prototype screenshots for §8.1 (terminal showing command, captured screen, overlay with all boxes, picked element highlighted, after-click result, honest failure case). |
-| 2.4 | 15 min | Three before/after preprocessing pairs (§3.1) — only needed if M5 is kept alive in Phase 1. Otherwise mark §3.1 as not applicable. |
+- [ ] **2.1** Run the 20 functional test cases T01–T20 in report §9 with the **VisClick full pipeline**. For each: launch `python -m visclick`, type instruction, observe pass/fail, paste the predicted element + path to `screenshots/last_overlay.png`. ~1 h.
+- [ ] **2.2** Run the same 20 cases with each Phase-1.C baseline (template / ocr-only / pywinauto). Record into `tables/baseline_results.csv`. ~30 min if scripts are working.
+- [ ] **2.3** Latency NFR (report §10.1): write `scripts/run_nfr.py` — a CLI loop that runs 20 representative instructions with `--image` so it's deterministic. Dump wall-times to `tables/nfr_performance.csv`. ~30 min.
+- [ ] **2.4** Six prototype screenshots for report §8.1 (terminal showing command / captured screen / overlay with all boxes / picked element highlighted / after-click result / honest failure case). Drag them into `figures/`. ~20 min.
+- [ ] **2.5** (Optional) Three before/after preprocessing pairs (report §3.1) — only needed if M5 is kept alive in Phase 1. Otherwise mark §3.1 as not applicable. ~15 min.
 
-**After Phase 2:** §8, §9, §10 are populated. **Chapter 7 (Evaluation) writes itself from the recorded numbers.**
+**After Phase 2:** §8, §9, §10 are populated; both VisClick and the baselines have TSR numbers on the same 20 cases. **Chapter 7 (Evaluation) writes itself.**
+
+---
 
 ### L.3 — Phase 3: Demo video (~1 h)
 
-§12 of the data form requires a demo video. Single take of the bot doing 6–8 representative tasks: open GUI → type "click Save" → countdown → click lands; switch to Chrome → "click address bar" → lands; then a refusal case ("click Save" on a blank desktop) showing the bot prints `FAIL: cannot find 'save'` instead of guessing. Tooling: OBS Studio or Windows Game Bar. Upload to YouTube unlisted. Paste link into §12.
+§12 of the data form requires a demo video.
+
+- [ ] **3.1** Storyboard: 6–8 representative tasks. Recommended sequence: (a) open GUI; (b) `click Save` on Notepad Save-As → success; (c) switch to Chrome → `click address bar` → success; (d) switch to VS Code → `click Search` → success or graceful failure with overlay shown; (e) refusal case: `click Save` on a blank desktop → bot prints `FAIL: cannot find 'save'`; (f) manual `xy 1234 567` fallback → success. ~10 min planning.
+- [ ] **3.2** Tooling check: OBS Studio (free, full screen capture, no watermark) installed and configured for 1080p / 30 fps; or Windows Game Bar as fallback. ~10 min.
+- [ ] **3.3** Single-take recording (run through storyboard once with the GUI). Re-record only on hard errors. ~20 min.
+- [ ] **3.4** Light edit: trim head/tail, add 4 title cards (Capture / Detect / Match / Click) at the corresponding moments. Export at 720p–1080p MP4. ~15 min.
+- [ ] **3.5** Upload to YouTube unlisted. Paste link into report §12. ~5 min.
+
+---
 
 ### L.4 — Phase 4: Better element coverage (optional, day-long)
 
-This is the "dropdowns and icon-only buttons" thread the user raised on 5 May 2026. **Honest framing for the dissertation:** §8.4 already documents this limitation as a deliberate scope decision aligned with UIED [L3], Apple Screen Recognition [L5], and ScreenAI [L10]. So Phase 4 is *not* required to defend the thesis; it is a quality lever.
+This is the "dropdowns and icon-only buttons" thread. **Honest framing for the dissertation:** §8.4 already documents this limitation as a deliberate scope decision aligned with UIED [L3], Apple Screen Recognition [L5], and ScreenAI [L10]. So Phase 4 is *not* required to defend the thesis; it is a quality lever.
 
-| Approach | Time | Expected gain | Risk |
-|----------|------|--------------|------|
-| **4A.** Class-specific conf thresholds: `icon` at 0.10, others at 0.25. Add a per-class threshold dict to `detect.py::Detector.predict` and rerun §9 functional tests. | 15 min | +5–15 pp recall on icon class on the live tests; maybe 0–10 pp precision drop | Low. Quick experiment; revert if it makes things worse. |
-| **4B.** Hand-add **icon-only** boxes (close X, settings cog, dropdown arrows, minimise, app-bar icons) to the existing 50 desktop seeds in Roboflow. Don't touch existing auto-labels — only add. Re-fine-tune for 30 more epochs from `best_desktop_v8s.pt`. | 3–4 h | +10–25 pp recall on icon/dropdown class; modest text-class drop possible | Medium. Annotation tedium. Highest expected dissertation value among Phase-4 options. |
-| **4C.** Use UI-Vision benchmark [L5 in `reports/literature_table.csv`] as **external test**, not training. Just `model.val(data=ui_vision_data.yaml)` on the desktop fine-tune. Numbers feed §7. | 4–5 h | Strong external-generalisation evidence in §7 — even if numbers are mediocre, *having* the table is the point. | Low. Just data wrangling. |
-| **4D.** Integrate a separate icon-classifier ensemble (e.g. UIED-style hybrid). | day+ | Marginal over 4B. | High effort. Not recommended. |
+- [ ] **4.A** **Class-specific conf thresholds.** Add a per-class threshold dict to `detect.py::Detector.predict` (e.g. `icon` at 0.10, `menu` at 0.15, others at 0.25). Re-run §9 functional tests. *Expected: +5–15 pp recall on icon class; some precision drop.* ~15 min.
+- [ ] **4.B** **Hand-add icon-only boxes.** In Roboflow, open the existing 50 desktop seeds and ADD bounding boxes for close X, settings cog, dropdown arrows (▼ / `^v`), minimise, app-bar icons, breadcrumb chevrons. Don't touch existing auto-labels. Re-fine-tune for 30 more epochs from `best_desktop_v8s.pt`. ~3–4 h.
+- [ ] **4.C** **UI-Vision external test.** [L5 in `reports/literature_table.csv`]. Use it as test-only: `model.val(data=ui_vision_data.yaml)` on the desktop fine-tune. Numbers feed report §7. ~4–5 h. **Strong external-generalisation evidence.**
+- [ ] **4.D** **Icon-classifier ensemble** (e.g. UIED-style hybrid). Day+. **Not recommended** unless aiming for distinction.
 
-**Recommended Phase-4 order if pursued:** 4A first (cheap, instantly informs whether 4B is worth doing), then 4B if recall gains in 4A look real, then 4C for external evidence. Skip 4D unless you're aiming for a top grade and have a free week.
+**Recommended Phase-4 order if pursued:** 4A first (cheap, instantly informs whether 4B is worth doing), then 4B if recall gains in 4A look real, then 4C for external evidence. Skip 4D unless you have a free week.
+
+---
 
 ### L.5 — Recommended overall order
 
 ```
-Today + tomorrow   → Phase 1 (1.5 h, mandatory)
+Today + tomorrow   → Phase 1 (3–4 h, mandatory)
 Day after          → Phase 2 (2 h, mandatory)
 Same day or next   → Phase 3 (1 h, mandatory)
-If time / ambition → Phase 4A (15 min) + Phase 4B (half day)
+If time / ambition → Phase 4.A (15 min) + Phase 4.B (half day) + Phase 4.C (half day)
 ```
 
-The mandatory three together are ~4.5 h of work and give a complete, defensible submission. Phase 4 is optional. Track per-phase progress in §13 of the data form (add observations O17, O18, …).
+Mandatory work (Phases 1–3) = ~6–7 h spread over a few days. Phases 1.C and 4 are the dissertation-quality multipliers — the more of them done well, the stronger the comparative evaluation chapter.
+
+### L.6 — How to use this roadmap with git
+
+- Each Phase-1.x.y / 2.x / 3.x / 4.x checkbox is a unit of work. When it's done, edit this document, change `- [ ]` to `- [x]`, and commit with a message like `Phase 1.A.1: hand-corrected 8 desktop test images`.
+- After every couple of completed steps, sync the working copy from `gui_temp/VisClick_Detailed_Plan.md` into `docs/VisClick_Detailed_Plan.md` and push so the GitHub copy reflects current progress.
+- The same checkboxes are mirrored in `docs/VisClick_Report_Data_Form.md` §13.1 for at-a-glance status; keep both copies in sync.
 
 ---
 

@@ -35,8 +35,8 @@ from PIL import Image, ImageDraw, ImageFont
 from visclick.act import click_box, click_xy
 from visclick.capture import find_pyautogui_primary, grab, list_monitors, set_dpi_awareness
 from visclick.detect import CLASS_NAMES, Detector
-from visclick.match import best_box
-from visclick.ocr import ocr_box
+from visclick.match import _is_class_only_target, _target_phrase, best_box
+from visclick.ocr import ocr_box, text_ground
 
 _DEFAULT_WEIGHTS = "weights/visclick.onnx"
 _OVERLAY_PATH = "screenshots/last_overlay.png"
@@ -395,9 +395,27 @@ class VisClickApp:
                           f"conf={cf:.2f}  text={txt!r}")
 
             pick = best_box(instruction, boxes_with_text)
+
+            if pick is None:
+                target = _target_phrase(instruction)
+                if target and not _is_class_only_target(target):
+                    self._log(f"FALLBACK: detector miss; running full-image OCR for {target!r}…")
+                    eng = ocr_engine if ocr_engine != "none" else "tesseract"
+                    hits = text_ground(img, target, engine=eng, min_similarity=70)
+                    self._log(f"  text_ground found {len(hits)} hit(s)")
+                    for xyxy_h, text_h, sim_h, ocr_conf_h in hits[:5]:
+                        cxh = (xyxy_h[0] + xyxy_h[2]) / 2
+                        cyh = (xyxy_h[1] + xyxy_h[3]) / 2
+                        self._log(f"    {text_h!r:25s} center=({cxh:>6.0f},{cyh:>6.0f})  "
+                                  f"sim={sim_h:.0f}  ocr_conf={ocr_conf_h:.0f}")
+                    if hits:
+                        xyxy_h, text_h, sim_h, ocr_conf_h = hits[0]
+                        boxes_with_text.append((1, xyxy_h, ocr_conf_h / 100.0, text_h))
+                        pick = (sim_h, 1, xyxy_h, ocr_conf_h / 100.0, text_h)
+
             if pick is None:
                 target = instruction.lower().replace("click", "").strip().strip("'\"")
-                self._log(f"FAIL: no detected box's text resembles {target!r}.")
+                self._log(f"FAIL: neither detector nor full-image OCR found {target!r}.")
                 self._log("  Possible causes:")
                 self._log(f"  - the model didn't detect that element on this UI")
                 self._log(f"    (try lowering the Conf threshold and re-running)")

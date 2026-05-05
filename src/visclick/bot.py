@@ -33,8 +33,8 @@ import pyautogui
 from visclick.act import click_box, click_xy
 from visclick.capture import find_pyautogui_primary, grab, set_dpi_awareness
 from visclick.detect import CLASS_NAMES, Detector
-from visclick.match import best_box
-from visclick.ocr import ocr_box
+from visclick.match import _is_class_only_target, _target_phrase, best_box
+from visclick.ocr import ocr_box, text_ground
 
 Box4 = Tuple[float, float, float, float]
 
@@ -151,6 +151,11 @@ def main() -> int:
                          "'none' skips OCR (match by class + confidence only).")
     ap.add_argument("--no-ocr", action="store_true",
                     help="Alias for --ocr-engine none.")
+    ap.add_argument("--no-text-fallback", action="store_true",
+                    help="Disable the full-image OCR fallback that runs when "
+                         "the YOLO detector misses a text-labeled element. "
+                         "By default the fallback is on for text-target "
+                         "instructions like 'click Save'.")
     args = ap.parse_args()
     if args.no_ocr:
         args.ocr_engine = "none"
@@ -208,6 +213,27 @@ def main() -> int:
               f"conf={conf:.2f} text={text!r}")
 
     pick = best_box(args.instruction, boxes_with_text)
+
+    if pick is None and not args.no_text_fallback:
+        target = _target_phrase(args.instruction)
+        if not _is_class_only_target(target):
+            print(f"FALLBACK: detector miss; running full-image OCR for {target!r}…")
+            hits = text_ground(img, target,
+                                engine=args.ocr_engine if args.ocr_engine != "none"
+                                       else "tesseract",
+                                min_similarity=70)
+            print(f"  text_ground found {len(hits)} hit(s)")
+            for xyxy_h, text_h, sim_h, ocr_conf_h in hits[:5]:
+                cxh = (xyxy_h[0] + xyxy_h[2]) / 2
+                cyh = (xyxy_h[1] + xyxy_h[3]) / 2
+                print(f"    {text_h!r:25s} center=({cxh:>6.0f},{cyh:>6.0f})  "
+                      f"sim={sim_h:.0f}  ocr_conf={ocr_conf_h:.0f}")
+            if hits:
+                xyxy_h, text_h, sim_h, ocr_conf_h = hits[0]
+                synth = (1, xyxy_h, ocr_conf_h / 100.0, text_h)  # cls=1=text
+                boxes_with_text.append(synth)
+                pick = (sim_h, 1, xyxy_h, ocr_conf_h / 100.0, text_h)
+
     picked_index = -1
     if pick is not None:
         score, cls, xyxy, conf, text = pick
@@ -222,10 +248,10 @@ def main() -> int:
 
     if pick is None:
         target = (args.instruction or "").lower().replace("click", "").strip().strip("'\"")
-        print(f"FAIL: no detected box's text resembles {target!r}.")
+        print(f"FAIL: neither detector nor full-image OCR found {target!r}.")
         print("  Try one of:")
         print("    --conf 0.10   (lower threshold; show weaker detections)")
-        print("    --ocr-engine easyocr   (more robust text reading; one-time download)")
+        print("    --ocr-engine easyocr   (more robust OCR; one-time download)")
         print("    --xy X,Y      (manual coordinate click as fallback)")
         return 1
     score, cls, xyxy, conf, text = pick

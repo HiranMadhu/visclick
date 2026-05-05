@@ -142,9 +142,18 @@ def main() -> int:
     ap.add_argument("--save-overlay", default=None,
                     help="If set, save annotated screenshot with all detection boxes "
                          "(picked one drawn thicker)")
+    ap.add_argument("--ocr-engine", choices=["tesseract", "easyocr", "both", "none"],
+                    default="tesseract",
+                    help="Which OCR backend to use on detected boxes. "
+                         "'tesseract' (default) is fast and needs no downloads. "
+                         "'easyocr' is more robust but downloads ~95 MB on first use. "
+                         "'both' falls back to easyocr if tesseract fails. "
+                         "'none' skips OCR (match by class + confidence only).")
     ap.add_argument("--no-ocr", action="store_true",
-                    help="Skip OCR (match against class names only — faster, less specific)")
+                    help="Alias for --ocr-engine none.")
     args = ap.parse_args()
+    if args.no_ocr:
+        args.ocr_engine = "none"
 
     if args.xy is not None:
         return _run_manual_xy(args)
@@ -188,12 +197,10 @@ def main() -> int:
             print(f"saved empty overlay to {args.save_overlay}")
         return 1
 
+    print(f"OCR engine: {args.ocr_engine}")
     boxes_with_text: List[Tuple[int, Box4, float, str]] = []
     for cls, xyxy, conf in raw:
-        if args.no_ocr:
-            text = ""
-        else:
-            text = ocr_box(img, xyxy)
+        text = ocr_box(img, xyxy, engine=args.ocr_engine)
         boxes_with_text.append((cls, xyxy, conf, text))
         cxl = (xyxy[0] + xyxy[2]) / 2
         cyl = (xyxy[1] + xyxy[3]) / 2

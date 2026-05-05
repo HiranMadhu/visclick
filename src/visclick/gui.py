@@ -102,6 +102,22 @@ class VisClickApp:
                         variable=self.dry_run_var).grid(row=4, column=0, columnspan=2,
                                                          sticky="w", pady=(8, 0))
 
+        ttk.Label(frm, text="OCR").grid(row=4, column=1, sticky="e", padx=(0, 6), pady=(8, 0))
+        self.ocr_var = tk.StringVar(value="tesseract")
+        ocr_combo = ttk.Combobox(
+            frm,
+            textvariable=self.ocr_var,
+            state="readonly",
+            width=20,
+            values=[
+                "tesseract",
+                "easyocr",
+                "both",
+                "none",
+            ],
+        )
+        ocr_combo.grid(row=4, column=2, sticky="w", pady=(8, 0))
+
         ttk.Label(frm, text="Weights").grid(row=5, column=0, sticky="w", pady=(8, 0))
         self.weights_var = tk.StringVar(value=_DEFAULT_WEIGHTS)
         ttk.Entry(frm, textvariable=self.weights_var).grid(
@@ -223,11 +239,12 @@ class VisClickApp:
             self._set_busy(False)
             return
 
+        ocr_engine = self.ocr_var.get() or "tesseract"
         self._log(f"DETECT mode: instruction={instruction!r}  countdown={countdown}s  "
-                  f"monitor={mon_idx or 'auto'}  dry_run={dry_run}")
+                  f"monitor={mon_idx or 'auto'}  ocr={ocr_engine}  dry_run={dry_run}")
         self._set_status("Switch to your target window…")
         self._countdown_then(countdown, lambda: self._do_pipeline(
-            instruction, weights, mon_idx, dry_run))
+            instruction, weights, mon_idx, dry_run, ocr_engine))
 
     def _countdown_then(self, remaining: int, action) -> None:
         if remaining > 0:
@@ -271,7 +288,8 @@ class VisClickApp:
 
     # ---------- detect → pick → click ----------
 
-    def _do_pipeline(self, instruction: str, weights: str, mon_idx: int, dry_run: bool) -> None:
+    def _do_pipeline(self, instruction: str, weights: str, mon_idx: int,
+                     dry_run: bool, ocr_engine: str = "tesseract") -> None:
         try:
             t0 = time.perf_counter()
             actual_mon = mon_idx if mon_idx > 0 else find_pyautogui_primary()
@@ -301,10 +319,10 @@ class VisClickApp:
 
             boxes_with_text = []
             for cls, xyxy, cf in raw:
-                txt = ocr_box(img, xyxy)
+                txt = ocr_box(img, xyxy, engine=ocr_engine)
                 boxes_with_text.append((cls, xyxy, cf, txt))
             t_ocr = time.perf_counter()
-            self._log(f"OCR: {(t_ocr - t_det)*1000:.0f} ms")
+            self._log(f"OCR ({ocr_engine}): {(t_ocr - t_det)*1000:.0f} ms")
             self._log("all candidates (monitor-local centers):")
             for cls, xyxy, cf, txt in boxes_with_text[:12]:
                 cxl = (xyxy[0] + xyxy[2]) / 2

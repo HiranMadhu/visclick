@@ -117,7 +117,7 @@ def predict(image_rgb: np.ndarray,
             ocr_engine: str = "easyocr",
             min_text_similarity: int = 60,
             **_: object) -> BaselineResult:
-    r = BaselineResult(method="visclick")
+    r = BaselineResult(method="visclick", found=False)
 
     w_path = Path(weights) if weights else DEFAULT_WEIGHTS
     if not w_path.is_file():

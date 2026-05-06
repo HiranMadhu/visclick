@@ -60,7 +60,8 @@ probe.png
 **/*.egg-info/
 
 # Local detector benchmark CSV (e.g. scripts/test_detector.py)
-tables/
+# Anchored at repo root so it does NOT match reports/tables/ (which is tracked).
+/tables/
 
 # Local backup when resolving pull vs untracked baseline CSV
 reports/tables/*.local.backup.csv

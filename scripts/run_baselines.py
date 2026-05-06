@@ -364,25 +364,33 @@ def ask_verdicts(task: Dict[str, Any],
 
 
 def append_csv(rows: List[Dict[str, Any]], csv_path: Path,
-               replace_tasks: Optional[List[str]] = None) -> None:
-    """Append ``rows`` to ``csv_path``. If ``replace_tasks`` is provided,
-    drop any pre-existing rows whose ``task`` is in that list before writing
-    (so re-running a task overwrites instead of duplicating)."""
+               replace_pairs: Optional[List[Tuple[str, str]]] = None) -> None:
+    """Append ``rows`` to ``csv_path`` after dropping any pre-existing row
+    whose ``(task, method)`` pair appears in ``replace_pairs``.
+
+    Idempotent: re-running a single (task, method) overwrites instead of
+    duplicating, but does **not** disturb verdicts for other methods on
+    the same task. This matters for Phase 2 where ``--only-method
+    visclick`` adds VisClick rows without nuking the Phase 1.C verdicts
+    for template / ocr_only / pywinauto.
+    """
     csv_path.parent.mkdir(parents=True, exist_ok=True)
 
     existing: List[Dict[str, str]] = []
     if csv_path.exists():
         with csv_path.open(newline="") as f:
-            reader = csv.DictReader(f)
-            existing = [r for r in reader]
-        if replace_tasks:
-            keep = {t.upper() for t in replace_tasks}
+            existing = list(csv.DictReader(f))
+        if replace_pairs:
+            keep = {(t.upper(), m) for t, m in replace_pairs}
             n_before = len(existing)
-            existing = [r for r in existing if r.get("task", "").upper() not in keep]
+            existing = [
+                r for r in existing
+                if (r.get("task", "").upper(), r.get("method", "")) not in keep
+            ]
             n_dropped = n_before - len(existing)
             if n_dropped:
-                print(f"  (dropped {n_dropped} existing row(s) for "
-                      f"task(s) {sorted(keep)})")
+                print(f"  (dropped {n_dropped} pre-existing (task, method) "
+                      f"row(s) before writing the new ones)")
 
     with csv_path.open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=CSV_FIELDS)
@@ -477,15 +485,25 @@ def main(argv: Optional[List[str]] = None) -> int:
         overlay = save_overlay(img, task, results)
         ask_verdicts(task, results, overlay, gui=not args.no_gui)
 
+        # Only emit rows for methods we actually ran on this task. Skipped
+        # methods are NOT written so they don't overwrite previous good
+        # verdicts in the CSV. This is what makes ``--only-method visclick``
+        # a safe additive operation.
         for name, r in results.items():
+            if name in skip:
+                continue
             row = r.to_csv_row()
             row["task"] = task["id"]
             row["instruction"] = task["instruction"]
             row["is_negative"] = task["is_negative"]
             all_rows.append(row)
 
+    ran_methods = [n for n, _ in METHODS if n not in skip]
     ran_task_ids = [t["id"] for t in tasks if t["app"] != "TBD"]
-    append_csv(all_rows, args.csv, replace_tasks=ran_task_ids)
+    replace_pairs: List[Tuple[str, str]] = [
+        (tid, m) for tid in ran_task_ids for m in ran_methods
+    ]
+    append_csv(all_rows, args.csv, replace_pairs=replace_pairs)
     summarise(args.csv)
     print(f"\nWrote {len(all_rows)} row(s) to {args.csv}")
     return 0

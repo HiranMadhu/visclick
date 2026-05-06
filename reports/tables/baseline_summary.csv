@@ -2,3 +2,4 @@ method,n_tasks,pass,fail,skip,TSR,latency_p50_ms,n_template_skips_or_unsupplied,
 template,15,11,4,0,0.7333,285.2,4,157,opencv-python (already a VisClick dep)
 ocr_only,15,5,10,0,0.3333,7774.7,0,121,easyocr + rapidfuzz (already VisClick deps)
 pywinauto,15,1,14,0,0.0667,129.6,0,164,pywinauto>=0.6.8 (Windows-only optional extra)
+visclick,15,11,4,0,0.7333,8055.3,0,-1,ultralytics + onnxruntime + opencv + easyocr + rapidfuzz + mss + pyautogui (full project)

@@ -10,6 +10,19 @@ This folder holds the **8-image test-set** labels after manual correction in Rob
 
 **Sync to Google Drive** (so notebook `08_phase1A_handlabel.ipynb` cell 9 finds `desktop_test_handcorrected.zip`):
 
+### Option A — one Colab cell (easiest)
+
+Paste the entire contents of `scripts/colab_sync_handcorrected_one_cell.py` from GitHub into a single Colab code cell and Run. It mounts Drive, `git clone`s or `git pull`s the repo, and copies the zip to `<DRIVE>/data/desktop_test_handcorrected.zip`.
+
+Or fetch and run without opening the repo first:
+
+```bash
+!curl -sO https://raw.githubusercontent.com/HiranMadhu/visclick/main/scripts/colab_sync_handcorrected_one_cell.py
+!python colab_sync_handcorrected_one_cell.py
+```
+
+### Option B — after you already cloned visclick
+
 ```bash
 # From repo root, after git pull:
 python scripts/sync_handcorrected_zip_to_drive.py

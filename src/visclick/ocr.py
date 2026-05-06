@@ -223,6 +223,8 @@ def _ground_tesseract(img_rgb: np.ndarray, target_lower: str, min_sim: int) -> L
             sim = 100.0
         else:
             sim = float(fuzz.partial_ratio(target_lower, text_lower))
+            if sim >= 100.0:
+                sim = 99.0
         if sim < min_sim:
             continue
         try:
@@ -263,6 +265,8 @@ def _ground_easyocr(img_rgb: np.ndarray, target_lower: str, min_sim: int) -> Lis
             sim = 100.0
         else:
             sim = float(fuzz.partial_ratio(target_lower, text_lower))
+            if sim >= 100.0:
+                sim = 99.0
         if sim < min_sim:
             continue
         xs = [int(p[0]) for p in bbox]

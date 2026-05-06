@@ -826,9 +826,11 @@ Cross-reference: full per-step roadmap with deliverables and adopt-if-better tri
 - [x] **Adopt-if-better decision:** no contender beats M3 by ≥ 3 pp; **headline stays M3** (per `notebooks/08_phase1B_ablations.ipynb` Section 7).
 
 **1.C — Classical / non-ML baselines (local Windows)**
-- [ ] **1.C.1** `scripts/baseline_template.py` — SikuliX-style template matching
-- [ ] **1.C.2** `scripts/baseline_ocr_only.py` — OCR-only (no detection model)
-- [ ] **1.C.3** `scripts/baseline_pywinauto.py` — Windows accessibility-tree (optional)
+- [x] **1.C.1** `scripts/baseline_template.py` — SikuliX-style template matching at 3 scales. **Scaffolding DONE May 6, 2026.** Pending: user captures reference PNGs into `samples/templates/` and runs `scripts/run_baselines.py`.
+- [x] **1.C.2** `scripts/baseline_ocr_only.py` — OCR-only via `visclick.ocr.text_ground`. **Scaffolding DONE May 6, 2026.** Pending: user runs `scripts/run_baselines.py`.
+- [x] **1.C.3** `scripts/baseline_pywinauto.py` — Windows accessibility-tree. **Scaffolding DONE May 6, 2026** (`pywinauto` added as `[windows]` extra in `pyproject.toml`). Pending: `pip install '.[windows]'` then run `scripts/run_baselines.py`.
+- Output schema fixed: every baseline row in `reports/tables/baseline_results.csv` has `task, method, found, verdict, xy, bbox, confidence, elapsed_ms, instruction, is_negative, notes`. Per-task overlays saved to `reports/figures/baselines/<id>.png`.
+- Canonical task list lives at `tasks/T01_T20.json` (T01-T15 populated from §9 of this report; T16-T20 are placeholders for user-defined tasks).
 
 **1.D — Cross-method comparison**
 - [ ] **1.D.1** Aggregate `tables/method_comparison.csv` across all methods

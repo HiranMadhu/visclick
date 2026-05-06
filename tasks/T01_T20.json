@@ -1,0 +1,38 @@
+{
+  "_comment": "Canonical task spec for Phase 1.C / Phase 2 evaluation. See VisClick_Detailed_Plan.md Part L. Each task has the natural-language `instruction` (input to ALL methods) and per-method target hints used by individual baselines:",
+  "_fields": {
+    "id":             "T01..T20",
+    "app":            "host application (Notepad, VS Code, Chrome, File Explorer)",
+    "setup":          "one-line description of the screen state when the test starts",
+    "instruction":    "natural-language input given to VisClick AND every baseline (e.g. 'click Save')",
+    "target_text":    "(OCR baseline) the keyword/phrase to fuzzy-match in the OCR output",
+    "target_template":"(template baseline) filename in samples/templates/ — capture once with Win+Shift+S and save under this name. Empty string = template baseline expected to fail (no reference available).",
+    "target_uia_name":"(pywinauto baseline) UIA Name attribute of the control. Empty string = pywinauto expected to fail.",
+    "target_uia_role":"(pywinauto baseline) optional UIA control type (Button, Edit, MenuItem, ListItem...) for disambiguation.",
+    "is_negative":    "true => the bot SHOULD refuse to click; success means returning a graceful failure, not a wrong click."
+  },
+
+  "tasks": [
+    {"id": "T01", "app": "Notepad",       "setup": "Save As dialog open",            "instruction": "click Save",                  "target_text": "Save",          "target_template": "Save.png",        "target_uia_name": "Save",          "target_uia_role": "Button",   "is_negative": false},
+    {"id": "T02", "app": "Notepad",       "setup": "empty document",                 "instruction": "open File menu",              "target_text": "File",          "target_template": "File_menu.png",   "target_uia_name": "File",          "target_uia_role": "MenuItem", "is_negative": false},
+    {"id": "T03", "app": "VS Code",       "setup": "dark theme, untitled file",      "instruction": "click Search icon",           "target_text": "Search",        "target_template": "VSCode_Search.png","target_uia_name": "Search",       "target_uia_role": "Button",   "is_negative": false},
+    {"id": "T04", "app": "VS Code",       "setup": "command palette open",           "instruction": "click first command",         "target_text": "",              "target_template": "",                "target_uia_name": "",              "target_uia_role": "ListItem", "is_negative": false},
+    {"id": "T05", "app": "VS Code",       "setup": "Settings tab open",              "instruction": "click search settings",       "target_text": "Search settings","target_template": "VSCode_SettingsSearch.png","target_uia_name": "Search settings","target_uia_role": "Edit",   "is_negative": false},
+    {"id": "T06", "app": "File Explorer", "setup": "Documents folder",               "instruction": "click View tab",              "target_text": "View",          "target_template": "Explorer_View.png","target_uia_name": "View",         "target_uia_role": "TabItem",  "is_negative": false},
+    {"id": "T07", "app": "File Explorer", "setup": "a file selected",                "instruction": "click Properties",            "target_text": "Properties",    "target_template": "Properties.png",  "target_uia_name": "Properties",    "target_uia_role": "MenuItem", "is_negative": false},
+    {"id": "T08", "app": "File Explorer", "setup": "up-arrow visible",               "instruction": "click address bar",           "target_text": "",              "target_template": "Explorer_Addr.png","target_uia_name": "Address",     "target_uia_role": "Edit",     "is_negative": false},
+    {"id": "T09", "app": "Chrome",        "setup": "new tab",                        "instruction": "click address bar",           "target_text": "",              "target_template": "Chrome_Omnibox.png","target_uia_name": "Address and search bar","target_uia_role": "Edit","is_negative": false},
+    {"id": "T10", "app": "Chrome",        "setup": "settings -> Privacy",            "instruction": "click Clear browsing data",   "target_text": "Clear browsing data","target_template": "Chrome_ClearBrowsing.png","target_uia_name": "Clear browsing data","target_uia_role": "Button","is_negative": false},
+    {"id": "T11", "app": "Chrome",        "setup": "settings page",                  "instruction": "toggle Use system proxy",     "target_text": "Use system proxy","target_template": "",              "target_uia_name": "Use system proxy","target_uia_role": "CheckBox","is_negative": false},
+    {"id": "T12", "app": "Notepad",       "setup": "text 'hello world' visible",     "instruction": "click word hello",            "target_text": "hello",         "target_template": "",                "target_uia_name": "",              "target_uia_role": "Text",     "is_negative": false},
+    {"id": "T13", "app": "VS Code",       "setup": "Source Control panel open",      "instruction": "click Commit",                "target_text": "Commit",        "target_template": "VSCode_Commit.png","target_uia_name": "Commit",      "target_uia_role": "Button",   "is_negative": false},
+    {"id": "T14", "app": "Chrome",        "setup": "downloads page with >=1 entry",  "instruction": "click first download",        "target_text": "",              "target_template": "",                "target_uia_name": "",              "target_uia_role": "ListItem", "is_negative": false},
+    {"id": "T15", "app": "any",           "setup": "blank desktop, target absent",   "instruction": "click Save",                  "target_text": "Save",          "target_template": "Save.png",        "target_uia_name": "Save",          "target_uia_role": "Button",   "is_negative": true},
+
+    {"id": "T16", "app": "TBD", "setup": "TBD", "instruction": "TBD", "target_text": "", "target_template": "", "target_uia_name": "", "target_uia_role": "", "is_negative": false},
+    {"id": "T17", "app": "TBD", "setup": "TBD", "instruction": "TBD", "target_text": "", "target_template": "", "target_uia_name": "", "target_uia_role": "", "is_negative": false},
+    {"id": "T18", "app": "TBD", "setup": "TBD", "instruction": "TBD", "target_text": "", "target_template": "", "target_uia_name": "", "target_uia_role": "", "is_negative": false},
+    {"id": "T19", "app": "TBD", "setup": "TBD", "instruction": "TBD", "target_text": "", "target_template": "", "target_uia_name": "", "target_uia_role": "", "is_negative": false},
+    {"id": "T20", "app": "TBD", "setup": "TBD", "instruction": "TBD", "target_text": "", "target_template": "", "target_uia_name": "", "target_uia_role": "", "is_negative": false}
+  ]
+}

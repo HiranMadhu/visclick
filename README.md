@@ -19,8 +19,11 @@ Vision-based GUI element detection and click automation for desktop applications
 | 4 | done | `04_assemble_source.ipynb` — `source_train` assembly |
 | 5 | done | `05_train_source.ipynb` — YOLOv8s source training |
 | 6 | done | `06_finetune_desktop.ipynb` — desktop fine-tune (auto-labelled, head-only) |
-| **7** | **current** | `07_export_onnx.ipynb` — export `best_desktop_v8s.pt` → `.onnx` |
-| 8 | later | Windows prototype: capture → detect → OCR → match → click |
+| 7 | done | `07_export_onnx.ipynb` — export `best_desktop_v8s.pt` → `.onnx` |
+| 8 | done | Windows prototype: capture → detect → OCR → match → click |
+| 9 | done | Phase 1.A — hand-corrected 8-image desktop test set (`08_phase1A_handlabel.ipynb`) |
+| 10 | done | Phase 1.B — ML ablations M0/M1/M2/M3 on hand-corrected GT (`08_phase1B_ablations.ipynb`); see `reports/tables/transfer_experiments.csv` |
+| **11** | **current** | Phase 1.C — classical baselines: `scripts/baseline_template.py`, `scripts/baseline_ocr_only.py`, `scripts/baseline_pywinauto.py`, runner `scripts/run_baselines.py` |
 
 ## Colab notebooks (run in order; each starts fresh: mount + `git pull`)
 
@@ -75,6 +78,29 @@ python -m visclick.bot --instruction "click Save" --image screenshots/test.png \
     --dry-run --save-overlay screenshots/overlay.png
 ```
 
+### Phase 1.C — classical baselines (Windows)
+
+Compare VisClick against three non-ML approaches on the same `T01..T20` task list (`tasks/T01_T20.json`):
+
+```bash
+pip install ".[windows]"      # adds pywinauto for the accessibility-tree baseline
+
+py -3 scripts/run_baselines.py                # interactive — captures screenshots and asks per-task verdicts
+py -3 scripts/run_baselines.py --auto          # offline — re-uses existing samples/test_screenshots/<id>.png
+py -3 scripts/run_baselines.py --only T01,T02  # subset
+py -3 scripts/run_baselines.py --skip-pywinauto  # skip if pywinauto unavailable
+```
+
+Each task captures one screenshot, runs **template / ocr_only / pywinauto** on it, saves an annotated overlay to `reports/figures/baselines/<id>.png`, and appends rows to `reports/tables/baseline_results.csv`. Per-baseline overlays let you confirm visually whether the predicted (x, y) lands on the correct control. To make the template baseline work you need to capture reference PNGs once — see `samples/templates/README.md`.
+
+Each baseline can also be invoked standalone:
+
+```bash
+py -3 scripts/baseline_ocr_only.py   --instruction "click Save" --image samples/test_screenshots/T01.png
+py -3 scripts/baseline_template.py   --instruction "click Save" --target-template Save.png --image samples/test_screenshots/T01.png
+py -3 scripts/baseline_pywinauto.py  --instruction "click Save" --target-uia-name Save --target-uia-role Button
+```
+
 ### One-time verification on a new machine (skip if the GUI already works)
 
 Three diagnostic scripts isolate each pipeline layer so a failure points at one place. You only need them if something feels off — the GUI/CLI run end-to-end on its own.
@@ -95,7 +121,9 @@ The `test_detector.py --bench 50` rows feed §4.1 / §10.1 of the dissertation r
 | `src/visclick/` | Library: capture, detect, OCR, match, act, bot |
 | `notebooks/` | `01_pull_and_data.ipynb`, `02_rico_zenodo_vins.ipynb` (more phases as we go) |
 | `configs/` | YOLO templates (`<DRIVE>` placeholders); use `patch_colab_configs.py` in Colab |
-| `scripts/` | `patch_colab_configs.py`, `capture_screenshots.py` (Windows), `annotate_export_to_yolo.py`, `run_eval.py` |
+| `scripts/` | data utilities (`capture_screenshots.py`, `annotate_export_to_yolo.py`, `run_eval.py`); Phase-1.C baselines (`baseline_template.py`, `baseline_ocr_only.py`, `baseline_pywinauto.py`, `run_baselines.py`); reproducibility (`sync_reports_to_repo.py`, `sync_handcorrected_zip_to_drive.py`) |
+| `tasks/` | `T01_T20.json` — canonical evaluation task list shared between VisClick and the classical baselines |
+| `samples/` | `desktop_seed/` (50 raw screenshots used to fine-tune); `templates/` (Phase-1.C reference PNGs, see its README); `test_screenshots/` (per-task captures saved by `run_baselines.py`) |
 | `tests/` | Unit tests |
 | `reports/` | `literature_table.csv` + `figures/`, `tables/` for the report |
 

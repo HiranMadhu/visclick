@@ -264,17 +264,19 @@ For every model M0..M8 you actually trained, fill ONE row with **hyperparameters
 |----|--------|--------------|--------|-----------|----|----|-------|--------|-----------------|--------|-------------|-----------|--------|----|----|----|----|----|
 | **Src (source baseline, YOLOv8s)** | DONE (Apr 30, 2026) | COCO | none | AdamW (cos_lr) | 0.001 | 16 | 640 | 30 (patience=10) | ~1.4 (training only; ~52 min after resume + ~30 min before disconnect — see §0.3 F9) | 0.4505 | 0.3498 | 0.5171 | 0.4776 | 0.4965 (computed) | 509 (val batched on T4) | `[FILL]` (export to ONNX in §G) | `[FILL]` (≈22 MB expected for v8s `.pt`) | `[FILL]` |
 | **Desktop FT (M3 slot: source → light full / head-only, YOLOv8s)** | DONE (May 4, 2026) | source (`best_source_v8s.pt`) | freeze=10 (backbone locked) | AdamW (cos_lr) | 0.001 | 8 | 640 | **11 of 20** (early-stopped, `patience=10` ran out — peaked at epoch 1) | **0.011** (39 s wall-clock — `REPORT step = TRAIN \| elapsed_s = 39`) | **0.7176** ¹ | **0.5975** ¹ | 0.679 ¹ | 0.681 ¹ | 0.680 (computed) ¹ | 18.6 (val on T4) | `[FILL]` (export to ONNX in §G) | 22.5 MB (`best.pt` from log) | `[FILL]` |
-| M0 (YOLOv8n scratch) | `[FILL]` | random | — | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` |
-| M1 (COCO → desktop) | `[FILL]` | COCO | none | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` |
-| M2 (source → head only) | `[FILL]` | source | freeze=22 | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` |
-| M3 (source → light full) | see *Desktop FT* row above | source | freeze=10 | AdamW | 0.001 | 8 | 640 | 11/20 | 0.011 | 0.7176 ¹ | 0.5975 ¹ | 0.679 ¹ | 0.681 ¹ | 0.680 ¹ | 18.6 | `[FILL]` | 22.5 MB | `[FILL]` |
+| M0 (YOLOv8n scratch) | DONE (May 6, 2026) | random | — | AdamW (cos_lr) | 0.001 | 8 | 640 | up to 25 | `[FILL]` | **0.0386** ² | **0.0226** ² | 0.024 ² | 0.234 ² | 0.043 ² | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` |
+| M1 (COCO → desktop) | DONE (May 6, 2026) | COCO | none | AdamW (cos_lr) | 0.001 | 8 | 640 | up to 25 | `[FILL]` | **0.0270** ² | **0.0226** ² | 0.025 ² | 0.234 ² | 0.046 ² | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` |
+| M2 (source → head only) | DONE (May 6, 2026) | source (`best_source_v8s.pt`) | freeze=22 | AdamW (cos_lr) | 0.001 | 8 | 640 | up to 25 | `[FILL]` | **0.0277** ² | **0.0152** ² | 0.047 ² | 0.089 ² | 0.062 ² | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` |
+| M3 (source → light full) | see *Desktop FT* row above | source | freeze=10 | AdamW | 0.001 | 8 | 640 | 11/20 | 0.011 | 0.7176 ¹ / **0.0319** ² | 0.5975 ¹ / **0.0184** ² | 0.679 ¹ / 0.047 ² | 0.681 ¹ / 0.091 ² | 0.680 ¹ / 0.061 ² | 18.6 | `[FILL]` | 22.5 MB | `[FILL]` |
 | M4 (source → full) | `[FILL]` | source | none | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` |
 | M5 (M3 + preprocessing) | `[FILL]` | source | freeze=10 | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` |
 | M6 (M3 + pseudo-labels) | `[FILL]` | source | freeze=10 | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` |
 | M7 (DINOv2 + linear) | `[FILL]` | DINOv2 | backbone frozen | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` |
 | M8 (heavy aug, no transfer) | `[FILL]` | random | — | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` | `[FILL]` |
 
-> **¹ Caveat on the Desktop FT / M3 numbers.** The 8-image desktop test split was labelled **by the same source-domain teacher** whose head this row fine-tunes (no human GT). The 0.7176 mAP@.5 therefore measures **agreement with the teacher**, not absolute correctness, and is **not directly comparable** to the source baseline's 0.4505 (which was on real human GT). Furthermore the test split contains only 24 instances split across 2 of 6 classes (`text` 16, `icon` 8) — see §4.6 — so `button`, `text_input`, `menu`, `checkbox` AP are undefined. The headline number quotable in the dissertation requires hand-correcting the 8 test images in Roboflow (~30 min) and re-running `06` cell 6.6.
+> **¹ Caveat on the Desktop FT / M3 numbers (auto-label evaluation).** The 8-image desktop test split was originally labelled **by the same source-domain teacher** whose head this row fine-tunes (no human GT). The 0.7176 mAP@.5 therefore measures **agreement with the teacher**, not absolute correctness, and is **not directly comparable** to the source baseline's 0.4505 (which was on real human GT). Furthermore the auto-labelled test split contains only 24 instances split across 2 of 6 classes (`text` 16, `icon` 8) — see §4.6 — so `button`, `text_input`, `menu`, `checkbox` AP are undefined.
+>
+> **² Phase 1.B re-evaluation on hand-corrected test set (May 6, 2026).** The same 8 test images were hand-corrected in Roboflow yielding 356 boxes across all 6 classes (§4.6c). Every column with a `²` was produced by `notebooks/08_phase1B_ablations.ipynb` running the **identical** `model.val()` call (imgsz=640, default IoU thresholds, `plots=False`) against this real GT set, so the four rows are directly comparable. Result file: [`reports/tables/transfer_experiments.csv`](reports/tables/transfer_experiments.csv). Comparison chart: [`reports/figures/method_comparison_map.png`](reports/figures/method_comparison_map.png). All five contenders sit in a tight ~3% mAP band; M3 stays the headline by ~0.4 pp over M2. See §13 O19 for the full interpretation of why mAP collapses by 22× when scored against real GT.
 
 ### §4.2 — Per-model artefact paths (training curves auto-saved by Ultralytics)
 
@@ -768,6 +770,32 @@ This per-class breakdown is what motivates the §6 implementation discussion: th
 
 **O18 — Class distribution is skewed toward `icon` and `menu`, not `text` (counter-intuitive).** Hand-corrected counts: `icon` 189 (53%), `menu` 89 (25%), `text` 33 (9%), `checkbox` 20 (6%), `button` 15 (4%), `text_input` 10 (3%). Common intuition is that desktop UIs are dominated by readable text labels; on this Windows-11 sample, **icons + menu rows are 78% of all clickable elements**. This justifies why the dissertation's value proposition (object detection + OCR fallback) is the right architecture: OCR alone would miss the dominant class; YOLO alone misses the long tail of text-labeled buttons. Both are needed.
 
+**O19 — Phase 1.B confirms the 14.8× under-detection numerically (6 May 2026).** Re-evaluating five models on the **hand-corrected** 356-box test set:
+
+| Method | Init weights | mAP@.5 (hand-corrected) | mAP@.5 (auto-labels, §4.6b) | Δ |
+|--------|--------------|-----------------------:|----------------------------:|--:|
+| Source (no FT) | source baseline (`best_source_v8s.pt`) | **0.0354** | 0.4505 (Zenodo GT, §4.1 row 1) | -0.42 |
+| M0 (YOLOv8n scratch) | random | **0.0386** | (not run) | — |
+| M1 (YOLOv8s COCO→FT) | COCO | **0.0270** | (not run) | — |
+| M2 (head-only freeze=22) | source baseline | **0.0277** | (not run) | — |
+| **M3 (current headline, freeze=10)** | source baseline | **0.0319** | 0.7176 (auto-labels, §4.6b) | **-0.69** |
+
+All five methods sit in a tight band around 3% mAP — they are statistically indistinguishable on the hand-corrected test set. The 0.7176 mAP@.5 reported as the desktop-FT headline in §4.6b was an artefact of evaluating against the same teacher's near-empty pseudo-labels: **it measured agreement with the teacher (24 boxes) rather than absolute correctness against ground truth (356 boxes).** When scored honestly, M3 detects roughly the same fraction of elements that the source baseline does (~3%), because the head-only fine-tune is — by construction — bounded by the recall of the frozen backbone, which has only ever seen RICO/Zenodo mobile-style training data.
+
+Why a tight ~3% band, not zero?
+- All five models are evaluating against **356 boxes** but only producing ~24-30 boxes per image; recall is consequently capped near 24/356 ≈ 6.7%. That is the dominant term in the per-class AP averages.
+- Per-class AP isolates this: `text` is ~10× higher than the average (text is the only class the teacher ever fired on at scale), `button` / `text_input` / `menu` / `checkbox` collapse to ~0 because the teacher emitted zero of them in the test set's scoring window.
+
+**Decision (per Plan §L.1 adopt-if-better rule):** no contender beats M3 by ≥ 3 pp; the headline stays M3, but the **honest headline number is 0.0319 mAP@.5 on hand-corrected GT, not 0.7176 on auto-labels**. The dissertation reports both with the explanation above: 0.7176 demonstrates the head adapted to the teacher's *style* on desktop screenshots; 0.0319 demonstrates the pipeline's absolute coverage on real Windows-11 elements is ~3%, which is exactly the gap §8.4's limitation table predicted.
+
+What this means for the dissertation chapters:
+- **§6 (Implementation):** the pure-detection part of VisClick has a *recall ceiling* set by the source-domain training data, not by the desktop fine-tune. No amount of head-only fine-tuning on 35 desktop images can push past it.
+- **§7 (Evaluation):** the honest contribution to evaluate is the **end-to-end click bot** (TSR on T01–T20), not the detector mAP — because the OCR fallback recovers many boxes the detector misses. Phase 2 measurements will be the headline; mAP is the supporting evidence.
+- **§8.4 (Limitations):** validated empirically; the 14.8× under-detection turns into a 22× collapse in mAP for the head-only fine-tune (0.7176 → 0.0319). This is a strong, citable number.
+- **§9 (Challenges):** carry the lesson that "evaluating against pseudo-labels measures agreement, not correctness" and that any future model in this space *must* spend the annotation budget for real GT before drawing performance conclusions.
+
+**Phase 4 motivation strengthened:** with a real-GT mAP this low, even a modest icon-coverage improvement (Phase 4.B) would move the headline mAP by 1–2 pp on this test set — which is now meaningful, whereas it would have been buried in the auto-label noise.
+
 ---
 
 ### §13.1 — Outstanding work after the 5 May 2026 prototype review
@@ -781,11 +809,12 @@ Cross-reference: full per-step roadmap with deliverables and adopt-if-better tri
 - [x] **1.A.2** Verify exports; record per-class instance counts in §4.6c *(committed to `tables/desktop_test_handcorrected.csv`)*
 
 **1.B — ML transfer-learning ablations (Colab T4)**
-- [ ] **1.B.1** M0 — YOLOv8n trained from scratch on 50 desktop images
-- [ ] **1.B.2** M1 — YOLOv8s COCO weights → desktop fine-tune
-- [ ] **1.B.3** M2 — YOLOv8s source-pretrained → desktop, head-only `freeze=22`
-- [ ] **1.B.4** M3 — current headline; re-eval on hand-corrected test
-- [ ] **1.B.5** Update §4.1 with all five rows on the same test set; mark M4/M5/M6/M7/M8 as `SKIPPED`
+- [x] **1.B.1** M0 — YOLOv8n trained from scratch on 50 desktop images. Result: mAP@.5 = **0.0386**, mAP@.5:.95 = 0.0226 on hand-corrected test (May 6, 2026).
+- [x] **1.B.2** M1 — YOLOv8s COCO weights → desktop fine-tune. Result: mAP@.5 = **0.0270**, mAP@.5:.95 = 0.0226 on hand-corrected test (May 6, 2026).
+- [x] **1.B.3** M2 — YOLOv8s source-pretrained → desktop, head-only `freeze=22`. Result: mAP@.5 = **0.0277**, mAP@.5:.95 = 0.0152 on hand-corrected test (May 6, 2026).
+- [x] **1.B.4** M3 — current headline; re-eval on hand-corrected test. Result: mAP@.5 = **0.0319**, mAP@.5:.95 = 0.0184 (collapsed from 0.7176 / 0.5975 against auto-labels — see §13 O19).
+- [x] **1.B.5** Update §4.1 with all five rows on the same test set; M4/M5/M6/M7/M8 marked `SKIPPED` (Phase 1.B + Phase 1.C is the agreed comparison study).
+- [x] **Adopt-if-better decision:** no contender beats M3 by ≥ 3 pp; **headline stays M3** (per `notebooks/08_phase1B_ablations.ipynb` Section 7).
 
 **1.C — Classical / non-ML baselines (local Windows)**
 - [ ] **1.C.1** `scripts/baseline_template.py` — SikuliX-style template matching

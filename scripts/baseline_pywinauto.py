@@ -99,7 +99,7 @@ def predict(_image_rgb,
             target_uia_role: str = "",
             offset: tuple[int, int] = (0, 0),
             **_: object) -> BaselineResult:
-    r = BaselineResult(method="pywinauto")
+    r = BaselineResult(method="pywinauto", found=False)
 
     why_skip = _can_run()
     if why_skip:

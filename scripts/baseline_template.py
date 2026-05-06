@@ -96,7 +96,7 @@ def predict(image_rgb: np.ndarray,
             templates_dir: Optional[Path] = None,
             threshold: float = DEFAULT_THRESHOLD,
             **_: object) -> BaselineResult:
-    r = BaselineResult(method="template")
+    r = BaselineResult(method="template", found=False)
     if not target_template:
         r.notes = "no target_template supplied; skipping"
         return r

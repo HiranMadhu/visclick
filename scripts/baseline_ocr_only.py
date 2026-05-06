@@ -62,7 +62,7 @@ def predict(image_rgb: np.ndarray,
             engine: str = "easyocr",
             min_similarity: int = 70,
             **_: object) -> BaselineResult:
-    r = BaselineResult(method="ocr_only")
+    r = BaselineResult(method="ocr_only", found=False)
 
     if target_text:
         target = target_text

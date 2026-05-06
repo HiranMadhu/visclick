@@ -108,7 +108,11 @@ def run_methods(image_rgb: np.ndarray,
     out: Dict[str, bc.BaselineResult] = {}
     for name, mod in METHODS:
         if name in skip:
-            r = bc.BaselineResult(method=name, notes="skipped via --skip-" + name)
+            r = bc.BaselineResult(
+                method=name,
+                found=False,
+                notes=f"skipped via --skip-{name}",
+            )
             out[name] = r
             continue
         r = mod.predict(
@@ -179,6 +183,9 @@ def ask_verdicts(task: Dict[str, Any],
     if any(r.found for r in results.values()) and not task["is_negative"]:
         _open_overlay(overlay)
     for name, r in results.items():
+        if r.notes.startswith("skipped via --skip-"):
+            r.verdict = "skip"
+            continue
         if task["is_negative"]:
             if not r.found:
                 r.verdict = "pass"

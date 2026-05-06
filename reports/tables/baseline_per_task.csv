@@ -1,0 +1,16 @@
+task,instruction,is_negative,template,ocr_only,pywinauto
+T01,click Save,False,pass,fail,fail
+T02,open File menu,False,pass,pass,fail
+T03,click Search icon,False,pass,fail,fail
+T04,click first command,False,fail,fail,fail
+T05,click search settings,False,pass,pass,fail
+T06,click View tab,False,pass,fail,fail
+T07,click Properties,False,pass,pass,fail
+T08,click address bar,False,pass,fail,fail
+T09,click address bar,False,pass,fail,fail
+T10,click Clear browsing data,False,pass,fail,fail
+T11,toggle Use system proxy,False,fail,fail,fail
+T12,click word hello,False,fail,pass,fail
+T13,click Commit,False,pass,fail,fail
+T14,click first download,False,fail,fail,fail
+T15,click Save,True,pass,pass,pass

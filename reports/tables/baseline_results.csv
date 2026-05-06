@@ -1,0 +1,46 @@
+task,method,found,verdict,xy,bbox,confidence,elapsed_ms,instruction,is_negative,notes
+T01,template,True,pass,"1783,891","1723,869,1843,914",0.9277648329734802,252.3337999591604,click Save,False,matched 'Save.png' at scale=1.00
+T01,ocr_only,True,fail,"551,239","533,230,570,248",1.0,25676.306000095792,click Save,False,"OCR matched 'Save' (sim=100, ocr_conf=100) as 'Save' [8 candidate(s)]"
+T01,pywinauto,False,fail,,,0.0,482.6922999927774,click Save,False,UIA element Name='Save' (Button) not found in any visible top-level window
+T02,template,True,pass,"33,63","12,50,54,77",0.9999962449073792,288.8622999889776,open File menu,False,matched 'File_menu.png' at scale=1.00
+T02,ocr_only,True,pass,"30,62","15,52,46,73",1.0,5769.305299967527,open File menu,False,"OCR matched 'File' (sim=100, ocr_conf=100) as 'File' [1 candidate(s)]"
+T02,pywinauto,False,fail,,,0.0,121.41669995617121,open File menu,False,UIA element Name='File' (MenuItem) not found in any visible top-level window
+T03,template,True,pass,"29,134","6,113,53,155",1.0,209.9831000668928,click Search icon,False,matched 'VSCode_Search.png' at scale=1.00
+T03,ocr_only,True,fail,"1381,1410","1353,1401,1409,1420",1.0,8020.602500066161,click Search icon,False,"OCR matched 'Search' (sim=100, ocr_conf=100) as 'Search' [2 candidate(s)]"
+T03,pywinauto,False,fail,,,0.0,136.35709998197854,click Search icon,False,UIA element Name='Search' (Button) not found in any visible top-level window
+T04,template,False,fail,,,0.0,0.0,click first command,False,no target_template supplied; skipping
+T04,ocr_only,True,fail,"30,316","10,292,51,341",0.99,10618.970400071703,click first command,False,"OCR matched 'C' (sim=99, ocr_conf=47) as 'first command' [1 candidate(s)]"
+T04,pywinauto,False,fail,,,0.0,0.0,click first command,False,no target_uia_name supplied; pywinauto cannot guess a UIA Name from a free-text instruction.
+T05,template,True,pass,"1692,121","959,98,2425,145",0.893412172794342,378.63809999544173,click search settings,False,matched 'VSCode_SettingsSearch.png' at scale=1.00
+T05,ocr_only,True,pass,"1034,124","976,111,1093,137",1.0,10472.343000001274,click search settings,False,"OCR matched 'Search settings' (sim=100, ocr_conf=100) as 'Search settings' [7 candidate(s)]"
+T05,pywinauto,False,fail,,,0.0,924.2848999565467,click search settings,False,UIA element Name='Search settings' (Edit) not found in any visible top-level window
+T06,template,True,pass,"656,396","536,163,776,629",0.758150041103363,258.87310004327446,click View tab,False,matched 'Explorer_View.png' at scale=1.00
+T06,ocr_only,True,fail,"3387,134","3358,125,3416,143",0.99,7774.67539999634,click View tab,False,"OCR matched 'Preview' (sim=99, ocr_conf=100) as 'View' [4 candidate(s)]"
+T06,pywinauto,False,fail,,,0.0,131.12709997221828,click View tab,False,UIA element Name='View' (TabItem) not found in any visible top-level window
+T07,template,True,pass,"511,627","431,608,592,646",1.0,331.72490005381405,click Properties,False,matched 'Properties.png' at scale=1.00
+T07,ocr_only,True,pass,"514,627","472,617,557,637",1.0,8646.531700040214,click Properties,False,"OCR matched 'Properties' (sim=100, ocr_conf=100) as 'Properties' [3 candidate(s)]"
+T07,pywinauto,False,fail,,,0.0,318.2177999988198,click Properties,False,UIA element Name='Properties' (MenuItem) not found in any visible top-level window
+T08,template,True,pass,"671,74","242,48,1100,100",0.9958279728889465,285.3371000383049,click address bar,False,matched 'Explorer_Addr.png' at scale=1.00
+T08,ocr_only,False,fail,,,0.0,7337.602799991146,click address bar,False,OCR found no 'address' (engine=easyocr)
+T08,pywinauto,False,fail,,,0.0,118.96660004276782,click address bar,False,UIA element Name='Address' (Edit) not found in any visible top-level window
+T09,template,True,pass,"1722,509","1246,471,2198,547",0.999998927116394,285.2200000779703,click address bar,False,matched 'Chrome_Omnibox.png' at scale=1.00
+T09,ocr_only,False,fail,,,0.0,6123.570300056599,click address bar,False,OCR found no 'address' (engine=easyocr)
+T09,pywinauto,False,fail,,,0.0,145.8721999078989,click address bar,False,UIA element Name='Address and search bar' (Edit) not found in any visible top-level window
+T10,template,True,pass,"1952,1076","1888,1050,2016,1102",0.9999997019767761,241.23580008745193,click Clear browsing data,False,matched 'Chrome_ClearBrowsing.png' at scale=1.00
+T10,ocr_only,True,fail,"118,77","105,65,131,90",0.99,8150.204200064763,click Clear browsing data,False,"OCR matched 'C' (sim=99, ocr_conf=39) as 'Clear browsing data' [4 candidate(s)]"
+T10,pywinauto,False,fail,,,0.0,119.94669993873686,click Clear browsing data,False,UIA element Name='Clear browsing data' (Button) not found in any visible top-level window
+T11,template,False,fail,,,0.0,0.0,toggle Use system proxy,False,no target_template supplied; skipping
+T11,ocr_only,True,fail,"1324,296","1294,286,1355,307",0.99,6479.908699984662,toggle Use system proxy,False,"OCR matched 'System' (sim=99, ocr_conf=100) as 'Use system proxy' [3 candidate(s)]"
+T11,pywinauto,False,fail,,,0.0,128.04290000349283,toggle Use system proxy,False,UIA element Name='Use system proxy' (CheckBox) not found in any visible top-level window
+T12,template,False,fail,,,0.0,0.0,click word hello,False,no target_template supplied; skipping
+T12,ocr_only,True,pass,"604,250","560,240,648,261",0.99,6934.807699988596,click word hello,False,"OCR matched 'Hello World' (sim=99, ocr_conf=100) as 'hello' [2 candidate(s)]"
+T12,pywinauto,False,fail,,,0.0,0.0,click word hello,False,no target_uia_name supplied; pywinauto cannot guess a UIA Name from a free-text instruction.
+T13,template,True,pass,"31,195","11,174,51,216",0.996080756187439,531.8758999928832,click Commit,False,matched 'VSCode_Commit.png' at scale=1.00
+T13,ocr_only,True,fail,"30,316","10,292,51,341",0.99,10499.829799984582,click Commit,False,"OCR matched 'C' (sim=99, ocr_conf=47) as 'Commit' [3 candidate(s)]"
+T13,pywinauto,False,fail,,,0.0,127.35789990983903,click Commit,False,UIA element Name='Commit' (Button) not found in any visible top-level window
+T14,template,False,fail,,,0.0,0.0,click first download,False,no target_template supplied; skipping
+T14,ocr_only,True,fail,"554,126","533,117,576,135",0.8,6954.251499962993,click first download,False,"OCR matched 'to do' (sim=80, ocr_conf=99) as 'first download' [5 candidate(s)]"
+T14,pywinauto,False,fail,,,0.0,0.0,click first download,False,no target_uia_name supplied; pywinauto cannot guess a UIA Name from a free-text instruction.
+T15,template,False,pass,,,0.0,228.92370005138218,click Save,True,best score 0.553 below threshold 0.70 using template 'Save.png'
+T15,ocr_only,False,pass,,,0.0,7490.9511000150815,click Save,True,OCR found no 'Save' (engine=easyocr)
+T15,pywinauto,False,pass,,,0.0,118.69949998799711,click Save,True,UIA element Name='Save' (Button) not found in any visible top-level window

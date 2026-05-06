@@ -155,12 +155,29 @@ def save_overlay(image_rgb: np.ndarray,
     return out
 
 
+def _open_overlay(p: Path) -> None:
+    try:
+        if sys.platform == "win32":
+            import os as _os
+            _os.startfile(str(p))  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            import subprocess as _sp
+            _sp.Popen(["open", str(p)])
+        else:
+            import subprocess as _sp
+            _sp.Popen(["xdg-open", str(p)])
+    except Exception as e:
+        print(f"    (could not auto-open {p.name}: {e})")
+
+
 def ask_verdicts(task: Dict[str, Any],
                  results: Dict[str, bc.BaselineResult],
                  overlay: Path,
                  auto_pass_negative: bool = True) -> None:
     """Mutates each result.verdict to 'pass' / 'fail' / 'skip'."""
     print(f"    overlay saved: {overlay}")
+    if any(r.found for r in results.values()) and not task["is_negative"]:
+        _open_overlay(overlay)
     for name, r in results.items():
         if task["is_negative"]:
             if not r.found:

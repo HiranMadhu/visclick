@@ -163,6 +163,7 @@ def save_overlay(image_rgb: np.ndarray,
 
 
 def _open_overlay(p: Path) -> None:
+    """Fallback: hand the PNG to the OS's default image viewer (non-blocking)."""
     try:
         if sys.platform == "win32":
             import os as _os
@@ -177,29 +178,178 @@ def _open_overlay(p: Path) -> None:
         print(f"    (could not auto-open {p.name}: {e})")
 
 
+_METHOD_COLOURS_HEX = {
+    "template":  "#ff6464",
+    "ocr_only":  "#3cc8ff",
+    "pywinauto": "#ffc800",
+    "visclick":  "#3cdc5a",
+}
+
+
+def _verdict_dialog_tk(overlay_path: Path,
+                       task: Dict[str, Any],
+                       to_judge: List[Tuple[str, bc.BaselineResult]]
+                       ) -> Dict[str, str]:
+    """Modal Tk window: shows the overlay image + a Pass/Fail/Skip row per
+    method that needs a human verdict. Blocks until the user hits "Next →".
+    Returns ``{method: "pass"|"fail"|"skip"}``.
+
+    One window at a time, brought to the foreground; closes when the user
+    advances. This replaces ``os.startfile()`` which was non-blocking and
+    let multiple system image-viewer windows pile up.
+    """
+    import tkinter as tk
+    from PIL import Image as _PILImage, ImageTk
+
+    img = _PILImage.open(overlay_path)
+    iw, ih = img.size
+    max_w, max_h = 1500, 760
+    scale = min(max_w / iw, max_h / ih, 1.0)
+    if scale < 1.0:
+        img = img.resize((int(iw * scale), int(ih * scale)), _PILImage.LANCZOS)
+
+    choices: Dict[str, Optional[str]] = {m: None for m, _ in to_judge}
+
+    root = tk.Tk()
+    root.title(f"{task['id']} — {task['instruction']!r}")
+    try:
+        root.attributes("-topmost", True)
+    except tk.TclError:
+        pass
+    root.lift()
+    root.focus_force()
+
+    photo = ImageTk.PhotoImage(img)
+    canvas_lbl = tk.Label(root, image=photo, bd=2, relief=tk.SUNKEN)
+    canvas_lbl.image = photo  # keep reference
+    canvas_lbl.pack(padx=8, pady=(8, 4))
+
+    header = tk.Label(
+        root,
+        text=f"{task['id']}: {task['instruction']!r}   (app={task['app']})",
+        font=("Arial", 13, "bold"),
+    )
+    header.pack(pady=(0, 4))
+
+    grid = tk.Frame(root)
+    grid.pack(pady=4)
+
+    btn_refs: Dict[str, Dict[str, tk.Button]] = {}
+
+    def _refresh_next_state() -> None:
+        next_btn.configure(
+            state=("normal" if all(c is not None for c in choices.values()) else "disabled")
+        )
+
+    def _mark(method: str, verdict: str) -> None:
+        choices[method] = verdict
+        for v, b in btn_refs[method].items():
+            b.configure(
+                bg=("#88ee88" if v == verdict else "SystemButtonFace"),
+                relief=(tk.SUNKEN if v == verdict else tk.RAISED),
+            )
+        _refresh_next_state()
+
+    for i, (m, r) in enumerate(to_judge):
+        swatch = tk.Label(
+            grid, bg=_METHOD_COLOURS_HEX.get(m, "#cccccc"),
+            width=2, height=1, relief=tk.RAISED,
+        )
+        swatch.grid(row=i, column=0, padx=(2, 6), pady=2)
+        tk.Label(grid, text=m, width=12, anchor="w",
+                 font=("Arial", 11, "bold")).grid(row=i, column=1, sticky="w")
+        info_text = f"xy={r.xy}" if r.xy else "(not found)"
+        tk.Label(grid, text=info_text, width=22, anchor="w",
+                 font=("Consolas", 10)).grid(row=i, column=2, sticky="w")
+        btn_refs[m] = {}
+        for col, (label, v) in enumerate(
+            [("Pass", "pass"), ("Fail", "fail"), ("Skip", "skip")], start=3
+        ):
+            b = tk.Button(grid, text=label, width=8,
+                          command=lambda m=m, v=v: _mark(m, v))
+            b.grid(row=i, column=col, padx=2, pady=1)
+            btn_refs[m][v] = b
+
+    def _next() -> None:
+        if all(c is not None for c in choices.values()):
+            root.destroy()
+
+    next_btn = tk.Button(
+        root, text="Next →", width=22, font=("Arial", 11, "bold"),
+        command=_next, state="disabled",
+    )
+    next_btn.pack(pady=(8, 12))
+
+    # Keyboard shortcuts: y/n/s mark all methods at once (handy when there's
+    # only one method to judge, e.g. --only-method visclick); Enter advances
+    # once everything is decided.
+    def _mark_all(verdict: str) -> None:
+        for m in choices:
+            _mark(m, verdict)
+    root.bind("<y>", lambda e: _mark_all("pass"))
+    root.bind("<n>", lambda e: _mark_all("fail"))
+    root.bind("<s>", lambda e: _mark_all("skip"))
+    root.bind("<Return>", lambda e: _next())
+    root.bind("<Escape>", lambda e: _mark_all("skip"))
+
+    # If user closes the window early, treat any unset methods as 'skip'.
+    def _on_close() -> None:
+        for m, v in choices.items():
+            if v is None:
+                choices[m] = "skip"
+        root.destroy()
+    root.protocol("WM_DELETE_WINDOW", _on_close)
+
+    root.mainloop()
+    return {m: (v or "skip") for m, v in choices.items()}
+
+
 def ask_verdicts(task: Dict[str, Any],
                  results: Dict[str, bc.BaselineResult],
                  overlay: Path,
+                 gui: bool = True,
                  auto_pass_negative: bool = True) -> None:
-    """Mutates each result.verdict to 'pass' / 'fail' / 'skip'."""
+    """Mutates each result.verdict to 'pass' / 'fail' / 'skip'.
+
+    Pass-1: assign deterministic verdicts (skipped methods, negative tasks,
+    not-found predictions).  Pass-2: ask the human about the remaining
+    methods that need eyeballs. With ``gui=True`` (default) the human pass
+    uses a single modal Tk window per task — one image visible at a time,
+    Pass/Fail/Skip buttons, blocking until "Next →" is clicked. With
+    ``gui=False`` it falls back to the legacy os.startfile + stdin flow.
+    """
     print(f"    overlay saved: {overlay}")
-    if any(r.found for r in results.values()) and not task["is_negative"]:
-        _open_overlay(overlay)
+
+    to_judge: List[Tuple[str, bc.BaselineResult]] = []
     for name, r in results.items():
         if r.notes.startswith("skipped via --skip-"):
             r.verdict = "skip"
             continue
         if task["is_negative"]:
-            if not r.found:
-                r.verdict = "pass"
-                continue
-            r.verdict = "fail"
+            r.verdict = "pass" if not r.found else "fail"
             continue
-
         if not r.found:
             r.verdict = "fail"
             continue
+        to_judge.append((name, r))
 
+    if not to_judge:
+        print(f"    (no method needs a human verdict for {task['id']})")
+        return
+
+    if gui:
+        try:
+            choices = _verdict_dialog_tk(overlay, task, to_judge)
+            for name, r in to_judge:
+                r.verdict = choices.get(name, "skip")
+            for name, r in to_judge:
+                print(f"    [{name}] predicted {r.xy} → {r.verdict}")
+            return
+        except Exception as e:
+            print(f"    (GUI verdict dialog failed: {e!r}; falling back to terminal)")
+
+    _open_overlay(overlay)
+    for name, r in to_judge:
         prompt = (f"    [{name}] predicted {r.xy}. "
                   f"open {overlay.name} and check the {name} marker. "
                   f"Is it on the correct element? [y/N/s(kip)] ")
@@ -284,6 +434,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                    help="comma-separated subset of methods to run (others are "
                         "marked as skip). Use to re-run a single method against "
                         "saved screenshots, e.g. --only-method visclick --auto.")
+    p.add_argument("--no-gui", action="store_true",
+                   help="skip the modal Tk dialog and use the legacy "
+                        "os.startfile + stdin verdict flow (for headless / "
+                        "broken-tkinter setups).")
     p.add_argument("--csv", type=Path, default=CSV_PATH,
                    help=f"output CSV (default: {CSV_PATH.relative_to(REPO)}).")
     args = p.parse_args(argv)
@@ -321,7 +475,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         img, offset, _shot = capture_for_task(task, monitor, args.auto)
         results = run_methods(img, offset, task, skip)
         overlay = save_overlay(img, task, results)
-        ask_verdicts(task, results, overlay)
+        ask_verdicts(task, results, overlay, gui=not args.no_gui)
 
         for name, r in results.items():
             row = r.to_csv_row()

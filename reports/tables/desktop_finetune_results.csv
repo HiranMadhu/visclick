@@ -1,0 +1,2 @@
+model,dataset,init_weights,freeze,n_train,n_val,n_test,imgsz,batch,epochs,lr0,map50,map50_95,precision,recall,weights,ts
+YOLOv8s,"desktop_finetune (50 personal screenshots, auto-labelled)",best_source_v8s.pt,10,34,8,8,640,8,20,0.001,0.7176122542318364,0.5974736823505012,0.6790615438513037,0.6806715387510007,/content/drive/MyDrive/visclick/weights/desktop_finetune/best_desktop_v8s.pt,2026-05-04 09:10:03

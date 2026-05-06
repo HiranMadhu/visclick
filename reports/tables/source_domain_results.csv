@@ -1,0 +1,2 @@
+model,dataset,n_train,n_val,n_test,imgsz,batch,epochs,map50,map50_95,precision,recall,weights,ts
+YOLOv8s,"source_train (unified-sampled, 6-class)",8000,1000,1000,640,16,30,0.4504822037003877,0.34975533470177544,0.5170774011413982,0.4776347387140542,/content/drive/MyDrive/visclick/weights/baseline_source/best_source_v8s.pt,2026-04-30 07:44:28

@@ -203,13 +203,32 @@ def ask_verdicts(task: Dict[str, Any],
                 r.verdict = "skip"; break
 
 
-def append_csv(rows: List[Dict[str, Any]], csv_path: Path) -> None:
+def append_csv(rows: List[Dict[str, Any]], csv_path: Path,
+               replace_tasks: Optional[List[str]] = None) -> None:
+    """Append ``rows`` to ``csv_path``. If ``replace_tasks`` is provided,
+    drop any pre-existing rows whose ``task`` is in that list before writing
+    (so re-running a task overwrites instead of duplicating)."""
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    new_file = not csv_path.exists()
-    with csv_path.open("a", newline="") as f:
+
+    existing: List[Dict[str, str]] = []
+    if csv_path.exists():
+        with csv_path.open(newline="") as f:
+            reader = csv.DictReader(f)
+            existing = [r for r in reader]
+        if replace_tasks:
+            keep = {t.upper() for t in replace_tasks}
+            n_before = len(existing)
+            existing = [r for r in existing if r.get("task", "").upper() not in keep]
+            n_dropped = n_before - len(existing)
+            if n_dropped:
+                print(f"  (dropped {n_dropped} existing row(s) for "
+                      f"task(s) {sorted(keep)})")
+
+    with csv_path.open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=CSV_FIELDS)
-        if new_file:
-            w.writeheader()
+        w.writeheader()
+        for row in existing:
+            w.writerow({k: row.get(k, "") for k in CSV_FIELDS})
         for row in rows:
             w.writerow({k: row.get(k, "") for k in CSV_FIELDS})
 
@@ -286,7 +305,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             row["is_negative"] = task["is_negative"]
             all_rows.append(row)
 
-    append_csv(all_rows, args.csv)
+    ran_task_ids = [t["id"] for t in tasks if t["app"] != "TBD"]
+    append_csv(all_rows, args.csv, replace_tasks=ran_task_ids)
     summarise(args.csv)
     print(f"\nWrote {len(all_rows)} row(s) to {args.csv}")
     return 0

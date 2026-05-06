@@ -56,6 +56,15 @@ screenshots/
 probe.png
 .cache/
 
+# Editable install (pip install -e) — do not commit
+**/*.egg-info/
+
+# Local detector benchmark CSV (e.g. scripts/test_detector.py)
+tables/
+
+# Local backup when resolving pull vs untracked baseline CSV
+reports/tables/*.local.backup.csv
+
 # Phase 1.C: per-run captures and user-captured templates are local artefacts.
 # Their containing directories ARE tracked (via .gitkeep / README.md) so the
 # layout is reproducible; the PNGs themselves are not.

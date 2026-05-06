@@ -1314,10 +1314,10 @@ The original "Option A" (just ablate M1 / M2) is too narrow. To defend the headl
 
 All four runs use **the same hand-corrected test split** so rows are directly comparable.
 
-- [x] **1.B.1** **M0 — YOLOv8n trained from scratch on the 50 desktop images.** No transfer learning. ~50 epochs, batch=8, `imgsz=640`. **DONE May 6, 2026: mAP@.5 = 0.0386, mAP@.5:.95 = 0.0226 on hand-corrected test.**
-- [x] **1.B.2** **M1 — YOLOv8s with COCO weights → fine-tuned on desktop.** Standard "off-the-shelf" transfer. `freeze=None`, 30 epochs, AdamW `lr0=0.001`, cos_lr. **DONE May 6, 2026: mAP@.5 = 0.0270, mAP@.5:.95 = 0.0226 on hand-corrected test.**
-- [x] **1.B.3** **M2 — YOLOv8s source-pretrained → desktop, head-only `freeze=22`.** Same recipe as M3 but only the head trains. **DONE May 6, 2026: mAP@.5 = 0.0277, mAP@.5:.95 = 0.0152 on hand-corrected test.**
-- [x] **1.B.4** **M3 — current headline (already trained).** Re-ran `model.val(split='test')` on hand-corrected test set. **DONE May 6, 2026: mAP@.5 = 0.0319 (collapsed from 0.7176 against auto-labels — see Report §13 O19).**
+- [x] **1.B.1** **M0 — YOLOv8n trained from scratch on the 50 desktop images.** No transfer learning. ~50 epochs, batch=8, `imgsz=640`. **DONE May 6, 2026: mAP@.5 = 0.0000 (collapsed to zero — random init on 50 images detects nothing on the hand-corrected test set; P = R = 0). This is the cleanest empirical proof that transfer is mandatory.**
+- [x] **1.B.2** **M1 — YOLOv8s with COCO weights → fine-tuned on desktop.** Standard "off-the-shelf" transfer. `freeze=None`, 30 epochs, AdamW `lr0=0.001`, cos_lr. **DONE May 6, 2026: mAP@.5 = 0.0390, mAP@.5:.95 = 0.0226, P = 0.024, R = 0.233 (highest recall of any contender, lowest precision).**
+- [x] **1.B.3** **M2 — YOLOv8s source-pretrained → desktop, head-only `freeze=22`.** Same recipe as M3 but only the head trains. **DONE May 6, 2026: mAP@.5 = 0.0277, mAP@.5:.95 = 0.0160, P = 0.541 (highest precision of any contender), R = 0.047.**
+- [x] **1.B.4** **M3 — current headline (already trained).** Re-ran `model.val(split='test')` on hand-corrected test set. **DONE May 6, 2026: mAP@.5 = 0.0330 (collapsed 22× from 0.7176 against auto-labels — see Report §13 O19), P = 0.389, R = 0.047.**
 - [x] **1.B.5** Updated report §4.1 with rows for **Src no FT**, **M0**, **M1**, **M2**, **M3** — all on the same hand-corrected test set, identical `model.val()` call. M4/M5/M6/M7/M8 marked `SKIPPED` (Phase 1.B + Phase 1.C is the agreed comparison study; further ML variants would not change the recall ceiling identified in O19). **DONE May 6, 2026.**
 - [x] **Adopt-if-better outcome:** no contender beats M3 by ≥ 3 pp mAP@.5 (the spread is < 1.5 pp); **headline stays M3**. The honest headline number is now **mAP@.5 = 0.0319 on hand-corrected GT** (not 0.7176 on auto-labels). See Report §13 O19 for full interpretation; core finding is that the recall ceiling is set by the source-domain backbone, not the head.
 

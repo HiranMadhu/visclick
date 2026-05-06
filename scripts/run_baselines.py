@@ -43,6 +43,7 @@ import baseline_common as bc
 import baseline_template as B_TPL
 import baseline_ocr_only as B_OCR
 import baseline_pywinauto as B_PWA
+import baseline_visclick as B_VC
 
 REPO = Path(__file__).resolve().parent.parent
 TASKS_JSON = REPO / "tasks" / "T01_T20.json"
@@ -55,6 +56,7 @@ METHODS: List[Tuple[str, Any]] = [
     ("template",  B_TPL),
     ("ocr_only",  B_OCR),
     ("pywinauto", B_PWA),
+    ("visclick",  B_VC),
 ]
 
 CSV_FIELDS = [
@@ -139,6 +141,7 @@ def save_overlay(image_rgb: np.ndarray,
         "template":  (255,  60,  60),
         "ocr_only":  ( 60, 200, 255),
         "pywinauto": (255, 200,   0),
+        "visclick":  ( 60, 220,  90),
     }
     for name, r in results.items():
         c = colours.get(name, (200, 200, 200))
@@ -276,14 +279,29 @@ def main(argv: Optional[List[str]] = None) -> int:
     p.add_argument("--skip-template", action="store_true")
     p.add_argument("--skip-ocr_only", action="store_true")
     p.add_argument("--skip-pywinauto", action="store_true")
+    p.add_argument("--skip-visclick", action="store_true")
+    p.add_argument("--only-method", default="",
+                   help="comma-separated subset of methods to run (others are "
+                        "marked as skip). Use to re-run a single method against "
+                        "saved screenshots, e.g. --only-method visclick --auto.")
     p.add_argument("--csv", type=Path, default=CSV_PATH,
                    help=f"output CSV (default: {CSV_PATH.relative_to(REPO)}).")
     args = p.parse_args(argv)
 
+    method_names = [n for n, _ in METHODS]
     skip = []
-    for n in ("template", "ocr_only", "pywinauto"):
-        if getattr(args, f"skip_{n}"):
-            skip.append(n)
+    if args.only_method.strip():
+        wanted = {n.strip() for n in args.only_method.split(",") if n.strip()}
+        unknown = wanted - set(method_names)
+        if unknown:
+            print(f"ERROR: unknown method(s) in --only-method: {sorted(unknown)} "
+                  f"(known: {method_names})", file=sys.stderr)
+            return 2
+        skip.extend(n for n in method_names if n not in wanted)
+    for n in method_names:
+        if getattr(args, f"skip_{n}", False):
+            if n not in skip:
+                skip.append(n)
 
     only = [t for t in args.only.split(",") if t.strip()] or None
     tasks = load_tasks(only)

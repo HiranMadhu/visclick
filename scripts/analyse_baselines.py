@@ -36,12 +36,17 @@ LOC = {
     "template":  157,
     "ocr_only":  121,
     "pywinauto": 164,
+    "visclick":  -1,  # whole project; computed at runtime if requested
 }
 DEPS = {
     "template":  "opencv-python (already a VisClick dep)",
     "ocr_only":  "easyocr + rapidfuzz (already VisClick deps)",
     "pywinauto": "pywinauto>=0.6.8 (Windows-only optional extra)",
+    "visclick":  "ultralytics + onnxruntime + opencv + easyocr + rapidfuzz + mss + pyautogui (full project)",
 }
+
+# Display order on the bar chart; methods not in METHOD_ORDER appear after.
+METHOD_ORDER = ["pywinauto", "ocr_only", "template", "visclick"]
 
 
 def load_rows() -> List[Dict[str, str]]:
@@ -128,17 +133,19 @@ def make_chart(summary: List[Dict[str, str]], visclick_tsr: float | None) -> Non
         print("  (matplotlib not installed; skipping bar chart)")
         return
 
-    methods = [r["method"] for r in summary]
-    tsr = [float(r["TSR"]) * 100 for r in summary]
+    by_name = {r["method"]: float(r["TSR"]) * 100 for r in summary}
     if visclick_tsr is not None:
-        methods.append("VisClick (full)")
-        tsr.append(visclick_tsr * 100)
+        by_name["visclick"] = visclick_tsr * 100
+
+    methods = [m for m in METHOD_ORDER if m in by_name]
+    methods += [m for m in by_name if m not in methods]
+    tsr = [by_name[m] for m in methods]
 
     colours = {
         "template":  "#cc4444",
         "ocr_only":  "#3a8fbf",
         "pywinauto": "#d9a000",
-        "VisClick (full)": "#3aa05e",
+        "visclick":  "#3aa05e",
     }
     bar_colours = [colours.get(m, "#888888") for m in methods]
 
@@ -177,9 +184,10 @@ def main(argv: List[str] | None = None) -> int:
     ])
 
     pivot = per_task_pivot(rows)
-    write_csv(PIVOT, pivot, [
-        "task", "instruction", "is_negative", "template", "ocr_only", "pywinauto",
-    ])
+    methods_seen = sorted({r["method"] for r in rows},
+                          key=lambda m: (METHOD_ORDER.index(m)
+                                         if m in METHOD_ORDER else 999))
+    write_csv(PIVOT, pivot, ["task", "instruction", "is_negative", *methods_seen])
 
     print("\n=== Per-method TSR ===")
     print(f"{'method':14s} {'n':>3s} {'pass':>4s} {'fail':>4s} {'skip':>4s} {'TSR':>7s} {'p50_ms':>9s}")

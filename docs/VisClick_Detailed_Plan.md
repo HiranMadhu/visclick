@@ -1305,8 +1305,8 @@ The original "Option A" (just ablate M1 / M2) is too narrow. To defend the headl
 
 #### L.1.A — Test-set hardening (~45 min, **prerequisite for everything else in Phase 1**)
 
-- [ ] **1.A.1** Hand-correct the 8 desktop test images in Roboflow. Open `data/desktop_finetune/images/test/`, fix wrong boxes, add missing boxes (especially Save / Cancel / OK / dropdowns the auto-labeler missed), keep the 6-class taxonomy. Export YOLO labels back to `data/desktop_finetune/labels/test/`. ~30 min.
-- [ ] **1.A.2** Verify exports: count files, check at least one label file by hand, count instances per class in the test split, paste counts into report §4.6b. ~15 min.
+- [x] **1.A.1** Hand-correct the 8 desktop test images in Roboflow. Open `data/desktop_finetune/images/test/`, fix wrong boxes, add missing boxes (especially Save / Cancel / OK / dropdowns the auto-labeler missed), keep the 6-class taxonomy. Export YOLO labels back to `data/desktop_finetune/labels/test/`. ~30 min. **DONE 6 May 2026 → 356 boxes total (button 15 / text 33 / text_input 10 / icon 189 / menu 89 / checkbox 20). Roboflow export at `datasets/handcorrected_desktop_test/visclick3.yolov8.zip`.**
+- [x] **1.A.2** Verify exports: count files, check at least one label file by hand, count instances per class in the test split, paste counts into report §4.6c. ~15 min. **DONE 6 May 2026 → counts CSV at `<DRIVE>/reports/tables/desktop_test_handcorrected.csv`; rebuilt `desktop_finetune_bundles/test.tar.gz`; original auto-labels backed up to `test_autolabels.tar.gz`.**
 
 **Deliverable:** a hand-corrected 8-image test split with ~30–40 real-GT boxes across the 6 classes. Every other Phase-1 evaluation runs on this set.
 

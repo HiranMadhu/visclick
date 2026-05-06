@@ -22,6 +22,8 @@ htmlcov/
 data/
 weights/
 *.zip
+# Phase 1.A hand-corrected Roboflow export (~2.5 MB; committed for reproducibility).
+!datasets/handcorrected_desktop_test/visclick3.yolov8.zip
 *.tar
 *.tar.gz
 *.7z

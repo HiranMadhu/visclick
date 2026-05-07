@@ -246,7 +246,8 @@ def main(argv: List[str] | None = None) -> int:
     if args.instruction is None or args.fail_instruction is None:
         import json
         tj = json.loads((REPO / "tasks" / "T01_T20.json").read_text())
-        by_id = {t["id"]: t for t in tj}
+        task_list = tj["tasks"] if isinstance(tj, dict) and "tasks" in tj else tj
+        by_id = {t["id"]: t for t in task_list}
         if args.instruction is None:
             args.instruction = by_id[args.task]["instruction"]
         if args.fail_instruction is None:

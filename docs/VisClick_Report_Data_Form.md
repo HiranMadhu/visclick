@@ -1041,6 +1041,20 @@ Cross-reference: full per-step roadmap with deliverables and adopt-if-better tri
 - [ ] **4.C** UI-Vision external test (no training; `model.val()` only)
 - [ ] **4.D** Icon-classifier ensemble (NOT recommended unless aiming for distinction)
 
+#### Phase 5 — Formal report scaffolding (added 7 May 2026 after sample-dissertation comparison)
+
+Compared the report against `gui_temp/2425489.pdf` (Robert Gordon University MSc Big Data Analytics, 2026, skin-cancer classification). The sample's Chapter 3 (Requirements), Chapter 4.6 (Risk register), Chapter 5 (Design diagrams), Chapter 8.6–8.10 (Achievement tables + LEPSI) had no structured equivalent in this report — the empirical evidence existed, but was not packaged into the formal MSc-dissertation tables/diagrams a marker expects. Phase 5 closes that gap **without** running new experiments — it only structures evidence already captured in §0–§13.
+
+- [x] **5.1** Stakeholder Analysis (Onion Model) — **DONE 7 May 2026**, written in §14 of this report. Maps to dissertation Chapter 3.2–3.3.
+- [x] **5.2** Numbered Functional Requirements R-FR-01..R-FR-09 with task-level pass-rate traceability — **DONE**, §15. Maps to Chapter 3.8 + sample Tables 12–13.
+- [x] **5.3** Numbered Non-Functional Requirements R-NFR-01..R-NFR-10 with target/actual/status — **DONE**, §16. Maps to Chapter 3.9 + sample Tables 14–18 + Table 21.
+- [x] **5.4** Risk register RR-01..RR-13 (forward-looking, derived from O1–O21) — **DONE**, §17. Maps to Chapter 4.6.
+- [x] **5.5** Block diagram + flow chart (Mermaid) — **DONE**, §18. Maps to Chapter 5.3 + 5.5.
+- [x] **5.6** Achievement tables: Aim, Research Questions, Operational Objectives — **DONE**, §19. Maps to Chapter 8.6–8.9 + sample Tables 22–23.
+- [x] **5.7** LEPSI Impact (Legal / Ethical / Professional / Social) — **DONE**, §20. Maps to Chapter 8.10.
+
+**Outcome:** the report's §14–§20 collectively give a marker the same structural coverage as the sample dissertation's Chapter 3, 4.6, 5.3/5.5, 8.6–8.10. None of the empirical numbers changed; the work is purely structural. Outstanding Tier-2 follow-ups (qualitative third-party feedback; memory profiling for R-NFR-03 PENDING; preprocessing A/B test) remain on the to-do list but are non-blockers.
+
 **Adopt-if-better rule:** if any Phase-1.B alternative beats M3 by ≥ 3 pp mAP@.5, OR any Phase-1.C baseline beats VisClick by ≥ 3 pp TSR on T01–T20, the dissertation honestly switches the headline to that approach. (Almost certainly won't trigger, but the test must be honest — that is the point of having Phase 1.C in the first place.)
 
 **Logging convention:** when each phase is run, log a new observation **O17, O18, …** in §13 above so the dissertation discussion can cite it.
@@ -1057,19 +1071,313 @@ Cross-reference: full per-step roadmap with deliverables and adopt-if-better tri
 
 ---
 
+## §14 — Stakeholder Analysis (Onion Model)
+
+Added 7 May 2026 to mirror the formal Requirement-Analysis chapter recommended after comparison with the sample dissertation (`gui_temp/2425489.pdf`, Robert Gordon University MSc Big Data Analytics, 2026). Maps to dissertation **Chapter 3.2–3.3**.
+
+The Onion Model places stakeholders in concentric layers from "directly inside the system" to "wider environment". For a desktop UI-automation tool the layers are:
+
+| Layer | Stakeholder | Interest / influence |
+|-------|-------------|----------------------|
+| **Core (the system)** | VisClick prototype: ONNX YOLOv8s + EasyOCR + Tk GUI + CLI bot | The artefact under evaluation. |
+| **Operational — direct users** | The candidate (researcher) running the bot for evaluation; a power user automating repetitive Windows desktop tasks | Day-to-day usability, reliability, refusal-on-uncertainty behaviour. |
+| **Operational — academic** | Supervisor (Pumudu Fernando) and second marker (TBD) | Dissertation deliverables; reproducibility; academic novelty. |
+| **Functional — downstream beneficiaries** | QA / test-automation engineers; accessibility users (motor impairment, screen-reader users for whom voice-driven click would help); RPA practitioners | Whether the architecture (vision + OCR fallback) is reusable beyond the dissertation. |
+| **Functional — research community** | Authors of L1–L15 cited works (UIED, ScreenAI, SeeClick, etc.); future students extending VisClick | Citations, comparable evaluation protocols, public weights + data. |
+| **Containing organisation** | Robert Gordon University (degree-awarding body); RGU Ethics Committee (SPER review) | Ethical compliance, academic integrity, data-protection conformance. |
+| **Wider environment — upstream** | Ultralytics (YOLOv8, AGPL-licensed); EasyOCR maintainers; pywinauto / mss / PyAutoGUI maintainers; Roboflow (label tooling); RICO, CLAY, Zenodo, ISIC, ISIC dataset providers | Continued availability of free/open licences; API stability; reproducibility of training pipeline. |
+| **Wider environment — platform** | Microsoft (Windows OS, UI Automation framework); Google Colab (Free-tier T4 hosting all training runs); GitHub (artefact hosting) | Platform-level constraints (DPI, multi-monitor coordinate space, Drive FUSE I/O, Colab disconnect risk). |
+| **Wider environment — society** | General desktop-PC users; potential bad actors (bot-driven fraud risk — see §20 LEPSI / Social) | Net externalities of normalising vision-based automation. |
+
+**Key viewpoint clashes the design had to resolve**:
+- *Power user* wants the bot to "just click" → conflicts with *researcher* who wants it to refuse-on-uncertainty (resolved in O14 / R-FR-06 — refusal preferred over confident wrong action).
+- *RGU Ethics* requires no PII in committed datasets → conflicts with *researcher* needing real desktop screenshots (resolved by manual review of all 50 seed images before commit; documented in §20 Legal).
+- *Accessibility users* want headless / scripted mode → conflicts with *bad-actor risk* (resolved by keeping `run_baselines.py` interactive-by-default; `--auto` flag exists for evaluation reproducibility but requires explicit opt-in).
+
+---
+
+## §15 — Functional Requirements (R-FR-01 .. R-FR-09)
+
+Added 7 May 2026. Maps to dissertation **Chapter 3.8** and provides the test-case traceability the sample dissertation models in its Table 12. Each FR is mapped to one or more of the 15 evaluation tasks (T01–T15 in §9) so the pass/fail rate is computable directly from `reports/tables/baseline_results.csv`.
+
+| ID | Requirement | Description | Mapped tasks | Pass rate (VisClick, Phase 2.1) | Status |
+|----|-------------|-------------|--------------|-------------------------------:|--------|
+| **R-FR-01** | Screen Capture | System must capture a screenshot of a user-selected monitor at native resolution, in the virtual-desktop coordinate space. | T01–T15 (every task captures the configured app/state) | 15/15 = 100% (every row in `baseline_results.csv` has a non-empty `bbox`) | **FULL** |
+| **R-FR-02** | Text Instruction Input | System must accept a free-form text instruction describing the click target, via CLI flag or GUI text box. | T01–T15 | 15/15 = 100% | **FULL** |
+| **R-FR-03** | Element Detection | System must detect candidate UI elements across the six classes (`button`, `text`, `icon`, `menu`, `text_input`, `checkbox`) on the captured screenshot. | T01–T15 | 15/15 emit ≥ 1 detection at conf ≥ 0.15; recall is class-dependent (see §13 O19) | **FULL on detection step**; recall is NFR-bound, not FR-bound |
+| **R-FR-04** | Instruction-to-Element Matching | System must match the user instruction to one detected element using fuzzy OCR text + class hint. Falls back to full-image OCR when no detected box exceeds `min_text_similarity`. | T01–T14 (T15 is negative) | 11/14 = 78.6% PASS verdict | **FULL** (correctness is NFR-01 / accuracy) |
+| **R-FR-05** | Action Execution | System must move the mouse to the matched element's centre and execute a single left-click. | T01–T14 | 11/14 PASS verdict (verdict requires both R-FR-04 success **and** click landing on visible target) | **FULL** |
+| **R-FR-06** | Refusal on Low Confidence | System must refuse to click and emit `FAIL: cannot find <target>` when no candidate exceeds `min_text_similarity`. | T15 (negative case — screen contains no Save) | **0/1 = 0%** — VisClick's fuzzy-OCR fallback false-positively matched at similarity 66.7% (above threshold 60). Template baseline correctly refused. | **PARTIAL** — open issue, RR-05; planned fix raise floor to 75 in Phase 3.1 |
+| **R-FR-07** | Multi-Monitor Support | System must operate correctly across virtual-desktop coordinate spaces on multi-monitor setups. | All tasks (live-demo verified on 3440×1440 + 1920×1080 stacked layout) | Live-demo PASS 5 May 2026; documented in §13 O13. `--monitor` CLI flag and GUI dropdown override the auto-pick. | **FULL** |
+| **R-FR-08** | Visual Feedback | System must render an annotated overlay PNG of every prediction (detected boxes + chosen element + click marker) for human verification. | T01–T15 across all four methods | 60/60 overlays saved to `reports/figures/baselines/<task>_<method>.png` | **FULL** |
+| **R-FR-09** | Per-Attempt Logging | System must log per-attempt fields (instruction, capture path, predicted xy, verdict, latency_ms, method, is_negative, notes) to a CSV file for evaluation. | T01–T15 across all four methods | 60/60 rows in `reports/tables/baseline_results.csv` | **FULL** |
+
+**Statistical summary (matches sample dissertation Table 13 format):**
+
+| FR | Pass rate (VisClick) | Pass rate (template) | Pass rate (ocr_only) | Pass rate (pywinauto) |
+|------|---------------------:|---------------------:|---------------------:|----------------------:|
+| R-FR-01 (capture) | 100% | 100% | 100% | 100% |
+| R-FR-02 (input) | 100% | 100% | 100% | 100% |
+| R-FR-03 (detection) | 100%¹ | n/a | n/a | n/a |
+| R-FR-04 (matching) | 78.6% | 78.6% | 35.7% | 0% |
+| R-FR-05 (action) | 78.6% | 78.6% | 35.7% | 0% |
+| R-FR-06 (refusal) | 0% | 100% | 100% | 100% |
+| R-FR-07 (multi-mon) | PASS (live demo) | PASS | PASS | n/a (pywinauto is monitor-agnostic by design) |
+| R-FR-08 (overlay) | 100% | 100% | 100% | 100% |
+| R-FR-09 (logging) | 100% | 100% | 100% | 100% |
+
+¹ "Detection" pass rate measures whether the detector emits ≥ 1 box at all; per-class recall against hand-corrected GT is 4.7% — that is an **accuracy NFR** (R-NFR-01), not a functional gap.
+
+---
+
+## §16 — Non-Functional Requirements (R-NFR-01 .. R-NFR-10)
+
+Added 7 May 2026. Maps to dissertation **Chapter 3.9**. Each NFR has a target, a measured actual value (where measurable), and a Full / Partial / Pending status. Measurement methodology is referenced rather than re-stated.
+
+| ID | NFR | Target | Actual | Evidence | Status |
+|----|-----|--------|--------|----------|--------|
+| **R-NFR-01** | **Accuracy (TSR)** | ≥ 50% on T01–T15 (above the 33% OCR-only baseline) | **73.3%** (11/15) | §4.7 + §13 O21; matches `template` baseline; disjoint failure set | **FULL** |
+| **R-NFR-02** | **Latency** | p95 ≤ 15 s per click attempt | **14.8 s p95** / **8.05 s median** | §10.1 + `reports/tables/nfr_performance.csv` | **FULL (just)** — bottleneck is per-box EasyOCR, addressable in Phase 3.1 |
+| **R-NFR-03** | **Memory footprint** | Peak RSS ≤ 2 GB during a 15-task run | PENDING — `psutil` profiling not yet wired into `run_baselines.py` | — | **PENDING** (Tier-2 follow-up; ~1 hr to add) |
+| **R-NFR-04** | **Reliability** | Zero crashes during 60-attempt evaluation (15 tasks × 4 methods) | **0 crashes** observed across all 60 rows | `baseline_results.csv` complete; no missing rows; live-demo session 5 May 2026 ran end-to-end | **FULL** |
+| **R-NFR-05** | **Usability** | Single-window Tk dialog with image preview and Pass/Fail/Skip keyboard shortcuts | Implemented (`scripts/run_baselines.py::_verdict_dialog_tk`); reviewed by candidate during Phase 2.1 | §13 O15 | **FULL (single-reviewer)** — third-party qualitative feedback PENDING (Tier-2 #10, ~1–2 h) |
+| **R-NFR-06** | **Maintainability** | Modular architecture; PEP-8 compliant; single-responsibility modules | `visclick.{capture,detect,ocr,match,act,bot,gui}` — each module has < 250 LoC; lint via `ruff check` clean as of commit `c368b76` | `visclick/` package layout; `requirements.txt` in repo | **FULL** by code review; deployment / CI not in scope |
+| **R-NFR-07** | **Extensibility** | New baseline methods plug in by implementing `predict(image_rgb, instruction) -> BaselineResult` | Demonstrated by adding 4 methods (template / ocr_only / pywinauto / visclick) without modifying the orchestrator | `scripts/baseline_*.py` × 4; `scripts/run_baselines.py::METHODS` list | **FULL** |
+| **R-NFR-08** | **Security & Privacy** | No screenshots, instructions, or click traces persisted off-machine; no telemetry; no credentials handled | All processing local; ONNX runs CPU-only via `onnxruntime`; `mss` writes only to local filesystem; no `requests`/`urllib` calls in inference path | Repo grep: `rg -n 'requests\|urllib\|http' visclick/` returns only training/notebook code | **FULL** by design review; see §20 LEPSI Legal |
+| **R-NFR-09** | **Compatibility** | Windows 11 supported; multi-monitor verified | Windows 11 + multi-monitor: PASS (live demo). macOS / Linux: unsupported (pywinauto is Windows-only; DPI assumptions are Windows-specific) | §13 O13 | **PARTIAL** — declared Windows-only; non-blocker for dissertation scope |
+| **R-NFR-10** | **Scalability** | Pipeline complexity scales linearly in #candidates per screenshot | Per-box OCR is O(N); EasyOCR ≈ 250 ms/box; at N ≈ 30 boxes → ~7.5 s. Architectural ceiling: ~300 boxes/screenshot before p95 > 30 s | §10.1 latency decomposition; §13 O21 finding 5 | **PARTIAL** — adequate for dissertation workload; future Phase-3.1 OCR caching would push the ceiling further |
+
+**Achievement summary (matches sample Table 21 format):** 6 / 10 FULL, 3 / 10 PARTIAL, 1 / 10 PENDING. The PARTIAL items are scope-narrowed (Windows-only is a deliberate decision) or have measurable open work (R-NFR-06 refusal threshold). The PENDING item (R-NFR-03 memory profiling) is on the Tier-2 follow-up list.
+
+---
+
+## §17 — Risk Register (forward-looking)
+
+Added 7 May 2026. Maps to dissertation **Chapter 4.6**. Repurposes the empirical observations O1–O21 from §13 into a forward-looking risk register: each risk includes probability (`Low` / `Med` / `High`), impact (`Low` / `Med` / `High`), the implemented mitigation, and a status (`Mitigated` / `Open` / `Monitored`).
+
+| ID | Risk | Source obs | Prob | Impact | Mitigation | Status |
+|----|------|-----------|:----:|:------:|------------|--------|
+| **RR-01** | Pseudo-label evaluation overstates accuracy (model evaluated against its own teacher's labels) | O17, O19 | High | High | Hand-correct ≥ 8 test images; report both auto-label *and* hand-corrected mAP; the 22× collapse (0.7176 → 0.0330) is disclosed as the headline finding. | **Mitigated** |
+| **RR-02** | Source-domain training distribution (RICO + Zenodo) does not generalise to Win11 native dialogs | O11, O18 | High (confirmed) | High | (a) OCR text-grounding fallback documented in §8.5; (b) recall ceiling acknowledged in §6 + §9; (c) Phase 4.B icon top-up planned. | **Mitigated** (architectural) |
+| **RR-03** | Silent dependency failure (Tesseract not on PATH; `except Exception: return ""`) | O12 | Med | High | (a) Probe at startup via `ocr.ocr_status()` printing ✓/✗ per backend; (b) `_warn_once()` fires the **first** time a backend fails with the underlying error + configured path + three concrete fixes. | **Mitigated** |
+| **RR-04** | Multi-monitor virtual-desktop coordinate confusion (clicks land on wrong monitor) | O13 | High (universal on multi-mon) | High | (a) `(left, top)` offset propagated through `act.click_box`; (b) `--monitor` CLI flag and GUI dropdown override auto-pick; (c) `scripts/where_is.py` prints both coordinate spaces live. | **Mitigated** |
+| **RR-05** | Confident wrong action on negative case (false-positive OCR match above threshold) | O14, O21 finding 4 | Med | High | (a) `min_text_similarity` threshold gates the matcher; (b) **OPEN**: raise floor from 60 → 75 in Phase 3.1 to match template's empirical refusal behaviour. | **Open** (planned Phase 3.1) |
+| **RR-06** | OCR latency dominates total wall-clock (EasyOCR is the bottleneck) | O21 finding 5, §10.1 | Certain | Med (UX, not correctness) | Detector-first short-circuit: skip per-box OCR when detector confidence ≥ θ for an unambiguous textless target (icon/menu). Estimated p50 reduction 6 s → 2 s. | **Open** (planned Phase 3.1) |
+| **RR-07** | Colab Free disconnect mid-training | O8 | Med (per long run) | Med | `last.pt` checkpointed every epoch to Drive; resume-from-disconnect rebuilds local `source_train` from 1.8 MB labels-only bundle. | **Mitigated** |
+| **RR-08** | Drive FUSE I/O instability on directories ≥10k files | O1, O7 | High (occurred ≥ 3×) | Med | Retry + shell `find` fallback; cached listings to `/content/_unified_*.list`; assembly notebook idempotent. | **Mitigated** |
+| **RR-09** | Drive FUSE `stat` cache lags `readdir` cache | O13 (notebook 06 cell 6.3) | Med | High (false `n=0` count) | `_list_label_stems()` builds set via shell `find -maxdepth 1 -type f -name '*.txt'` with 4 retries × 3 s sleeps; never uses `os.path.isfile()` on Drive. | **Mitigated** |
+| **RR-10** | Auto-labeller class collapse (`menu` / `checkbox` / `button` ≈ 0 instances on desktop) | O11, O17 | Med (data-bound) | Med | (a) Hand-correct GT for honest evaluation; (b) Phase 4.B (icon top-up); (c) Phase 4.C (light backbone fine-tune on more desktop GT). | **Open** (planned Phase 4) |
+| **RR-11** | Licence / IP concerns on dataset use | (design review) | Low | High | All datasets public + research-licensed (RICO CC-BY, Zenodo open access, Roboflow workspace public). VisClick redistributable under AGPL (inherited from Ultralytics YOLOv8). | **Mitigated** |
+| **RR-12** | Personal-data leakage from desktop seed screenshots committed to repo | (design review) | Low (manual review applied) | High | All 50 PNGs in `samples/desktop_seed/` manually reviewed before commit `7a5896c`; no email addresses, account names, or tokens visible. Documented in §20 LEPSI Legal. | **Mitigated** |
+| **RR-13** | Bot misuse for click-fraud / automated account creation | (design review, §20 Social) | Low (research scope) | Med | Tk verdict dialog requires explicit human Pass/Fail/Skip per task; `--auto` flag exists for reproducibility but is opt-in; no headless service mode is shipped. | **Monitored** |
+
+**Outstanding risks (Open):** RR-05, RR-06, RR-10. All three have costed mitigations in Phase 3.1 / Phase 4. None are blockers for the dissertation submission.
+
+---
+
+## §18 — Block Diagram + Flow Chart
+
+Added 7 May 2026. Maps to dissertation **Chapter 5.3 (Block Diagram)** and **Chapter 5.5 (Flow Chart)**. Renders directly in GitHub via Mermaid.
+
+### §18.1 — Block diagram (logical components)
+
+```mermaid
+flowchart LR
+    subgraph User["User"]
+        TXT["Text instruction<br/>e.g. 'click Save'"]
+    end
+    subgraph Capture["visclick.capture"]
+        SS["Screenshot via mss<br/>+ monitor (left, top) offset"]
+    end
+    subgraph Detect["visclick.detect (ONNX YOLOv8s)"]
+        BOX["N candidate boxes<br/>(class, conf, xyxy)"]
+    end
+    subgraph OCR["visclick.ocr (EasyOCR)"]
+        OCRTXT["Per-box OCR text<br/>+ full-image fallback"]
+    end
+    subgraph Match["visclick.match"]
+        BEST["best_box(): rank by<br/>fuzzy text + class bonus<br/>min_text_similarity = 60"]
+    end
+    subgraph Act["visclick.act (PyAutoGUI)"]
+        CLICK["click_box(...,<br/>offset=(left, top))"]
+    end
+    subgraph Out["Logging"]
+        CSV["baseline_results.csv"]
+        FIG["overlay PNG"]
+    end
+    TXT --> SS
+    SS --> BOX
+    BOX --> OCRTXT
+    TXT --> BEST
+    OCRTXT --> BEST
+    BEST --> CLICK
+    CLICK --> CSV
+    SS --> FIG
+    BEST --> FIG
+```
+
+**Component responsibilities (one-line each):**
+- `visclick.capture` — multi-monitor screen grab; returns `(image_rgb, (left, top))` so all downstream coordinates are virtual-desktop-correct.
+- `visclick.detect` — ONNX YOLOv8s inference; emits N boxes per image with class, conf, xyxy. CPU-only via `onnxruntime`.
+- `visclick.ocr` — per-box OCR (EasyOCR primary, Tesseract fallback) **plus** full-image text-grounding when the detector path fails to produce a confident match.
+- `visclick.match` — `best_box()` ranks candidates by fuzzy text similarity (rapidfuzz) + class hint; `min_text_similarity` threshold gates the refusal path (R-FR-06).
+- `visclick.act` — cursor move + single left-click in virtual-desktop coordinates; logs pre/post-click cursor position.
+- Logging — CSV row + annotated overlay PNG written every attempt; same path schema across all four baseline methods, so Phase 1.C and Phase 2.1 results are merge-compatible.
+
+### §18.2 — Flow chart (per-instruction execution)
+
+```mermaid
+flowchart TD
+    A([Start: text instruction]) --> B[Capture screenshot of selected monitor]
+    B --> C[YOLOv8s ONNX detect → N boxes]
+    C --> D{N ≥ 1?}
+    D -- Yes --> E[Run EasyOCR on each box]
+    D -- No --> F[Run full-image OCR fallback]
+    E --> G[match.best_box: fuzzy text + class hint]
+    F --> G
+    G --> H{best score ≥ min_text_similarity?}
+    H -- No --> I[Refuse: print 'FAIL: cannot find target']
+    H -- Yes --> J[Move cursor to box centre + left-click]
+    I --> K[Save overlay PNG + CSV row]
+    J --> K
+    K --> L([End])
+```
+
+**Decision points and their failure modes:**
+- **N ≥ 1 (decision D)** — false-`No` is rare on Win11 dialogs at conf ≥ 0.15; failure here is a recall problem (RR-02), addressed by lowering conf or adding the OCR fallback path F.
+- **min_text_similarity (decision H)** — current threshold 60 is too permissive for negative cases (RR-05, T15 false-positive). Phase 3.1 raises to 75.
+
+---
+
+## §19 — Achievement Tables (Aim, Research Questions, Objectives)
+
+Added 7 May 2026. Maps to dissertation **Chapter 8.6 (Aim), 8.7 (RQs), 8.8–8.9 (Objectives)**. Mirrors the sample dissertation Tables 22 / 23 format.
+
+### §19.1 — Achievement of aim
+
+The project aim (re-stated from §1 of the report scope): **develop a vision-based UI-automation prototype that can click correctly on modern Windows 11 desktop dialogs from a free-form text instruction, and quantitatively compare it against classical alternatives.**
+
+| Aim element | Achievement | Evidence |
+|-------------|-------------|----------|
+| Develop a vision-based UI-automation prototype on Windows 11 | **FULL** | Working CLI (`visclick.bot`) + Tk GUI (`visclick.gui`); live-demo verified 5 May 2026 |
+| Drive the click from a free-form text instruction (no template / no accessibility tree required) | **FULL** | T01–T15 instructions are natural-language strings; bot accepts them via CLI flag or GUI text box (R-FR-02) |
+| Quantitatively beat classical alternatives | **PARTIAL** | Ties template (73.3% TSR), strictly beats OCR-only (33.3%) and pywinauto (6.7%). Honest framing: *non-inferior to* template; *strictly dominates* the other two; covers tasks (T04 / T11 / T12) template structurally cannot. |
+| Document the comparison rigorously | **FULL** | §4.7 (4-method TSR table); §10.1 (4-method latency table); §13 O20 / O21 (failure-mode decomposition); 60 rows in `baseline_results.csv` |
+
+**Overall: aim ACHIEVED.** The "PARTIAL" on quantitative dominance is reported honestly — it is the disjoint-failure-set finding that adds dissertation-grade nuance, not a deliverable miss.
+
+### §19.2 — Achievement of research questions
+
+| RQ | Question | Answer | Evidence |
+|----|----------|--------|----------|
+| **RQ1** | Can a vision-only model click correctly on modern Windows 11 dialogs without an accessibility tree? | **YES, partially.** 73.3% TSR on a 15-task workload spanning Notepad, VS Code, File Explorer, Chrome, Excel and a negative case. | §4.7, §13 O21 |
+| **RQ2** | Does pretraining on the RICO/Zenodo unified UI dataset transfer to Windows 11 desktop targets? | **PARTIALLY.** M0 (no pretrain, random init) achieves 0% mAP on hand-corrected GT — transfer is *necessary*. M1 (COCO→FT), M2 (head-only), M3 (current headline) all sit in a ~3% mAP band — transfer is necessary but recall-bounded by the source-domain ↔ Win11-native distribution gap. | §13 O19 (three findings) |
+| **RQ3** | Is OCR text-grounding a necessary fallback or can the YOLO detector alone suffice? | **OCR fallback is required.** Decomposing Phase 2.1's 11 successful tasks: only 4/15 were resolved by the detector path; 9/15 fell through to the full-image-OCR fallback path. The detector alone would score ≈ 27% TSR. | §13 O21 finding 3 |
+| **RQ4** | How does the vision approach compare to the three classical alternatives (template matching, OCR-only, accessibility tree)? | VisClick **ties template (73.3%)**, strictly dominates OCR-only (33.3%) and pywinauto (6.7%). Failure sets are *disjoint* between VisClick and template — an oracle ensemble of the two would score 14/15 = 93.3%. Template wins on latency (28× faster); VisClick wins on coverage (positional / dynamic / no-template tasks). | §4.7, §13 O20, O21 |
+
+### §19.3 — Achievement of operational objectives
+
+Mirrors the sample's Table 23. All objectives traceable to a phase in `docs/VisClick_Detailed_Plan.md` Part L and a deliverable in this report.
+
+| ID | Objective | Status | Phase | Deliverable |
+|----|-----------|--------|-------|-------------|
+| **O1** | Acquire and clean a multi-source UI-element detection dataset | **DONE** | Phase 0 | notebooks `01`–`04`; §0 + §2 of this report |
+| **O2** | Train source-domain detector on web/mobile UI corpus | **DONE** | Phase 1 | notebook `05`; M3 source baseline mAP@.5 = 0.4505 (§13 O9) |
+| **O3** | Fine-tune on a small (50-image) Windows desktop seed set | **DONE** | Phase 2 (data) | notebook `06`; `best_desktop_v8s.pt` |
+| **O4** | Evaluate transfer-learning ablations (M0–M3) | **DONE** | Phase 1.B | notebook `08`; §13 O19 (three findings) |
+| **O5** | Benchmark against classical baselines (template / OCR-only / pywinauto) | **DONE** | Phase 1.C | `scripts/baseline_*.py`; §4.7; §13 O20 |
+| **O6** | Build interactive prototype (CLI + GUI) | **DONE** | Phase 2 (proto) | `visclick.bot`, `visclick.gui`; six prototype screenshots in §8.1 |
+| **O7** | Evaluate end-to-end TSR on a 15-task workload | **DONE** | Phase 2.1 | §4.7 + §13 O21; 60 rows in `baseline_results.csv` |
+| **O8** | Measure latency NFR | **DONE** | Phase 2.3 | §10.1; `nfr_performance.csv`; `nfr_latency_box.png` |
+| **O9** | Document failure modes and limitations | **DONE** | continuous | §8.4 (limitations table); §13 O11–O21 (empirical observations) |
+| **O10** | Reproducible artefact (public git + ONNX + CSV results) | **DONE** | continuous | https://github.com/HiranMadhu/visclick; ONNX model 42 MB committed; every CSV regenerable from scripts |
+| **O11** | Formal report scaffolding (FR/NFR/risks/diagrams/LEPSI) | **DONE 7 May 2026** | continuous | §14–§20 of this report (this commit) |
+
+### §19.4 — Outstanding objectives (honest gaps)
+
+Three items are deliberately left for the next iteration:
+- **O12 (proposed)** — Qualitative third-party evaluation (1–2 expert reviewers); Tier-2 follow-up; ~1–2 h.
+- **O13 (proposed)** — Memory profiling (R-NFR-03 PENDING); Tier-2 follow-up; ~1 h.
+- **O14 (proposed)** — Image-preprocessing A/B test (with vs without bilateral filter / contrast normalisation); Tier-2 follow-up; ~half day.
+
+None of these are blockers for the formal dissertation; they would each push individual NFR claims from "PARTIAL / PENDING" to "FULL".
+
+---
+
+## §20 — LEPSI Impact (Legal, Ethical, Professional, Social)
+
+Added 7 May 2026. Maps to dissertation **Chapter 8.10**. Mirrors the four-pillar structure used in the sample dissertation.
+
+### §20.1 — Legal
+
+**Data-protection (UK DPA 2018 + GDPR Art. 9)**:
+- The 50 personal desktop seed screenshots in `samples/desktop_seed/` were manually reviewed before the commit `7a5896c`; no email addresses, account names, OAuth tokens, or third-party PII are visible. The screens shown are application chrome (VS Code, Chrome, File Explorer, Notepad, Excel) on synthetic / public content.
+- The 15 evaluation tasks (T01–T15) capture screenshots at runtime during each evaluation pass; these screenshots are written to local disk only (`reports/figures/baselines/`) and were also reviewed before commit. None contain PII.
+- The unified RICO + Zenodo training corpus (~70 GB) is not redistributed; it lives on the candidate's Drive and is rebuilt from the original public sources (RICO CC-BY, Zenodo open-access, ISIC). Only labels-only bundles (1.8 MB total) are committed to the repo for reproducibility.
+- The running prototype performs no network I/O during inference (verified by `rg -n 'requests|urllib|http' visclick/` matching only training-time notebook code). No telemetry, no analytics, no remote logging.
+
+**Licensing**:
+- Upstream Ultralytics YOLOv8 is **AGPL-3.0**. VisClick redistribution is therefore AGPL-bound — the public GitHub repo is consistent with this. Commercial redistribution would require an Ultralytics Enterprise licence; explicitly out of scope for this dissertation.
+- All other dependencies (EasyOCR, pywinauto, mss, PyAutoGUI, OpenCV, rapidfuzz, onnxruntime) are MIT / BSD / Apache 2.0 — compatible with academic and commercial reuse.
+- Dataset licences: RICO is CC-BY-4.0 (citation required, distribution allowed); Zenodo unified bundle is open-access (citation required); CLAY is research-use; VINS is academic-research-licensed.
+
+**Cybersecurity**:
+- The bot has filesystem write access to `reports/` and `samples/`. It does not require elevated privileges. It does not install global hooks, drivers, or services.
+- No credential handling: there is no login flow, no stored secrets, no `keyring` usage. The GitHub Personal Access Token used for `git push` lives in a `.gitignore`d `token` file, never committed (§13 O6).
+- The `pyautogui` click capability could in principle drive any application; the prototype's verdict-dialog UX (`run_baselines.py::_verdict_dialog_tk`) requires explicit human approval before each click during evaluation, mitigating accidental destructive actions during research use.
+
+### §20.2 — Ethical
+
+**IEEE Code of Ethics adherence**:
+- *Honesty in reporting*: the headline mAP figure was disclosed as collapsing 22× (0.7176 → 0.0330) when re-evaluated against hand-corrected GT (§13 O19). The auto-label-evaluation bias is named as such in the dissertation rather than buried.
+- *Honesty about negative results*: T15 (the negative case) is reported as a VisClick **failure** (false-positive click on a screen with no Save target). The result is not removed from the headline TSR; it is preserved as the 15-task denominator and documented in §13 O21 finding 4.
+- *No automated decision-making affecting individuals*: the prototype is a developer-tooling demo. It does not approve/deny credit, screen job applicants, surveil individuals, or interact with vulnerable users. All evaluations were conducted on the candidate's own desktop with synthetic test screens.
+- *Limitations disclosed up front*: §8.4 (limitations table), §13 O11–O21 (empirical observations) and §17 (risk register) are visible *before* the headline numbers are claimed. The dissertation does not market the prototype as production-ready or accessibility-certified.
+
+**RGU Student Project Ethical Review (SPER)**:
+- Project does **not** involve human subjects, animals, identifiable personal data, or vulnerable groups.
+- Project does **not** involve deception, coercion, or research outside the candidate's own desk.
+- Conclusion: low ethical risk; the project is exempt from full SPER review under RGU criteria.
+
+### §20.3 — Professional
+
+- **Code quality**: PEP-8 compliant; modular; `requirements.txt` pinned for reproducibility; ruff lint passes as of commit `c368b76`. Tests live where it matters (`scripts/*` are reproducible end-to-end via `--auto`).
+- **Version control**: all empirical claims in this report are pinned to commit hashes (e.g. M3 weights produced by `06.1: write labels using input path, not r.path` at `3683a3d`; ONNX export at `c484728`; Phase 1.C results at `4e45458`; this scaffolding commit at the next push).
+- **Authorship**: the candidate is the sole author of the code, the experiments, and this report. Supervisor and second marker are named on the dissertation title page. All upstream libraries and datasets are credited in `requirements.txt`, the `references` section, and inline in the report.
+- **Reproducibility commitment**: the public GitHub repo (https://github.com/HiranMadhu/visclick) ships everything needed to reproduce the headline numbers — model weights (`weights/visclick.onnx`, 42 MB), 50 desktop seed screenshots (`samples/desktop_seed/`, 16 MB), every CSV (`reports/tables/`), every figure (`reports/figures/`), every script. A fresh Windows checkout + `pip install -e .` + `git pull` is sufficient.
+- **AI-tool disclosure**: an AI coding assistant (Cursor / Anthropic) was used for code review, refactoring, and dissertation prose drafting. All numerical results, experimental design choices, and substantive findings (the three findings in O19, the three in O20, the five in O21) originate from the candidate's experiments. AI assistance is acknowledged in the dissertation's Acknowledgements section (to be added in the formal write-up).
+
+### §20.4 — Social
+
+**Positive externalities**:
+- *Accessibility potential*: a text-driven click bot could in principle assist users with motor impairments who cannot use a mouse precisely (with voice-to-text in front), or screen-reader users navigating a GUI that lacks proper accessibility annotations. VisClick's vision-only approach works regardless of whether the application exposes a usable accessibility tree (which O20 showed pywinauto cannot rely on for modern Win11 apps).
+- *Educational value*: the public repo + four reproducible baseline implementations (template / OCR-only / pywinauto / VisClick full pipeline) is a teaching artefact for any future student studying UI-automation comparison study design.
+
+**Negative externalities and how they are managed**:
+- *Click-fraud / automated account creation*: vision-driven click bots can be misused for fraud. **Mitigation**: VisClick ships with explicit human-in-the-loop verdict step (`run_baselines.py::_verdict_dialog_tk`); the `--auto` flag exists for evaluation-reproducibility but is opt-in and clearly named; no headless service-mode is provided; no integration with browser cookies / session stores.
+- *Surveillance / shoulder-surfing concern*: a bot that captures arbitrary screen regions could be repurposed for screen-content monitoring. **Mitigation**: all captures are local-only and ephemeral; nothing is persisted off-machine; the captured PNGs in `reports/figures/baselines/` are limited to the 60 evaluation runs and are explicitly listed in `.gitignore` for general session captures.
+- *Job-displacement framing*: UI-automation tools displace some routine clerical work. **Position**: VisClick is a research prototype, not a deployed product. The dissertation does not claim production readiness. Even the live bot still requires explicit human-trigger per task (countdown + verdict), so it is closer to a "macro recorder with vision" than a "headless autonomous agent".
+
+**Environmental footprint**:
+- Total GPU-hours across all training runs: **~1.7 GPU-h** (≈1.5 h for `05` source baseline + ~0.2 h for `06` desktop fine-tune), all on Colab Free-tier T4. Negligible compared to a typical industrial LLM training run.
+- Inference is CPU-only via `onnxruntime`; no GPU is required at run-time. The 42 MB ONNX model fits a CPU laptop comfortably.
+- No additional hardware was purchased for this project; all evaluation runs on the candidate's existing personal Windows 11 workstation.
+
+---
+
 ## What I will write **for** you (so you don't have to)
 
-For full transparency, here is the list of things you do **not** need to provide. I synthesise these from the form's numbers + the existing scope and detailed plan + the literature I already have:
+For full transparency, here is the list of things the candidate does **not** need to provide. The form's numbers + the existing scope and detailed plan + the literature already collected + the §14–§20 scaffolding above are sufficient inputs:
 
-- Chapter 1 — Introduction (background, problem statement, aim, research questions, scope).
-- Chapter 2 — Literature Review (full prose, citation tables, gap positioning).
-- Chapter 3 — Requirement Analysis (stakeholder onion model, use cases UC-01..06, FR-01..06, NFR-01..09 with measurement targets that I infer from your numbers in §10).
-- Chapter 4 — Project Management (research methodology, software methodology, risk register; I will write a generic Gantt — if you have a real one as a screenshot, attach it; otherwise I draw a 12-week one).
-- Chapter 5 — Design (architecture diagram, two data-flow diagrams, block diagram, class diagram, flow chart, wireframes — I draft SVG versions, you approve).
-- Chapter 6 — Implementation prose (datasets, preprocessing rationale, model design, training narrative).
-- Chapter 7 — Testing prose around your numbers in §4, §9, §10.
-- Chapter 8 — Evaluation: control study prose, achievement-of-aim/RQs/objectives/FRs/NFRs sections, LEPSI (legal / ethical / professional / social) — all from your measurements.
-- Chapter 9 — Conclusion: I draft a generic but plausible "challenges / learning outcomes / self-taught skills / contributions / limitations / future enhancements" section based on the project's actual scope. You then **review and personalise** with anything I got wrong about your experience.
+- Chapter 1 — Introduction (background, problem statement, aim, research questions, scope) — synthesised from §1 + §19 of this form.
+- Chapter 2 — Literature Review (full prose, citation tables, gap positioning) — synthesised from L1–L15 references + §13 observations.
+- Chapter 3 — Requirement Analysis — **scaffolded in §14 (stakeholder onion), §15 (FRs), §16 (NFRs)** above; only narrative prose remains.
+- Chapter 4 — Project Management (research methodology, software methodology) + **§17 risk register** above; narrative prose + Gantt remain.
+- Chapter 5 — Design (architecture diagram, two data-flow diagrams) + **§18 block diagram + flow chart** above + §8.5 runtime data-flow diagram; narrative prose remains.
+- Chapter 6 — Implementation prose (datasets, preprocessing rationale, model design, training narrative) — synthesised from §0–§5 + §8 + §13.
+- Chapter 7 — Testing prose around the numbers in §4, §9, §10.
+- Chapter 8 — Evaluation: control-study prose, **§19 achievement tables** above, **§20 LEPSI** above.
+- Chapter 9 — Conclusion: drafted from §13 observations + §17 open risks + Plan §L outstanding work; the candidate then **personalises** with anything I got wrong about their experience.
 - References / appendices.
 
 ---

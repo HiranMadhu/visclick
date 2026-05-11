@@ -1,6 +1,14 @@
 # VisClick: submission task plan
 
-**Purpose:** turn the draft dissertation and code into a marker-ready submission. This file is the day-to-day checklist. Detailed gap IDs and evidence pointers live in `Final_Report_GAPS.md`.
+**Purpose:** day-to-day checklist. Detailed gap rows and evidence pointers: `Final_Report_GAPS.md`.
+
+**Author priority (locked):** **D → T → W → F → U**
+
+1. **D (DATA)** first: experiments and measurements.
+2. **T (TABLE)** second: consolidate CSVs and requirement tables.
+3. **W (WRITING)** third: references, Chapter 6 sync, personal Chapter 9.
+4. **F (FIGURE)** fourth: diagrams and screenshots (many depend on D).
+5. **U (USER)** last: RGU front matter, style, title page, export to PDF.
 
 **Last updated:** 11 May 2026.
 
@@ -14,125 +22,120 @@
 | Formal scaffolding (`docs/VisClick_Report_Data_Form.md`) | Stakeholders, FR/NFR, risks, diagrams, LEPSI scaffold |
 | Core code + harness | `src/visclick/`, four-method baselines, T01–T15 tasks |
 | Quantitative evidence | Baseline TSR, NFR latency, transfer tables, hand-corrected mAP story |
-| Gaps tracker | `docs/Final_Report_GAPS.md` (43 line items) |
+| Gaps tracker | `docs/Final_Report_GAPS.md` (43 line items, ordered D–T–W–F–U) |
 
 ---
 
-## 2. What is still missing (summary by type)
+## 2. What is still missing (by bucket)
 
-| Type | Count | Typical effort |
-|------|------:|----------------|
-| **DATA** (new runs, metrics) | 12 | Hours to weeks each |
-| **FIGURE** (PNG exports, composites) | 12 | Minutes to hours each |
-| **TABLE** (consolidate CSVs) | 4 | ~30 min to hours |
-| **WRITING** (citations, personal voice) | 4 | 1–2 sessions |
-| **USER** (RGU/front matter, style, hardware) | 11 | Half-day + approvals |
-
-**Cross-cutting:** Many TABLE and FIGURE items depend on DATA items (for example T-02 needs D-05). The plan below orders work so dependencies are respected.
+| Bucket | Count | When you work it |
+|--------|------:|------------------|
+| **D** | 12 | **Now** (Track 1) |
+| **T** | 4 | After the D items each row needs |
+| **W** | 4 | After major D/T stable; **W-01** just before final PDF |
+| **F** | 12 | After D/T (or skip purely decorative ones) |
+| **U** | 11 | **Last** (Track 5) |
 
 ---
 
-## 3. Phased task plan (what to do in order)
+## 3. Track 1: DATA (D) — do first
 
-Use the checkboxes as you complete work. Change `[ ]` to `[x]` and optionally commit with message `docs: SUBMISSION_TASK_PLAN progress`.
+Use `[ ]` / `[x]`; match IDs in `Final_Report_GAPS.md`.
 
-### Phase 0: Admin and house style (before binding)
+**Foundation (unblocks D-05, D-02–D-04):**
 
-These are mostly USER and WRITING items. No new experiments.
+- [ ] **D-07** Hand-correct labelled desktop set toward 100 images (minimum: extend beyond 8).
+- [ ] **D-06** Unlabelled desktop capture toward ~2k *if* you run SSP/UDA; else document deferral in report Section 9.8.
 
-- [ ] **U-07** Confirm reference style with RGU Handbook: IEEE `[1]` vs Harvard `(Author, Year)`.
-- [ ] **U-08** Pick voice: first-person vs impersonal; then edit Chapters 1–9 consistently.
-- [ ] **U-09** Confirm British vs American spelling; run a pass if required.
-- [ ] **W-01** Renumber references so bibliography order matches **first appearance** in the dissertation (gap tracker calls this out).
-- [ ] **U-03** Check word count vs programme limit; trim or flag overflow sections.
-- [ ] **U-01** Fill submission date on title page.
-- [ ] **U-02** Fill second marker name when RGU confirms it.
-- [ ] **U-04** Write Acknowledgements (supervisor, second marker, family, AI-tool disclosure per programme rules).
-- [ ] **U-05** Paste hardware spec (`dxdiag` / `systeminfo`) into data form Section 1.1; align latency claims in Chapter 7.
-- [ ] Export `Final_Report.md` to your faculty template (Word / LaTeX / PDF) and fix headings, page breaks, and figure placement there.
+**Heavy experiments (triage with supervisor):**
 
-### Phase 1: Minimum viable figures (high visual impact, low dependency)
+- [ ] **D-01** DETR source + fine-tune; feeds **T-01**, **W-02**.
+- [ ] **D-05** Few-shot curve ($k = 1,5,10,50,100$); feeds **T-02**, **F-11**.
+- [ ] **D-02** SSP + fine-tune (needs **D-06**); feeds **T-02**.
+- [ ] **D-03** Adaptive Teacher; feeds **T-03**, **W-02**.
+- [ ] **D-04** SHOT; feeds **T-03**, **W-02**.
 
-Pick a subset if time is tight. Suggested minimum set for a strong first impression:
+**Lighter / parallel (good ROI without full Phase 2):**
 
-- [ ] **F-03** Solution overview block diagram (export from Mermaid in data form Section 18.1).
-- [ ] **F-05** One Win11 overlay from existing baseline figures (UIED-style).
-- [ ] **F-08** Gantt or timeline for the four project phases.
-- [ ] **F-07** GUI wireframe or annotated screenshot of real Tk window.
-- [ ] **Figure 5.4** Repository tree PNG (as promised in Chapter 5: `tree -L 3` or draw.io).
+- [ ] **D-08** CPV metric beside mAP.
+- [ ] **D-09** Detector-only inference timing.
+- [ ] **D-10** 2 reviewers on T01–T15; feeds Section 8.3 and **F-12**.
+- [ ] **D-11** Peak RSS → `nfr_memory.csv`; closes R-NFR-03.
+- [ ] **D-12** Preprocessing A/B on TSR.
 
-Optional but valuable:
-
-- [ ] **F-01** Domain shift three-panel composite.
-- [ ] **F-02** Positioning 2×2 grid.
-- [ ] **F-04** RICO vs CLAY pair.
-- [ ] **F-06** UML use case diagram.
-- [ ] **F-09** CVAT/Roboflow screenshot.
-- [ ] **F-10** Confusion matrix from notebook.
-- [ ] **F-11** After D-05 only: sample-efficiency curve.
-- [ ] **F-12** After D-10 only: reviewer feedback redacted screenshots.
-
-### Phase 2: Evaluation defensibility (no new models)
-
-Strengthens Chapter 7–8 without DETR/UDA.
-
-- [ ] **D-11** Peak RSS per method during T01–T15; write `nfr_memory.csv`; close R-NFR-03 in prose.
-- [ ] **D-08** Add CPV alongside mAP in evaluation notebook; one paragraph + optional table in report.
-- [ ] **D-09** Optional: separate detector-only timing vs full pipeline in `run_nfr` or a small script.
-- [ ] **D-10** Two reviewers run T01–T15; collect short written feedback; update Section 8.3 + **F-12**.
-- [ ] **T-04** Export one master CSV (or Word table) mapping every R-FR / R-NFR to evidence file + verdict.
-- [ ] **T-01** (partial) Refresh transfer table with **only YOLO** rows if DETR slips; leave DETR rows blank or "Not run" per programme rules.
-
-### Phase 3: Data and labels (largest accuracy gain for time)
-
-- [ ] **D-07** Expand hand-corrected desktop test set toward 100 images (or as many as you can before deadline).
-- [ ] **D-06** If pursuing SSP/UDA: grow unlabelled desktop capture toward 2,000 screens; else **document deferral** in Section 9.8.
-- [ ] **D-05** Few-shot curve $k \in \{1,5,10,50,100\}$ once D-07 gives enough labels **or** honestly scope to available $k$.
-- [ ] **U-10** Fill **T16–T20** in task JSON **or** state in report that evaluation stops at T15 (align with programme expectations).
-
-### Phase 4: Proposal-stretch experiments (optional; triage before starting)
-
-Complete only if time remains after Phase 0–3. Each unlocks new report prose (**W-02**) and tables **T-01–T-03**.
-
-- [ ] **D-01** DETR source + fine-tune notebooks; extend transfer CSV; update RQ3 answer.
-- [ ] **D-02** SSP pretrain + fine-tune (needs **D-06** corpus).
-- [ ] **D-03** Adaptive Teacher UDA.
-- [ ] **D-04** SHOT UDA.
-- [ ] **D-12** Preprocessing A/B on T01–T15.
-
-### Phase 5: Final polish
-
-- [ ] **W-03** Personal paragraphs: Learning outcomes (Section 9.3) and relevant modules (Section 9.4).
-- [ ] **W-04** Personal paragraph: Self-taught areas refinement (Section 9.5).
-- [ ] **U-06** Short reflection in Section 9.6 (YOLO vs DETR difficulty), even if DETR was not run ("did not complete DETR; YOLO consumed X hours…").
-- [ ] **U-11** Record demo video if programme or supervisor expects multimedia evidence; otherwise note "not submitted" in appendices.
-- [ ] Spell-check, consistency pass on acronyms (TSR, mAP, CPV, IVGocr).
-- [ ] Final PDF: table of contents, list of figures, list of tables, plagiarism/AI declaration per RGU.
+**Suggested order:** **D-07** early; then **D-08, D-09, D-11, D-12** in parallel with whatever heavy D you choose; **D-06** before **D-02–D-04**; **D-01** before claiming DETR in **T-01**.
 
 ---
 
-## 4. Triage rule (so you do not drown)
+## 4. Track 2: TABLE (T) — after D
 
-1. **Phase 0** and **Phase 1** are usually enough for a **defensible** MSc submission **if** the written argument and existing numbers are honest (including partial RQ2/RQ3).
-2. **Phase 2** turns "good draft" into "hard to argue with" on evaluation.
-3. **Phase 3** improves science more than **Phase 4** for equal hours, if the story is detector + OCR + refusal.
-4. **Phase 4** is for programmes that **require** every proposal experiment: confirm with supervisor before committing weeks.
+- [ ] **T-04** Master FR/NFR evidence table (can start anytime; uses existing CSVs).
+- [ ] **T-01** Extend transfer / model comparison table (YOLO complete; add DETR after **D-01**).
+- [ ] **T-02** Sample-efficiency table (after **D-05** ± **D-02**).
+- [ ] **T-03** UDA comparison table (after **D-03** and **D-04**).
 
-If you defer Phase 4, add one explicit paragraph in Section 9.7 Limitations and Section 9.8 Future work stating which proposal items were not completed and why (time, compute, data).
-
----
-
-## 5. Link to gap IDs
-
-| Phase | Main gap IDs |
-|-------|----------------|
-| 0 | U-01–U-09, W-01 |
-| 1 | F-01–F-09, Figure 5.4 tree |
-| 2 | D-08, D-09, D-10, D-11, T-01 (partial), T-04, F-10, F-12 |
-| 3 | D-05, D-06, D-07, U-10 |
-| 4 | D-01–D-04, D-12, T-01–T-03, W-02, F-11 |
-| 5 | W-03, W-04, U-06, U-11 |
+Paste or link final numbers into `Final_Report.md` where chapters already point to those tables.
 
 ---
 
-*Owner: Hiran Abeywardhana. Sync this file when you close items in `Final_Report_GAPS.md`.*
+## 5. Track 3: WRITING (W) — after D/T settle
+
+- [ ] **W-02** Chapter 6: align implementation prose with whatever D experiments you actually ran.
+- [ ] **W-03** Chapter 9.3–9.4: personal learning outcomes + relevant modules.
+- [ ] **W-04** Chapter 9.5: self-taught areas (tighten placeholders).
+- [ ] **W-01** Renumber references = **first appearance order** in full dissertation (**do this last among W**, right before final export).
+
+---
+
+## 6. Track 4: FIGURE (F) — defer
+
+Do **after** the numbers and tables you want to illustrate exist.
+
+Minimum set if time is short: **F-03**, **F-05**, **F-08**, **F-07**, repository tree (**Figure 5.4** in report). Full list: `Final_Report_GAPS.md` (F-01–F-12).
+
+- [ ] **F-10** after detector eval refresh (**D** / notebook).
+- [ ] **F-11** after **T-02** / **D-05**.
+- [ ] **F-12** after **D-10**.
+
+---
+
+## 7. Track 5: USER (U) — last
+
+Do **after** figures embedded and text frozen except final proofread.
+
+- [ ] **U-07** RGU reference style (IEEE vs Harvard).
+- [ ] **U-08** Voice (I vs impersonal) — one consistent pass.
+- [ ] **U-09** British vs American spelling.
+- [ ] **U-03** Word count vs programme cap.
+- [ ] **U-01** Submission date on title page.
+- [ ] **U-02** Second marker name.
+- [ ] **U-04** Acknowledgements + AI disclosure per rules.
+- [ ] **U-05** Hardware spec in data form; align Chapter 7 latency text.
+- [ ] **U-06** Reflection Section 9.6 (YOLO vs DETR effort).
+- [ ] **U-10** Define T16–T20 **or** state explicitly evaluation ends at T15.
+- [ ] **U-11** Demo video only if required.
+- [ ] Export `Final_Report.md` → faculty Word/LaTeX; TOC, LOF, LOT; final PDF + declarations.
+
+---
+
+## 8. If you run out of time
+
+1. Finish **D** items your supervisor marks as mandatory; document the rest under Section 9.7–9.8.
+2. **T-04** + partial **T-01** still strengthen the report without every experiment.
+3. **W-01** + **U-*** are required for submission hygiene; do not skip **U** entirely, only **defer** it to the end as planned.
+
+---
+
+## 9. Gap ID quick map
+
+| Track | IDs |
+|-------|-----|
+| 1 D | D-01 … D-12 |
+| 2 T | T-01 … T-04 |
+| 3 W | W-01 … W-04 |
+| 4 F | F-01 … F-12 |
+| 5 U | U-01 … U-11 |
+
+---
+
+*Owner: Hiran Abeywardhana. Keep this file in sync when you mark items DONE in `Final_Report_GAPS.md`.*

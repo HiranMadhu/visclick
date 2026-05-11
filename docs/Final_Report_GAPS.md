@@ -2,13 +2,25 @@
 
 **Status:** living checklist. Whenever the report's prose introduces a placeholder of the form `[NUMBER]`, `[TABLE]`, `[FIGURE N.x]`, or `[CITATION]` that depends on work not yet finished, the matching entry below records what needs to be done to fill it. The author works through this list to bring the report from "first draft" to "submission-ready".
 
-**Action plan (phased checklists):** use `SUBMISSION_TASK_PLAN.md` for the ordered day-to-day to-do list (Phases 0–5, must-do vs optional). This file stays the detailed inventory; the task plan tells you *what to do next*.
+**Action plan (phased checklists):** use `SUBMISSION_TASK_PLAN.md` for checkboxes. That file follows the **author priority order** below.
+
+**Author priority order (current plan).** Work in this sequence unless the supervisor says otherwise.
+
+1. **D (DATA) first:** run experiments and measurements; produce CSVs and numbers the report can cite.
+2. **T (TABLE) second:** consolidate results into submission tables and extend `transfer_experiments` (and related files) once the D items they depend on exist.
+3. **W (WRITING) third:** renumber references (**W-01**); refresh Chapter 6 prose for new methods (**W-02**); personal Chapter 9 paragraphs (**W-03**, **W-04**) when the story is stable.
+4. **F (FIGURE) fourth:** export diagrams, composites, and screenshots; several figures depend on D outputs (for example **F-10**, **F-11**, **F-12**).
+5. **U (USER) last:** title page, RGU style, acknowledgements, hardware spec, Word/PDF export, and binding tasks.
 
 **Conventions.** Each row has a unique `ID`, a short `Gap` description, a chapter/section pointer, a `Source` indicating where the data or content needs to come from, and a `Status` field (`OPEN`, `IN PROGRESS`, `DONE`). Items group into five categories: DATA gaps (experiments not yet run), WRITING gaps (sections needing expansion), FIGURE gaps, TABLE gaps, and USER-OWED gaps (information only the author can provide).
 
+Section headings in this file follow that same order: **D, then T, then W, then F, then U.**
+
 ---
 
-## DATA gaps (experiments not yet run; results still owed)
+## DATA gaps (priority: first)
+
+**Do these before** investing in final tables, figures, and submission admin.
 
 | ID | Gap | Chapter | Source | Status |
 |----|-----|---------|--------|--------|
@@ -25,7 +37,13 @@
 | D-11 | Memory profiling during a full T01-T15 run, peak RSS reported per method. R-NFR-03 PENDING in Section 16 of data form. | Ch7 Section 7.3.2 | `psutil`-based wrapper around `run_baselines.py`, write per-method peak memory to `nfr_memory.csv` | OPEN |
 | D-12 | Preprocessing impact A/B test: run T01-T15 with bilateral filter / contrast normalisation enabled vs disabled, report ΔTSR. | Ch6 Section 6.6, Ch7 Section 7.2.3 | new script `scripts/run_preprocessing_ab.py` | OPEN |
 
-## TABLE gaps (table shells exist but cells still empty)
+**Suggested D sequence (dependencies):** **D-07** and/or **D-06** enlarge data where needed; then **D-05**, **D-01**, **D-02–D-04** as you choose. In parallel, lighter D items: **D-08**, **D-09**, **D-10**, **D-11**, **D-12**.
+
+---
+
+## TABLE gaps (priority: second)
+
+Fill after the D runs that feed each row.
 
 | ID | Gap | Chapter | Source | Status |
 |----|-----|---------|--------|--------|
@@ -34,7 +52,22 @@
 | T-03 | Table 7.y: UDA comparison: Adaptive Teacher vs SHOT, both backbones. | Ch7 | new CSV `reports/tables/uda_comparison.csv` from D-03 + D-04 | OPEN |
 | T-04 | Table 8.x: full requirement-evaluation table: every R-FR-01..R-FR-09 and R-NFR-01..R-NFR-10 with measured value. Today the per-method pass rate is in `baseline_per_task.csv`; the FR/NFR mapping table needs to be exported as its own CSV for citation. | Ch3 Section 3.8, Ch3 Section 3.9, Ch8 Section 8.4, Section 8.5 | hand-built table; ~30 min | OPEN |
 
-## FIGURE gaps (placeholders waiting for the author's images)
+---
+
+## WRITING gaps (priority: third)
+
+| ID | Gap | Chapter | Source | Status |
+|----|-----|---------|--------|--------|
+| W-01 | References list at end of report. Currently inline `[N]` citations use the proposal's numbering. Need a single sequential list ordered by first appearance in dissertation. | end of report | mechanical pass once all chapters written | OPEN |
+| W-02 | Chapter 6 (Implementation) sections covering DETR backbone implementation, SSP pretraining objective, and UDA framework code paths. These exist as plans in the proposal but are not yet implemented; corresponding prose must follow the code. | Ch6 | depends on D-01..D-04 | OPEN |
+| W-03 | Chapter 9 Section 9.3 "Learning Outcomes" and Section 9.4 "Highly Relevant Academic Modules" need personal-voice reflections that only the author can provide (which modules from the MSc curriculum mapped to which parts of the work, what surprised the author during execution, etc.). | Ch9 | author-owned | OPEN |
+| W-04 | Chapter 9 Section 9.5 "Self-Taught Areas and New Skills": same as W-03, author-owned. | Ch9 | author-owned | OPEN |
+
+---
+
+## FIGURE gaps (priority: fourth; defer)
+
+**Skip until** the D and T work you plan to cite is largely done (many figures depend on notebook output or reviewer quotes).
 
 | ID | Gap | Chapter | Source | Status |
 |----|-----|---------|--------|--------|
@@ -51,16 +84,11 @@
 | F-11 | Figure 7.y: sample-efficiency curve (depends on D-05). | Ch7 Section 7.2 | matplotlib plot from `sample_efficiency.csv` (T-02) | OPEN |
 | F-12 | Figure 8.x: qualitative evaluation evidence (screenshots of feedback). | Ch8 Section 8.3 | depends on D-10; could be quoted email screenshots, redacted as needed | OPEN |
 
-## WRITING gaps (sections needing content rewrite / expansion)
+---
 
-| ID | Gap | Chapter | Source | Status |
-|----|-----|---------|--------|--------|
-| W-01 | References list at end of report. Currently inline `[N]` citations use the proposal's numbering. Need a single sequential list ordered by first appearance in dissertation. | end of report | mechanical pass once all chapters written | OPEN |
-| W-02 | Chapter 6 (Implementation) sections covering DETR backbone implementation, SSP pretraining objective, and UDA framework code paths. These exist as plans in the proposal but are not yet implemented; corresponding prose must follow the code. | Ch6 | depends on D-01..D-04 | OPEN |
-| W-03 | Chapter 9 Section 9.3 "Learning Outcomes" and Section 9.4 "Highly Relevant Academic Modules" need personal-voice reflections that only the author can provide (which modules from the MSc curriculum mapped to which parts of the work, what surprised the author during execution, etc.). | Ch9 | author-owned | OPEN |
-| W-04 | Chapter 9 Section 9.5 "Self-Taught Areas and New Skills": same as W-03, author-owned. | Ch9 | author-owned | OPEN |
+## USER-OWED gaps (priority: last)
 
-## USER-OWED gaps (only the author can supply)
+**Do last:** RGU front matter, style decisions that affect the whole PDF, and hardware acknowledgement for timing claims.
 
 | ID | Gap | Chapter | Source | Status |
 |----|-----|---------|--------|--------|

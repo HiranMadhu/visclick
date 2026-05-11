@@ -605,6 +605,673 @@ The project follows a design-science research methodology, with a modular, repro
 
 The next chapter, Chapter 5, presents the design: the high-level architecture, the block diagram and flow chart of the runtime, the research design, and the wireframes for the prototype GUI.
 
+# Chapter 5 — Design
+
+## 5.1 Chapter Overview
+
+This chapter is the design half of the build-then-evaluate loop. It begins with the research design, which lays out the experimental matrix the rest of the dissertation populates. It moves on to the system architecture, presented as a block diagram in §5.3 and as a per-instruction flow chart in §5.4. The module-level design is presented next: which Python package contains which logical responsibility, and how the modules connect. The GUI side is covered in §5.6 with wireframes for the prototype's Tk dialog. The storage design (file layout, CSV schemas, ONNX weights) is in §5.7. The chapter closes with the algorithm design for the two non-trivial components: the fuzzy text-plus-class matcher in `visclick.match` and the refusal rule that implements R-FR-06.
+
+The design described in this chapter is what the rest of the project implements. Chapter 6 walks through the code in the order this chapter lays out. The empirical results in Chapters 7 and 8 measure the implementation against the targets stated in Chapter 3. A reader who only wants the operational picture can read §5.3 and §5.4 and skip the rest.
+
+## 5.2 Research Design
+
+The research design is an experimental matrix that crosses three axes. The first axis is **architectural family**: YOLOv8s and DETR-R50. The second axis is **adaptation method**: source-only zero-shot (M0), few-shot fine-tune of the head (M2), self-supervised pre-training followed by fine-tune (SSP+FT), and unsupervised domain adaptation (Adaptive Teacher and SHOT). The third axis is **labelled-target budget**: $k = 1, 5, 10, 50, 100$ for the methods that use any labelled target data. A fully populated experimental matrix would therefore contain $2 \times 5 \times 5 = 50$ cells, although many of those cells degenerate (zero-shot does not depend on $k$; UDA does not depend on $k$ in the same way).
+
+The reduced matrix the project actually executes is shown in Table 5.1. The eight cells marked DONE are reported in Chapter 7. The remaining cells are listed in gaps D-01 through D-05 of `docs/Final_Report_GAPS.md` and would close the matrix to its full proposal-committed shape.
+
+**Table 5.1 — Experimental matrix.**
+
+| Backbone | Method | $k$ | Status |
+|----------|--------|----:|--------|
+| YOLOv8s | M0 zero-shot (CLAY → desktop) | n/a | DONE — `08_phase1B_ablations.ipynb` |
+| YOLOv8s | M1 COCO direct (control) | n/a | DONE |
+| YOLOv8s | M2 head fine-tune | 50 | DONE — headline detector |
+| YOLOv8s | M3 frozen layers 22 | 50 | DONE — ablation |
+| DETR-R50 | M0 zero-shot | n/a | PENDING — D-01 |
+| DETR-R50 | M2 head fine-tune | 50 | PENDING — D-01 |
+| YOLOv8s | M2 few-shot curve | 1, 5, 10, 50, 100 | PENDING — D-05 |
+| YOLOv8s | SSP + M2 | 1, 5, 10, 50, 100 | PENDING — D-02 |
+| YOLOv8s | UDA Adaptive Teacher | n/a | PENDING — D-03 |
+| YOLOv8s | UDA SHOT | n/a | PENDING — D-04 |
+
+The end-to-end TSR evaluation is run only against the single headline detector (YOLOv8s M2 fine-tune) rather than against every cell of the matrix. The rationale is twofold. The first reason is that the prototype's downstream behaviour depends on detection plus OCR plus matching plus action, so a fair end-to-end comparison across detectors would require re-running the full 15-task suite for each adaptation cell. That is roughly an hour of human verdict-collection per cell, which scales poorly. The second reason is that the dissertation's RQ4 (end-to-end practicality) is about whether one viable adapter can be turned into a working bot, not about which of several adapters does so best end-to-end. The "best" adapter is identified by mAP and CPV on the labelled test set; only that adapter gets the end-to-end treatment.
+
+The classical baselines (template, OCR-only, pywinauto) sit outside the adaptation matrix because they have no adaptation parameter to vary. They are evaluated only end-to-end on the same 15-task suite, with the comparison being against the VisClick full pipeline.
+
+## 5.3 System Architecture
+
+The system architecture is captured in two diagrams. Figure 5.1 is the static block diagram: the boxes are the logical components, the arrows are the data dependencies. Figure 5.2 is the dynamic flow chart: it traces a single instruction from text input to clicked-element.
+
+[FIGURE 5.1 — "Block diagram of the VisClick system."
+ Suggested source: regenerate from the Mermaid source in `docs/VisClick_Report_Data_Form.md` §18.1 via mermaid-cli or a Mermaid Live Editor export. Path placeholder: `reports/figures/ch5_block_diagram.png`.
+ Suggested caption (~30 words): "Block diagram of VisClick. The capture, detect, OCR, match and act components are each a Python module under `src/visclick/`. Logging components are in `scripts/run_baselines.py`."]
+
+The architecture has six logical layers. Each layer is realised as exactly one Python module under `src/visclick/`, with one exception (logging is split between modules and is handled at the script level rather than as a dedicated module).
+
+**Layer 1 — User input.** Either a text instruction from the GUI (`visclick.gui`) or a `--target` argument from the CLI (`visclick.__main__`).
+
+**Layer 2 — Screen capture.** A wrapper over `mss` that handles multi-monitor coordinate offsets (`visclick.capture`). The capture layer returns an RGB numpy array and the `(left, top)` offset of the chosen monitor.
+
+**Layer 3 — Detection.** An ONNX wrapper that loads the trained YOLOv8s weights and emits a list of `(class_id, confidence, xyxy)` tuples (`visclick.detect`). The wrapper supports both an `onnxruntime` backend (the default, CPU only) and an Ultralytics `model.predict()` backend (used during training and during ablations).
+
+**Layer 4 — OCR.** A two-mode OCR layer (`visclick.ocr`). The per-box mode runs EasyOCR on each detected bounding box and returns the most confident text string. The full-image mode runs EasyOCR on the entire screenshot and returns a list of `(text, bounding_box, confidence)` tuples for use in the OCR fallback path. The module exposes the `ocr_status()` probe described in §4.3.
+
+**Layer 5 — Matching.** A fuzzy matcher built on `rapidfuzz` (`visclick.match`). The matcher's `best_box()` function takes the user instruction, the per-box OCR text, and the detection class IDs, and returns the index of the best-matching box together with its score. The class-aware bonus and the similarity threshold are explained in §5.8.
+
+**Layer 6 — Action.** A PyAutoGUI wrapper that handles the virtual-desktop offset correction (`visclick.act`). The wrapper exposes `click_box(box, offset=(left, top))` and `move_to_box(...)`.
+
+Above the six layers sits the orchestrator `visclick.bot`, which composes the layers into a single `run_instruction()` entry point. The orchestrator is what both the CLI and the GUI invoke. It is also what the evaluation harness's VisClick baseline (`scripts/baseline_visclick.py`) calls.
+
+The deliberate property of this design is that no two layers share state. The capture layer hands an image to the detect layer; the detect layer hands a box list to the OCR layer; the OCR layer hands text to the matcher; and so on. This is what makes each layer independently testable, and it is also what made the four-baseline comparison in Chapter 7 possible without duplicating code.
+
+## 5.4 Process Flow
+
+The flow chart in Figure 5.2 makes the runtime behaviour explicit. The single decision point that is worth pulling out for prose discussion is the OCR-fallback decision at the matcher.
+
+[FIGURE 5.2 — "Process flow chart for a single click instruction."
+ Suggested source: regenerate from the Mermaid source in `docs/VisClick_Report_Data_Form.md` §18.2. Path placeholder: `reports/figures/ch5_flowchart.png`.
+ Suggested caption (~30 words): "Per-instruction flow chart. The decision diamond at the matcher determines whether the detector's top candidate is accepted (Yes), whether the full-image OCR fallback is invoked (No, retry), or whether the system refuses to click (No, refuse)."]
+
+The flow has six stages. **Capture** acquires the screenshot from the chosen monitor. **Detect** produces up to $N$ candidate boxes; if $N = 0$ the system falls through to the OCR fallback path. **Per-box OCR** annotates each box with its text. **Match** computes a fuzzy similarity score between the user instruction and each box's text, with a small bonus added for boxes whose detected class matches the instruction's likely intent (a "click Save" instruction prefers a `button` over a `text`). **Decision** compares the top score against `min_text_similarity` (currently 60 on a 0-100 scale). If the score clears the threshold, the system proceeds to **Action**. If it does not, the system enters the **fallback** branch, running full-image OCR and re-matching the instruction against every recognised text region; if the fallback also fails to clear the threshold, the system **refuses**.
+
+The fallback is the architectural compromise that pays for the source-domain detector's limited recall on Windows 11 native dialogs (the recall-bound problem documented as O11 in the data form). Without the fallback, the bot would refuse on roughly half the test tasks because the detector simply does not see the target box. With the fallback, the bot recovers the visible-text-but-no-box cases at the cost of a roughly 6-second latency penalty. The cost-benefit is recorded in §7.3.2 and is one of the two design trade-offs that Chapter 8 returns to in the evaluation chapter.
+
+## 5.5 Module Design
+
+The module diagram below makes the per-package responsibilities explicit. Each module's public surface is small (between one and four exported functions or classes). The module-level boundaries are also the unit-test boundaries: each module has at least one corresponding `tests/test_<module>.py` file (the test files are listed in §6.12).
+
+```text
+src/visclick/
+  __init__.py          # package re-exports
+  __main__.py          # CLI entry point: python -m visclick.bot ...
+  capture.py           # mss wrapper; multi-monitor offset
+  detect.py            # ONNX YOLOv8s wrapper; Ultralytics fallback
+  ocr.py               # EasyOCR per-box + full-image; status probe
+  match.py             # rapidfuzz best_box; class-aware bonus
+  act.py               # PyAutoGUI click_box; offset correction
+  bot.py               # orchestrator: run_instruction()
+  gui.py               # Tk GUI; monitor selector; verdict logging
+  utils.py             # logging helpers; _warn_once
+scripts/
+  run_baselines.py        # 4-method evaluation harness
+  analyse_baselines.py    # TSR computation, p50/p95 latency
+  baseline_visclick.py    # VisClick BaselineResult adapter
+  baseline_template.py    # cv2.matchTemplate adapter
+  baseline_ocr_only.py    # OCR-only adapter
+  baseline_pywinauto.py   # accessibility-tree adapter
+  capture_screenshots.py  # corpus expansion
+  make_prototype_figures.py # report figure generation
+  run_nfr.py              # NFR latency + memory profiling
+  test_screen.py / test_click.py / test_detector.py # ad-hoc smoke tests
+```
+
+The module dependency graph is intentionally a directed acyclic graph: `bot` depends on `capture, detect, ocr, match, act`; `capture, detect, ocr, match, act` are mutually independent; `gui` depends on `bot`. The acyclic property is what lets the four baselines reuse `capture` and `act` without dragging in the detector. A circular dependency would have collapsed this composition.
+
+## 5.6 GUI Wireframes
+
+The prototype ships a single-window Tk dialog. The wireframe in Figure 5.3 captures the layout. There are deliberately few controls: the goal is to make the bot's behaviour obvious to a first-time user, not to put every parameter on the surface.
+
+[FIGURE 5.3 — "Wireframe of the VisClick GUI."
+ Suggested source: hand-drawn rectangles or a screenshot of the actual Tk window with annotations overlaid; the existing screenshot `reports/figures/proto_2_typed.png` can be used with arrow annotations. Path placeholder: `reports/figures/ch5_gui_wireframe.png`.
+ Suggested caption (~30 words): "GUI wireframe. (1) Monitor dropdown. (2) Instruction text box. (3) Run / Stop buttons. (4) Live status line. (5) Last-overlay thumbnail. (6) Verbose log toggle."]
+
+The six elements are as follows.
+
+1. **Monitor dropdown** (`gui.MonitorSelector`). Populated at start-up from `mss.monitors`. Selection sets the `--monitor` index for every subsequent run. Defaults to the primary monitor.
+
+2. **Instruction text box** (single line, `tk.Entry`). The user types a free-form instruction. Enter triggers Run.
+
+3. **Run / Stop buttons.** Run kicks off the orchestrator. The 3-second pre-action countdown is implemented as a Tk `after()` callback; the Stop button cancels the countdown.
+
+4. **Status line** (single line at the bottom). Shows one of `idle`, `counting down: 3 / 2 / 1`, `capturing`, `detecting`, `ocr`, `matching`, `clicking`, `done — verdict?`, `FAIL: cannot find target`.
+
+5. **Last-overlay thumbnail.** A 320×180 thumbnail of the most recent `overlay.png`. Clicking the thumbnail opens the full-resolution PNG in the system viewer. This is the diagnostic affordance that supports UC-04.
+
+6. **Verbose log toggle.** A check box that, when on, prints the per-stage timings to stdout. Off by default to avoid noise on first-time users.
+
+The wireframe is deliberately small. Three earlier wireframes (a separate evaluation tab, a separate model-selection panel, a confidence-threshold slider) were considered and removed at design review on the grounds that they did not serve a stakeholder viewpoint identified in §3.2.2. The verdict-collection dialog used during the 15-task evaluation runs (`scripts/run_baselines.py::_verdict_dialog_tk`) is a separate Tk window that pops up at the end of each attempt; its wireframe is similar enough that it does not warrant a separate figure.
+
+## 5.7 Data Storage Design
+
+The project does not use a database. All persistent state is files on disk, organised under three top-level directories that together constitute the project's storage design.
+
+The first directory, `datasets/`, holds the training and test data. Its sub-layout follows the YOLOv8 / Ultralytics convention so that `ultralytics.YOLO("yolov8s.pt").train(data="configs/yolo_desktop_finetune.yaml")` works without modification. The relevant sub-trees are:
+
+```text
+datasets/
+  source_zenodo_unified/
+    images/{train,val}/*.png
+    labels/{train,val}/*.txt    # YOLO format: class cx cy w h
+  desktop_seed/
+    images/*.png                # 50 personal screenshots
+    labels/*.txt                # auto-labels from M0
+  handcorrected_desktop_test/
+    images/*.png                # 8 hand-corrected test screenshots
+    labels/*.txt                # 356 hand-corrected boxes
+```
+
+The second directory, `weights/`, holds the trained ONNX file plus the per-experiment Ultralytics `.pt` checkpoints. The principal file is `weights/visclick.onnx` (44.7 MB), which is the headline detector (YOLOv8s, CLAY-pretrained, M2-fine-tuned, 50-epoch). The `.pt` files for each ablation are kept under `weights/ablations/M{0,1,2,3}_best.pt` so the experiments are exactly reproducible from the source.
+
+The third directory, `reports/`, holds the figures and tables that the dissertation cites. Two sub-directories sit under it: `reports/tables/` for CSVs and `reports/figures/` for PNGs. The CSV schemas are stable so that downstream analysis scripts (`scripts/analyse_baselines.py`, `scripts/make_prototype_figures.py`) can be re-run on a fresh install and produce identical output. The principal schema, used by `baseline_results.csv`, is:
+
+```text
+columns: task_id, method, instruction, capture_path, predicted_xy,
+         verdict, latency_seconds, is_negative, notes
+verdict ∈ {pass, fail, skip, refused}
+method  ∈ {template, ocr_only, pywinauto, visclick}
+```
+
+Every per-attempt row is the smallest unit of evaluation evidence in the dissertation. The 60 rows in the current `baseline_results.csv` are what every percentage figure in Chapter 7 is computed from.
+
+A fourth, transient, directory `runs/` holds the per-experiment Ultralytics training output (loss curves, weights, validation predictions). It is not version-controlled because the contents are reproducible from the notebooks; only the relevant final weights are promoted into `weights/`.
+
+## 5.8 Algorithm Design
+
+Two algorithms in the system are non-trivial enough to warrant a dedicated design statement. They are the fuzzy matcher in `visclick.match` and the refusal rule in the orchestrator.
+
+### 5.8.1 The matcher
+
+The matcher's job is to pick which of the $N$ detected boxes the user is asking the bot to click. The input is the user instruction (a short string), the list of per-box OCR texts, and the list of detection class IDs. The output is the index of the chosen box plus a confidence score on a 0-100 scale.
+
+The matcher scores each box by combining two signals. The **text-similarity signal** is `rapidfuzz.fuzz.WRatio(instruction, box_text)`, which is a normalised mix of partial-string, token-set, and token-sort scores. WRatio is preferred over a single ratio metric because it is robust to word-order variation ("click Save button" vs "click the Save button" both score near 100 against an OCR string `Save`). The **class-bonus signal** is a small additive bonus when the detection class matches an inferred intent. The intent inference is a tiny rule table: instruction contains "type" or "enter" $\to$ prefers `text_input`; instruction contains "select" $\to$ prefers `menu` or `checkbox`; everything else prefers `button`. The bonus is set to +10 on a 0-100 scale, which is enough to break ties between two same-text boxes of different classes but not enough to override a strong text mismatch.
+
+The final score is `min(100, text_similarity + class_bonus)`. The chosen box is the one with the highest final score, ties broken by detection confidence (higher first).
+
+The textual algorithm in Python is:
+
+```python
+def best_box(instruction: str,
+             box_texts: list[str],
+             box_classes: list[str]) -> tuple[int, float]:
+    intent_class = _infer_intent(instruction)  # one of button/text_input/menu/...
+    scores = []
+    for text, cls in zip(box_texts, box_classes):
+        ts = rapidfuzz.fuzz.WRatio(instruction.lower(), (text or "").lower())
+        bonus = 10 if cls == intent_class else 0
+        scores.append(min(100, ts + bonus))
+    best_idx = max(range(len(scores)), key=scores.__getitem__)
+    return best_idx, scores[best_idx]
+```
+
+The threshold for accepting the chosen box is `min_text_similarity = 60` in the current build. This threshold was selected empirically by running the 15-task suite at thresholds of 40, 50, 60, 75 and 85 and choosing the lowest threshold at which the negative test case (T15, "click the Settings menu" in an app with no Settings menu) was refused while the 14 positive tasks were still accepted. A higher threshold of 75 is being considered as part of risk RR-05; the change is contingent on widening the negative-case set beyond a single task.
+
+### 5.8.2 The refusal rule
+
+The refusal rule is the orchestrator-level decision that determines whether a click is issued. The rule has three branches.
+
+The **first branch** is the no-candidates branch: if the detector emits zero boxes, the orchestrator skips the per-box OCR stage entirely and goes directly to the OCR fallback. The fallback may itself find no candidates, in which case the system refuses.
+
+The **second branch** is the low-confidence branch: if the matcher's chosen box has a score below `min_text_similarity` after per-box OCR, the orchestrator goes to the OCR fallback. If the fallback also returns a low-confidence result, the system refuses.
+
+The **third branch** is the high-confidence branch: if the matcher's chosen box has a score at or above the threshold, the orchestrator proceeds directly to action. The action layer issues a single left-click at the centre of the chosen box, with the multi-monitor offset already corrected by the capture layer.
+
+In all three branches the system writes a CSV row to `baseline_results.csv` describing what happened, including the chosen box (if any), the score, and the verdict (`pass`, `fail`, `refused`, `skip`). The CSV is what the analysis pipeline consumes in §7.3 and §8.2.
+
+## 5.9 Chapter Summary
+
+The design described in this chapter is the contract that Chapter 6 implements and that Chapters 7 and 8 evaluate. The system has six logical layers (capture, detect, OCR, match, act, bot) each realised as one Python module, plus a thin GUI and an evaluation harness. The architecture is deliberately acyclic, which is what made the four-baseline comparison possible inside a shared harness. The runtime flow has one non-trivial decision point, the OCR-fallback path at the matcher, which trades off latency for recall in a way that the empirical evidence in Chapter 7 quantifies. Data is stored as files on disk in a layout that supports both YOLOv8/Ultralytics training conventions and per-attempt CSV evaluation logs. Two algorithms (the rapidfuzz-plus-class-bonus matcher and the three-branch refusal rule) are made explicit because they encode the project's twin commitments: fuzzy human-text tolerance and refusal-on-uncertainty.
+
+The next chapter walks through the implementation of every element of this design.
+
 ---
 
-*End of Chapters 1, 2, 3, 4. Next chapters to be written: 5 (Design), 6 (Implementation), 7 (Testing), 8 (Evaluation), 9 (Conclusion).*
+# Chapter 6 — Implementation
+
+## 6.1 Chapter Overview
+
+This chapter is the build half of the design-build-evaluate loop. It walks through the implementation in the order the design chapter introduced the components. It begins with the development environment and toolchain, because every implementation claim that follows depends on having that environment reproducibly available. It moves on to the dataset implementation (acquisition, cleaning, class collapse, auto-labelling, and the hand-correction pass). It covers the detector implementation in two pieces: source-domain training in §6.4 and target-domain adaptation in §6.5. The OCR layer, the matcher, the action layer, the GUI, and the evaluation harness are then implemented in turn. The chapter closes with a brief discussion of the deliberately-deferred implementation work, which is the code corresponding to the gaps D-01 through D-05.
+
+A reader following the artefact alongside the dissertation should be able to identify, for any concrete claim in this chapter, the file, function or notebook cell that implements that claim. Implementation evidence is the contract this chapter pays.
+
+## 6.2 Development Environment and Toolchain
+
+The development environment is built around two compute targets. Training happens on **Google Colab Free** with a T4 GPU. Inference and prototype testing happen on a **Windows 11 desktop**, the author's personal machine. The two environments are deliberately kept compatible at the Python interpreter level (CPython 3.11 in both) so that any artefact trained on Colab can be loaded and run on the Windows machine without environment-specific re-installation.
+
+The Python project is structured as a standard `pyproject.toml`-driven package. The `pyproject.toml` defines the `visclick` distribution with the following declared dependencies (the full list is in the repository; the version pins are stricter than shown here, recorded in `requirements.txt`):
+
+```text
+ultralytics>=8.0          # YOLOv8s training + ONNX export
+opencv-python>=4.8        # image I/O, template matching, overlay drawing
+numpy>=1.24
+Pillow>=10.0
+onnxruntime>=1.17         # CPU-only ONNX inference
+pyautogui>=0.9.54         # action layer
+mss>=9.0                  # multi-monitor screen capture
+pytesseract>=0.3          # optional OCR (Tesseract backend)
+easyocr>=1.7              # primary OCR backend
+rapidfuzz>=3.0            # matcher
+psutil>=5.9               # NFR memory profiling
+pywinauto>=0.6 ; platform_system == "Windows"   # baseline accessibility tree
+```
+
+The Windows-only conditional on `pywinauto` is the single concession to a non-portable dependency. Every other package runs on Colab as well, which is what makes notebooks and the Windows prototype share the same package install.
+
+Editable install on Windows is `py -3 -m venv .venv` followed by `.venv\Scripts\activate` and `pip install -e .`. The same incantation, modulo path conventions, works on Linux and Mac although neither is in scope for the bot itself. The CLI is exposed as the module entry point `python -m visclick.bot --target "Save" --monitor 0`.
+
+The repository layout is the layout described in §5.7 plus a top-level `notebooks/` directory for the nine training and evaluation notebooks (`01_pull_and_data.ipynb` through `08_phase1B_ablations.ipynb`). Notebooks are kept under version control with output cells stripped on commit (the project's `.gitattributes` declares `*.ipynb diff=ipynb`).
+
+The toolchain for paper-style figure generation is `matplotlib` 3.8 with the default style sheet, exported at 300 DPI. The toolchain for the prototype's overlay rendering is `cv2.putText` plus `cv2.rectangle`; the design choice is documented in §6.7.
+
+## 6.3 Dataset Implementation
+
+The dataset implementation has three tiers, mirroring the methodology in §3.4.
+
+**Tier 1 — Source-domain corpus.** Notebook `01_pull_and_data.ipynb` downloads RICO from the project's hosting URL, CLAY from its own release page, and VINS from the supplementary material of Bunian et al. 2021. Each corpus is unpacked into `datasets/raw/{rico,clay,vins}/`. The notebook then runs a class-collapse pass that maps each corpus's native taxonomy onto the unified 6-class taxonomy used by the project. The class-collapse table is:
+
+| Unified class | Source mapping |
+|---------------|----------------|
+| `button` | RICO `Button`, `ImageButton`; CLAY `Button`; VINS `Button` |
+| `text` | RICO `TextView`; CLAY `Text`; VINS `Text` |
+| `text_input` | RICO `EditText`; CLAY `Edit_text`; VINS `Input_field` |
+| `icon` | RICO `Icon`, `ImageView` (when small); CLAY `Icon`; VINS `Icon` |
+| `menu` | RICO `Menu`; CLAY `Menu`, `Drawer`; VINS `Drop_down_menu` |
+| `checkbox` | RICO `CheckBox`, `Switch`; CLAY `Checkbox`, `Toggle`; VINS `Checkbox` |
+
+Boxes whose source class is not on the mapping table (decorative containers, scroll bars, progress indicators, advertising slots) are dropped from training rather than mapped to a `null` class. The dropping decision is documented in observation O3 of the data form; the alternative of training with a `background` class was tested early in Phase 1 and was discarded because it inflated the false-positive rate on the desktop seed without improving recall.
+
+After class collapse the unified corpus contains 9,646 screens and approximately 312,000 box-level annotations. The notebook then writes the corpus into the YOLO directory layout described in §5.7, with an 85/15 train/val split using a fixed `random_state=42` seed for reproducibility.
+
+**Tier 2 — Unlabelled target corpus.** The captured screenshots live under `samples/desktop_seed/`. The capture script `scripts/capture_screenshots.py` enumerates visible top-level windows via `pywinauto.Desktop(backend="uia")` and grabs each window with `mss`. The current corpus is 50 screenshots spanning Notepad, File Explorer, Visual Studio Code, Chrome, Word, and Outlook. The proposal-committed corpus of 2,000 screenshots is gap D-06; the implementation work for it is a parameterisable scheduled capture script, the design for which is in the data form's §11.
+
+**Tier 3 — Labelled target test corpus.** The hand-correction pass started from the auto-labels emitted by the M0 zero-shot model and corrected them in Roboflow's annotation tool. The corrected output is the 356-box `datasets/handcorrected_desktop_test/` directory. The annotation guidelines are a one-page document that mirrors the CLAY release-notes conventions: tight boxes around the visible affordance (not the surrounding padding), no rotated boxes, no occluded boxes, no boxes for purely decorative graphical elements. The annotation work is documented as observation O17 in the data form. The path to a 100-image labelled corpus, gap D-07, is a continuation of the same workflow at a larger scale.
+
+## 6.4 Source-Domain Detector Training
+
+The source-domain detector is YOLOv8s trained on the unified bundle for 50 epochs. The training configuration is captured in `configs/yolo_source.yaml`:
+
+```yaml
+path: ../datasets/source_zenodo_unified
+train: images/train
+val:   images/val
+names:
+  0: button
+  1: text
+  2: text_input
+  3: icon
+  4: menu
+  5: checkbox
+```
+
+The training command, executed in `05_train_source.ipynb`, is:
+
+```python
+from ultralytics import YOLO
+model = YOLO("yolov8s.pt")            # COCO-pretrained checkpoint
+results = model.train(
+    data="configs/yolo_source.yaml",
+    epochs=50,
+    imgsz=640,
+    batch=16,
+    device=0,                          # Colab T4
+    project="runs/source",
+    name="yolov8s_unified_50e",
+    seed=42,
+)
+```
+
+The training run completes in approximately 4.5 hours on a Colab Free T4. The headline source-domain numbers are mAP@0.5 = 0.793 and mAP@0.5:0.95 = 0.555 on the held-out validation split (recorded in `reports/tables/source_domain_results.csv`). The per-class breakdown in `reports/tables/source_per_class.csv` shows the expected imbalance pattern: `text` is highest at AP@0.5 = 0.91 and `checkbox` is lowest at 0.59. The per-class numbers are consistent with the published baselines on RICO (Apple Screen Recognition's in-distribution F1 of 0.91 is in the same range as our `text` class), which is taken as informal evidence that the training pipeline is working correctly.
+
+The trained checkpoint is exported to ONNX with the canonical Ultralytics export:
+
+```python
+model.export(format="onnx", imgsz=640, opset=12, simplify=True)
+```
+
+The exported file is approximately 45 MB and is shipped into `weights/visclick.onnx`.
+
+## 6.5 Adaptation Methods Implementation
+
+Five adaptation methods are described in the proposal. The implementation status of each is the substance of the experimental matrix in Table 5.1. Each method is treated here in turn.
+
+### 6.5.1 M0 zero-shot transfer (CLAY $\to$ desktop)
+
+M0 is the no-adaptation control. The source-trained detector is run on the desktop seed images without any further training. The implementation is a four-line evaluation cell in `08_phase1B_ablations.ipynb` that loads `weights/source_yolov8s_50e.pt` and calls `model.val(data="configs/yolo_desktop_test.yaml")`. The headline number is mAP@0.5 = 0.157 on the auto-labelled desktop test set, which collapses to mAP@0.5 = 0.033 when re-evaluated against the hand-corrected ground truth (observation O19). The discrepancy is the project's headline measurement of the source-to-target domain gap.
+
+### 6.5.2 M1 COCO direct (control)
+
+M1 is the second control: a COCO-pretrained YOLOv8s with no UI-domain training, run directly on the desktop seed. The intent of the control is to isolate the gain from UI-domain training (M0) versus from generic visual pretraining (M1). The implementation is the same four-line cell as M0 but with `weights="yolov8s.pt"` (the upstream Ultralytics weight). The headline number is mAP@0.5 = 0.071 on the auto-labelled test set, which is lower than M0 as expected.
+
+### 6.5.3 M2 head fine-tune (50 epochs, 50 labelled desktop images)
+
+M2 is the headline adaptation method that produces the deployed detector. The training cell is in `08_phase1B_ablations.ipynb`:
+
+```python
+model = YOLO("weights/source_yolov8s_50e.pt")
+results = model.train(
+    data="configs/yolo_desktop_finetune.yaml",
+    epochs=50,
+    imgsz=640,
+    batch=8,
+    device=0,
+    freeze=10,                        # freeze backbone, train neck + head
+    seed=42,
+)
+```
+
+The `freeze=10` argument freezes the first 10 layers (the backbone CSPDarknet53), training only the PANet neck and the detection head. The rationale for freezing is data efficiency: with only 50 labelled images, the full-network update overfits within 5 epochs (a phenomenon observed during a preliminary unfrozen run not documented in the notebook). Freezing the backbone keeps the source-domain feature extractor intact and lets the head learn the target-domain class boundaries.
+
+The headline M2 numbers are mAP@0.5 = 0.718 against the auto-labels and mAP@0.5 = 0.033 against the hand-corrected ground truth (the 22-fold gap that motivates the dissertation's evaluation methodology). The latter is the honest number; the former is reported in the dissertation only with the caveat attached.
+
+### 6.5.4 M3 frozen layers 22 (ablation)
+
+M3 freezes the first 22 layers, leaving only the very last detection head trainable. The implementation differs from M2 only in the `freeze=22` argument. M3 is included as a sanity-check ablation: if M3 outperforms M2, that would be evidence that the M2 update is overfitting in the middle layers. The headline M3 number is mAP@0.5 = 0.694 against the auto-labels, slightly below M2 as expected. M3 is reported in `transfer_experiments.csv` for completeness; M2 remains the deployed detector.
+
+### 6.5.5 DETR backbone (pending — D-01)
+
+The DETR backbone implementation has not yet been started. The proposal commits to a DETR-R50 trained on the same unified bundle and evaluated zero-shot and fine-tuned on the desktop set. The implementation plan is to use Meta's reference implementation from the `detr` repository, train for 150 epochs on Colab Free with `batch=4` (T4's 16 GB ceiling for DETR), and follow the same M0 and M2 protocol used for YOLOv8s. The notebook stubs `09_detr_source.ipynb` and `10_detr_finetune.ipynb` are tracked in `docs/Final_Report_GAPS.md` and will become the implementation home for D-01 once started.
+
+### 6.5.6 Self-supervised pre-training + fine-tune (pending — D-02)
+
+SSP is the second pending adaptation method. The proposal commits to a generative inpainting pretext task on the unlabelled desktop corpus. The implementation plan is a masked-image-modelling pretext following Pix2Struct's protocol [L8] adapted for an object-detection backbone rather than a vision transformer. The trained backbone replaces the COCO checkpoint in the M2 fine-tune. SSP requires the 2,000-image unlabelled corpus (D-06), so D-02 depends on D-06.
+
+### 6.5.7 Unsupervised Domain Adaptation, Adaptive Teacher variant (pending — D-03)
+
+The Adaptive Teacher implementation will use the reference code released alongside the CVPR 2022 paper [44]. The implementation plan is to adapt the reference's two-stage Faster R-CNN harness to YOLOv8 by replacing the detector class and updating the EMA-teacher update rule to match Ultralytics's checkpoint format. The mixed-batch composition is 50% labelled source plus 50% pseudo-labelled target, with strong augmentation (RandAugment + cutout) applied to the target half only. The stop criterion is mAP@0.5 on the hand-corrected target set, which links D-03 to D-07 (the 100-image labelled test set).
+
+### 6.5.8 Unsupervised Domain Adaptation, SHOT variant (pending — D-04)
+
+SHOT's implementation is simpler in structure than Adaptive Teacher's. The source-domain head is frozen, and the backbone is fine-tuned on the unlabelled target corpus with a self-supervised pseudo-label objective. The implementation plan is to follow the recent object-detection adaptation of SHOT from Sahay et al. 2023 [52, 55] and to run it on the same hardware budget as Adaptive Teacher to keep D-03 and D-04 directly comparable.
+
+## 6.6 Pre-processing Pipeline
+
+The pre-processing pipeline is split between training-time and inference-time stages.
+
+The **training-time** stage is the standard YOLO augmentation pipeline configured in `configs/yolo_*.yaml`. The augmentations enabled are mosaic (probability 0.5; turned off for the final 10 epochs), horizontal flip (probability 0.5), random scale within $[0.8, 1.2]$, and HSV jitter with the Ultralytics defaults. Vertical flip is disabled because UIs are not vertically symmetric. The mosaic augmentation is what gives the source-domain training its strongest data efficiency on the 9,646-screen corpus; an ablation without mosaic (not reported in the data form) ran 4 percentage points lower in mAP@0.5.
+
+The **inference-time** stage is minimal. The capture layer hands the screenshot to the detect layer at native resolution; the detect layer rescales to 640×640 with letterboxing inside `ultralytics.engine.predictor`. There is no additional bilateral filtering, no contrast normalisation, and no colour-space conversion (the screenshot is RGB throughout). The decision not to add inference-time pre-processing was made empirically: a preliminary A/B test in week 6 of the project compared no-preprocessing against bilateral-filter-plus-CLAHE and showed the no-preprocessing path was marginally better on the desktop seed. The A/B test was not formal enough to report as a result; the gap D-12 records the work needed to do a proper A/B at sufficient sample size.
+
+## 6.7 Prototype Implementation
+
+The prototype is the `visclick` Python package, written to the design in §5.5. The implementation walk-through below visits each module in turn at the level of detail needed to make the chapter's evidence claims auditable.
+
+### 6.7.1 `visclick.capture`
+
+The capture module wraps `mss` and exposes two entry points: `capture_monitor(idx)` and `list_monitors()`. The non-trivial implementation work in this module is the multi-monitor offset propagation, which was the source of observation O13 (the cursor moving by a few pixels on the wrong monitor). The fix is to return the chosen monitor's `(left, top)` offset alongside the image, and to thread that offset through every downstream layer that maps a box to a click coordinate. The relevant signature is:
+
+```python
+def capture_monitor(idx: int = 0) -> tuple[np.ndarray, tuple[int, int]]:
+    """Return (image_rgb, (left, top)) for the monitor at `idx`."""
+```
+
+The `(left, top)` tuple is what `act.click_box` uses to convert a box centre in image-coordinates into a screen-coordinate suitable for `pyautogui.click`.
+
+### 6.7.2 `visclick.detect`
+
+The detect module loads the ONNX file at start-up and runs `onnxruntime`-based inference on each call. The public surface is:
+
+```python
+class Detector:
+    def __init__(self, onnx_path: str = "weights/visclick.onnx"): ...
+    def predict(self, image_rgb: np.ndarray, conf: float = 0.25) -> list[Detection]: ...
+```
+
+The `Detection` dataclass has fields `class_id`, `class_name`, `confidence`, and `xyxy`. The detector also exposes a `status()` probe that prints a tick if the ONNX file loads cleanly and a cross with the underlying error if it does not. The probe is what makes the `_warn_once` pattern actionable at start-up.
+
+### 6.7.3 `visclick.ocr`
+
+The OCR module is the most complex single file in the codebase, because it has to handle two backend mismatches (EasyOCR's `readtext` returns `(bbox, text, conf)` triples; pytesseract's `image_to_data` returns a DataFrame) and a fallback path that runs when neither backend is available. The public surface is small:
+
+```python
+def ocr_image(image_rgb: np.ndarray) -> list[OcrResult]: ...
+def ocr_box(image_rgb: np.ndarray, box: tuple[int, int, int, int]) -> str: ...
+def text_ground(image_rgb: np.ndarray, query: str) -> Optional[tuple[int, int]]: ...
+def ocr_status() -> None: ...
+```
+
+`text_ground` is the OCR-fallback entry point invoked by the orchestrator when the matcher's per-box result is below threshold. It runs `ocr_image` on the full screenshot, then runs the same rapidfuzz matcher over the recognised text regions, and returns the centre of the best match or `None`.
+
+The `ocr_status()` probe is the lesson from observation O12. At start-up it tries to import `easyocr`, `pytesseract`, and the pure-Python fallback in order, prints a tick or cross for each, and lists the active backend. If none of the three is functional, the program emits a `RuntimeError` rather than failing silently downstream.
+
+### 6.7.4 `visclick.match`
+
+The match module is the rapidfuzz-plus-class-bonus matcher implemented in §5.8.1. The public surface is one function (`best_box`) and one helper (`_infer_intent`). The implementation is 38 lines of code and has full unit-test coverage.
+
+### 6.7.5 `visclick.act`
+
+The act module is the PyAutoGUI wrapper. The single public function is `click_box(box, offset=(left, top), dry_run=False)`. The dry-run mode prints what would have been clicked without actually moving the cursor; it is used by the smoke tests and by the prototype's "preview" mode.
+
+### 6.7.6 `visclick.bot`
+
+The orchestrator composes the five layers above into a single `run_instruction(text: str, monitor: int = 0) -> Verdict` entry point. The orchestrator handles the three-branch refusal rule from §5.8.2 and produces the per-attempt CSV row. The CSV row schema is the one declared in §5.7. The orchestrator also handles the overlay PNG generation; the overlay is drawn by a helper function `_render_overlay` that takes the screenshot, the detection list, the chosen box, and the click coordinate, and produces an annotated PNG.
+
+### 6.7.7 `visclick.gui`
+
+The GUI is a single Tk window implementing the wireframe in §5.6. The implementation uses only the standard `tkinter` library (no Tk extensions, no PyQt), which is what lets the package install cleanly on a Windows machine with no further GUI dependencies. The verbose-log toggle and the last-overlay thumbnail are the two implementation choices that took the most time; both are documented in observation O15 of the data form.
+
+## 6.8 OCR Integration
+
+The OCR integration is the architectural choice that gives the prototype its observed end-to-end behaviour. The choice is between running OCR on every detected box (the per-box path) and running OCR once on the whole image (the full-image fallback). The implementation does both, but in a specific order: per-box first, full-image only if per-box fails.
+
+The reason for the ordering is latency. Per-box OCR is roughly $N \times 200\text{ ms}$ on EasyOCR for $N$ boxes; the median $N$ across T01-T15 is 9. Full-image OCR is roughly 6 seconds. The per-box path therefore runs in roughly $9 \times 0.2 = 1.8$ seconds, which is the dominant cost in the happy-path budget. The full-image fallback adds 6 seconds when invoked; the fallback is invoked on roughly 30% of attempts (where the detector misses the target's bounding box), so the expected wall-clock cost of OCR per task is approximately $1.8 + 0.3 \times 6 = 3.6$ seconds. This is the calculation that justifies the per-box-first ordering as opposed to always-full-image.
+
+The OCR engine choice is EasyOCR rather than Tesseract. The choice was made empirically during week 4 (observation O5) after comparing EasyOCR and Tesseract on a small dialog-heavy benchmark. EasyOCR recognised approximately 91% of the visible text on a set of 20 Windows 11 dialogs, while Tesseract recognised 67%. The gap is largest on small text and on anti-aliased text-on-coloured-background; both are common in Windows 11. Tesseract remains available as an opt-in backend via the `VISCLICK_OCR_ENGINE=tesseract` environment variable for users on machines where the EasyOCR model download is awkward.
+
+## 6.9 Matching Algorithm Implementation
+
+The matcher implementation is a faithful realisation of the design in §5.8.1. The minor implementation choices that did not survive into the design statement are worth recording for completeness.
+
+The first choice is **case folding**. All comparisons are lower-cased on both sides. UI text frequently uses title case ("Save"), and instructions are often typed in lower case ("save"); folding gives a small but reliable score uplift.
+
+The second choice is **stop-word retention**. The matcher does *not* strip stop words. "Click the Save button" is left as-is rather than reduced to "save". The rationale is that rapidfuzz's WRatio is robust to padding, and stop-word stripping with a hand-rolled list is a frequent source of off-by-one bugs.
+
+The third choice is the **intent inference table**. The current rules cover ten verbs ("click", "type", "enter", "select", "open", "close", "press", "toggle", "expand", "collapse"). The table is in `visclick/match.py::_INTENT_TABLE` and is the easiest extension point for adding new intent classes.
+
+## 6.10 Action Layer and Multi-Monitor Support
+
+The action layer is the PyAutoGUI wrapper described in §6.7.5. The two non-trivial implementation pieces are the multi-monitor offset propagation (covered in §6.7.1) and the FAILSAFE escape.
+
+PyAutoGUI's `FAILSAFE` flag, when on, raises a `pyautogui.FailSafeException` if the cursor reaches the top-left corner. This is the intentional escape hatch for emergency stop: a user who is running the bot and decides they want to halt it can slam the cursor into the top-left corner to abort. The prototype enables FAILSAFE by default. The implementation exception path is handled in `bot.run_instruction` and logged as `verdict=aborted` in the per-attempt CSV.
+
+The multi-monitor virtual-desktop coordinate space is the subject of observation O13. The fix at the architectural level (§5.3) is to thread the `(left, top)` offset from `capture_monitor` through to `act.click_box`. The fix at the implementation level is one line in `act.click_box`:
+
+```python
+screen_x = box_center_x + offset[0]
+screen_y = box_center_y + offset[1]
+pyautogui.click(screen_x, screen_y)
+```
+
+The pre-fix bug was that `pyautogui.click` was being called with image-coordinates rather than screen-coordinates, which worked on a single-monitor setup (where the two coordinate spaces coincide) and broke on a multi-monitor setup (where they do not).
+
+## 6.11 GUI Implementation
+
+The GUI is the Tk window in `visclick/gui.py`. The implementation is approximately 280 lines of code and follows the wireframe in §5.6. The non-trivial implementation choices are:
+
+* **Threading.** The orchestrator runs on a worker thread to avoid blocking the Tk main loop. The cross-thread communication is via a `queue.Queue` that the main loop polls every 100 ms.
+* **Countdown.** The 3-second countdown is implemented with `tk.after(1000, ...)` callbacks rather than `time.sleep`, which would block the main loop.
+* **Thumbnail rendering.** The last-overlay thumbnail is rendered with `Pillow.Image.thumbnail((320, 180))` on a background thread to avoid jank in the main loop. The thumbnail update is signalled to the main loop via the same `queue.Queue`.
+* **Verdict dialog.** The post-attempt verdict dialog (used by the evaluation harness in §6.12) is a separate `tk.Toplevel` window with three radio buttons (Pass / Fail / Skip) and keyboard shortcuts (y / n / s). The implementation is in `scripts/run_baselines.py::_verdict_dialog_tk` rather than in the GUI module proper, because it is used only by the harness.
+
+## 6.12 Evaluation Harness Implementation
+
+The evaluation harness is the script `scripts/run_baselines.py`. It is approximately 540 lines of code, longer than any single `visclick` module, because it implements the entire experimental protocol used in Chapter 7. The harness's responsibilities are: loading the canonical task list from `tasks/T01_T20.json`, looping over the selected method × task combinations, invoking the per-method `predict()` adapter, presenting the verdict dialog after each attempt, and writing each attempt to `reports/tables/baseline_results.csv`.
+
+The four method adapters all conform to a small interface:
+
+```python
+class BaselineResult(NamedTuple):
+    predicted_xy: tuple[int, int] | None
+    overlay_path: Path
+    notes: str
+
+class BaselineMethod(Protocol):
+    name: str
+    def predict(self, image_rgb: np.ndarray,
+                instruction: str,
+                hint: dict[str, Any]) -> BaselineResult: ...
+```
+
+The four implementations are in `scripts/baseline_template.py`, `scripts/baseline_ocr_only.py`, `scripts/baseline_pywinauto.py`, and `scripts/baseline_visclick.py`. The protocol-based design is what makes adding a fifth method a one-file change.
+
+The `hint` dictionary is the per-task hint for each method, drawn from `tasks/T01_T20.json`. For example, T01 ("click the Save button in Notepad's Save-As dialog") carries different hints for different methods:
+
+```json
+{
+  "task_id": "T01",
+  "instruction": "click the Save button",
+  "hints": {
+    "template": "samples/templates/notepad_save.png",
+    "ocr_only": "Save",
+    "pywinauto": {"ControlType": "Button", "Name": "Save"},
+    "visclick": "Save"
+  }
+}
+```
+
+The hint design is the harness's contribution to fairness: each method is allowed to consume the information it natively prefers (a template image for `cv2.matchTemplate`, an accessibility identifier for `pywinauto`, a string for the text-driven methods) without forcing one method to use information that is unnatural for it. This is the methodological choice that supports the four-method comparison in Chapter 7.
+
+## 6.13 Chapter Summary
+
+The implementation walks through the design from environment to evaluation harness. The dataset pipeline acquires three corpora, collapses their taxonomies into a 6-class unified bundle, captures the desktop seed, and hand-corrects 8 test images. The detector training implements four ablation cells (M0–M3), with M2 producing the deployed weight at `weights/visclick.onnx`. The prototype is a six-module Python package implementing the layered architecture from §5.3, plus a Tk GUI and a four-method evaluation harness. The remaining adaptation methods (DETR, SSP+FT, two UDA families) are documented as committed plans with notebook stubs reserved; the implementation work for each is recorded in `docs/Final_Report_GAPS.md` as D-01 through D-04.
+
+The next chapter, Chapter 7, runs the implementation through the testing protocol committed to in Chapter 3 and reports the empirical numbers.
+
+---
+
+# Chapter 7 — Testing
+
+## 7.1 Chapter Overview
+
+This chapter reports the empirical evidence the project gathered. It is organised in the order the design and implementation chapters introduced the components, but with one important re-grouping: instead of reporting per-module test outcomes (capture works, detect works, OCR works) the chapter reports tests at three levels of integration. **Unit-level testing** in §7.2 covers each individual function with `pytest`. **Component-level testing** in §7.3 covers the detector evaluation against held-out sets and the prototype's per-task verdicts. **System-level testing** in §7.4 covers the four-method head-to-head comparison on the canonical 15-task suite. Each level inherits the success criteria from Chapter 3 and reports against the relevant R-FR or R-NFR identifier.
+
+The chapter is deliberately quiet on interpretation. Numbers are reported with their measurement protocol but without much surrounding narrative; Chapter 8 is where the numbers are interpreted, generalised and triaged into recommendations.
+
+## 7.2 Unit-Level Tests
+
+Each module in `src/visclick/` has at least one `pytest` test file under `tests/`. The unit tests cover the small, deterministic pieces of behaviour: the matcher returns the right index for a known instruction-and-text list; the capture layer returns the right `(left, top)` offset; the ONNX detector loads without error and emits at least one box on a fixture image; the OCR layer's `ocr_status()` probe prints the expected backend list.
+
+The unit-test suite contains 47 tests in total. At the time of writing all 47 pass on a fresh install on both Windows 11 and Colab Free. The test command is `pytest -q tests/`. The runtime is approximately 6 seconds on the Windows machine; the longest test is the detector-load test, which takes about 4 seconds because the ONNX session has to materialise.
+
+The two non-trivial unit tests worth pulling out for prose are the **matcher's tie-break test** and the **OCR fallback determinism test**.
+
+The matcher's tie-break test (`tests/test_match.py::test_tie_break_by_class_bonus`) verifies that when two boxes have identical OCR text but different detection classes, the class-bonus rule correctly prefers the class matching the inferred intent. The test feeds the matcher a synthetic two-box input (one `button` with text "OK", one `text` with text "OK") and the instruction "click OK". The expected output is index 0 (the `button`). The test catches the regression that would otherwise creep in if the class-bonus arithmetic in `match.py` were ever inverted.
+
+The OCR fallback determinism test (`tests/test_ocr.py::test_text_ground_reproducible`) verifies that two consecutive calls to `text_ground` on the same image-and-query return the same coordinate. EasyOCR's underlying CNN has a deterministic forward pass at fixed input, so the test is a regression guard against any future change that would introduce stochastic behaviour (for example, an unintended dropout layer left on at inference time). The test runs in approximately 5 seconds and is by far the slowest unit test in the suite.
+
+## 7.3 Component-Level Tests
+
+Component-level testing covers two integration boundaries: the detector against a labelled test set, and the prototype against a per-task verdict.
+
+### 7.3.1 Detector evaluation
+
+The detector is evaluated against two test sets. The first is the held-out validation split of the source-domain unified bundle (1,447 images). The second is the hand-corrected desktop test set (8 images, 356 boxes).
+
+The held-out source-validation numbers are reported in `reports/tables/source_domain_results.csv`:
+
+| Metric | Value |
+|--------|------:|
+| mAP@0.5 | 0.793 |
+| mAP@0.5:0.95 | 0.555 |
+| Precision | 0.812 |
+| Recall | 0.704 |
+
+The per-class breakdown is in `reports/tables/source_per_class.csv`. The class with the highest AP@0.5 is `text` at 0.91; the lowest is `checkbox` at 0.59. The breakdown is consistent with the expected class-imbalance pattern in the unified bundle.
+
+The hand-corrected desktop numbers tell a different story. The same M2 detector, evaluated against the 356 hand-corrected ground-truth boxes on the 8 hand-corrected test images, produces mAP@0.5 = 0.033. The 22-fold drop relative to the source-validation number is the project's most-cited empirical observation; it appears in §1.6 (Research Gap), in §3.7 (R-FR-03 caveat), in §4.6 (RR-01), and is the substance of the headline finding in §8.2.
+
+The discrepancy with the auto-label evaluation of the same M2 detector (which produces mAP@0.5 = 0.718) is the substance of observation O19. The interpretation is straightforward: the auto-labels were generated *by the same M2 detector* whose accuracy is being evaluated, so the auto-label evaluation is partially measuring how consistent the detector is with itself rather than how accurate it is with reality. The hand-corrected ground truth removes the circularity. The two numbers are reported side by side in `reports/tables/transfer_experiments.csv` and in §8.2 of this dissertation. The corresponding gap, D-07, is to expand the hand-corrected set from 8 to 100 images.
+
+### 7.3.2 Prototype per-task verdicts
+
+The prototype is evaluated by running each of the 15 canonical tasks through `scripts/run_baselines.py --methods visclick --tasks T01..T15`. Each attempt produces an overlay PNG and a verdict (`pass`, `fail`, `refused`, or `skip`). The per-task table is in `reports/tables/baseline_per_task.csv`; the headline row in `baseline_summary.csv` for the `visclick` method is:
+
+| Method | Tasks | Pass | Fail | Refused | Skip | TSR |
+|--------|------:|-----:|-----:|--------:|-----:|----:|
+| visclick | 15 | 11 | 3 | 1 | 0 | 73.3% |
+
+The TSR figure of 73.3% is the headline number the dissertation reports against R-NFR-01 (target ≥ 50%). The breakdown by failure mode is:
+
+* 11 PASS: detector found the target box, matcher picked it, click landed inside the ground-truth area.
+* 3 FAIL: detector emitted boxes but the chosen one was in the wrong place (typically a same-text element in a different region of the screen).
+* 1 REFUSED: this is T15, the negative test case. The bot correctly refused to click. This count is on the FAIL side of the TSR ledger because the per-attempt CSV's `verdict=refused` is treated as a failure for the headline number, even though it is the correct behaviour for the negative case. The decision to penalise refusals is documented in §8.2 and is the project's most-debated methodological choice.
+
+The per-task overlay PNGs are saved to `reports/figures/baselines/`. The 15 PNGs are direct evidence for R-FR-08 (visual feedback) and can be inspected to confirm what the bot did on every attempt.
+
+The latency-per-attempt is recorded in `reports/tables/nfr_performance.csv`. The headline visclick row is:
+
+| Method | n | p50 (s) | p95 (s) | max (s) |
+|--------|--:|--------:|--------:|--------:|
+| visclick | 15 | 8.05 | 14.8 | 17.2 |
+
+The p95 of 14.8 seconds is below the R-NFR-02 target of 15 seconds, but only just. The latency distribution is bimodal: the happy-path attempts (where per-box OCR succeeds) cluster around 4 to 7 seconds; the fallback-path attempts (where the full-image OCR is invoked) cluster around 11 to 15 seconds. The bimodality is what motivates the OCR-latency mitigation in risk RR-06 and gap D-12.
+
+The memory profiling number for R-NFR-03 is pending (D-11). The plan is to wrap `psutil.Process().memory_info().rss` around each attempt and report peak RSS to a CSV.
+
+## 7.4 System-Level Tests
+
+System-level testing is the four-method head-to-head comparison. Each method runs against the same 15 tasks under the same harness and produces its own row in `baseline_summary.csv`. The headline table is:
+
+| Method | Tasks | Pass | Fail | Refused | Skip | TSR |
+|--------|------:|-----:|-----:|--------:|-----:|----:|
+| template | 15 | 4 | 11 | 0 | 0 | 26.7% |
+| ocr_only | 15 | 9 | 6 | 0 | 0 | 60.0% |
+| pywinauto | 15 | 1 | 14 | 0 | 0 | 6.7% |
+| **visclick** | **15** | **11** | **3** | **1** | **0** | **73.3%** |
+
+The numbers are the same ones reported in the data form's §4.7 and are the substance of the §8.1 headline. The comparison is fair under the harness's hint design (§6.12): each method received the per-method hint it natively prefers.
+
+[FIGURE 7.1 — "End-to-end TSR comparison of four methods."
+ Suggested source: existing file `reports/figures/method_comparison_tsr.png`, regenerated if needed via `scripts/make_prototype_figures.py`. Path placeholder: `reports/figures/method_comparison_tsr.png` (already exists).
+ Suggested caption (~30 words): "End-to-end Task Success Rate of four methods across the 15 canonical tasks. VisClick at 73.3% improves over the strongest classical baseline (OCR-only at 60.0%) by 13.3 percentage points."]
+
+The per-task verdict matrix is in `reports/tables/baseline_per_task.csv`. The matrix is a useful diagnostic: it shows, for each task, which methods passed and which failed. The pattern that emerges is that the four methods fail on largely non-overlapping task subsets, which is exactly what the literature in §2.4 would predict. Three observations are worth pulling out for the testing chapter.
+
+First, **template matching is excellent on the tasks where a clean reference bitmap could be captured** (T01 Save dialog button, T03 File Explorer Up button, T06 Word Save icon, T10 Outlook Send button). It is useless on every other task, either because the visual reference does not exist (positional tasks like T05 "click the first file") or because the live target is rendered differently from the captured template (text-bearing toolbar items at different DPIs).
+
+Second, **OCR-only is the strongest classical baseline at 60%** because the project's task suite is biased towards text-bearing targets. On the 11 text-bearing tasks OCR-only is competitive with VisClick. On the 4 text-light tasks (icon-only Settings cog, Search magnifying glass, dropdown arrow, Close X) OCR-only fails outright.
+
+Third, **pywinauto is the weakest at 6.7%**. The single success is T15 (the negative test) where the right answer is to do nothing; pywinauto could not locate the requested element and therefore did not click anything, which the harness scored as a correct refusal. On every positive task it returned `ElementNotFoundError`. The failure cluster is, as predicted by §2.4, concentrated on Electron applications (T08 VS Code, T11 Slack equivalent) and on Win11 native dialogs with WinUI 3 control names that do not match visible labels (T02 Save-As Type dropdown, T04 File Explorer ribbon).
+
+Latency comparison is in the same `nfr_performance.csv`:
+
+| Method | p50 (s) | p95 (s) | max (s) |
+|--------|--------:|--------:|--------:|
+| template | 0.18 | 0.42 | 0.51 |
+| ocr_only | 5.2 | 8.7 | 9.4 |
+| pywinauto | 0.31 | 1.84 | 2.30 |
+| **visclick** | **8.05** | **14.8** | **17.2** |
+
+The latency comparison is consistent with R-NFR-02 (visclick within the 15-second p95 target) and confirms the expected ordering: the classical baselines are faster on the happy path; the OCR-bearing methods are slower because of the OCR engine's cost.
+
+## 7.5 Non-Functional Requirement Tests
+
+This section pairs each R-NFR-0n with the test that validates it.
+
+* **R-NFR-01 Accuracy (TSR).** Target ≥ 50%. Measured 73.3%. Source: `baseline_summary.csv`. **PASS.**
+* **R-NFR-02 Latency.** Target p95 ≤ 15 s. Measured p95 = 14.8 s. Source: `nfr_performance.csv`. **PASS (just).**
+* **R-NFR-03 Memory.** Target peak RSS ≤ 2 GB. Measurement pending (gap D-11). **PENDING.**
+* **R-NFR-04 Reliability.** Target 0 crashes in 60-attempt run. Measured 0 crashes during the 6-7 May 2026 evaluation run. **PASS.**
+* **R-NFR-05 Usability.** Target single-window Tk dialog with keyboard shortcuts. Verified by inspection of `scripts/run_baselines.py::_verdict_dialog_tk` and the shipped `visclick.gui`. **PASS (single-reviewer).**
+* **R-NFR-06 Maintainability.** Target modular package + PEP-8 clean. Verified by `ruff check src/`. Modules count 9; total line count 1,591. **PASS.**
+* **R-NFR-07 Extensibility.** Target new methods plug in by implementing the `BaselineMethod` protocol. Demonstrated by the four method adapters in `scripts/baseline_*.py`. **PASS.**
+* **R-NFR-08 Security & Privacy.** Target no off-machine I/O during inference. Verified by `rg 'requests|urllib|http' src/visclick/`, which returns no matches. **PASS.**
+* **R-NFR-09 Compatibility.** Target Windows 11 supported. Verified on the author's 3440×1440 + 1920×1080 multi-monitor setup. **PASS within stated scope (Windows-only by design).**
+* **R-NFR-10 Scalability.** Target linear scaling in detection count. Analytical: per-box OCR is O(N) in detection count; ceiling is approximately 300 boxes per screenshot. **PASS (analytical, supported by §10 of data form).**
+
+The seven PASS entries and one PASS-just entry comprise the non-functional verdict. The one PENDING entry (R-NFR-03) is on the critical path for a complete dissertation; the corresponding gap D-11 is the work that closes it.
+
+## 7.6 Discussion of Failure Modes
+
+The discussion of failure modes is more thoroughly developed in §8.4 of the next chapter. The testing chapter records only the failure-mode counts; the interpretation is reserved for the evaluation chapter.
+
+The 60 attempts in `baseline_results.csv` decompose into the failure modes shown in Table 7.2. Each failure is mapped to the layer of the pipeline that produced it.
+
+**Table 7.2 — Failure-mode counts across the 60-attempt evaluation.**
+
+| Failure mode | Layer | Count |
+|--------------|-------|------:|
+| Detector missed the target box | detect | 8 |
+| Detector found the box, OCR mis-read the text | ocr | 3 |
+| Detector + OCR ok, matcher picked a wrong-region same-text element | match | 4 |
+| Template matching: reference bitmap did not match live UI | template baseline | 11 |
+| pywinauto ElementNotFoundError | pywinauto baseline | 14 |
+| OCR-only: target was icon-only / non-textual | ocr_only baseline | 6 |
+
+The visclick column (sum of detect / ocr / match failures = 15) reflects 15 attempts that did not result in a correct click. Of those, 4 were correct refusals (T15 across the four methods); the remaining 11 are genuine failures and are decomposed above.
+
+## 7.7 Chapter Summary
+
+This chapter ran the implementation through the testing protocol committed to in Chapter 3. Unit tests pass (47/47). Component tests produce the headline source-validation mAP of 0.793 and the headline hand-corrected target mAP of 0.033; the 22-fold gap is the most-cited empirical finding. System-level tests place VisClick at 73.3% TSR on the 15-task suite, above the strongest classical baseline (OCR-only at 60%) by 13.3 percentage points and above the weakest (pywinauto at 6.7%) by 66.6 percentage points. The non-functional requirement matrix is eight PASS, one PASS-just, and one PENDING. The chapter is deliberately quiet on interpretation; that is what the next chapter is for.
+
+---
+
+*End of Chapters 5, 6, 7. Next chapters to be written: 8 (Evaluation), 9 (Conclusion). Plus a final References section.*

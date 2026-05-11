@@ -2,6 +2,8 @@
 
 **Status:** living checklist. Whenever the report's prose introduces a placeholder of the form `[NUMBER]`, `[TABLE]`, `[FIGURE N.x]`, or `[CITATION]` that depends on work not yet finished, the matching entry below records what needs to be done to fill it. The author works through this list to bring the report from "first draft" to "submission-ready".
 
+**Action plan (phased checklists):** use `SUBMISSION_TASK_PLAN.md` for the ordered day-to-day to-do list (Phases 0–5, must-do vs optional). This file stays the detailed inventory; the task plan tells you *what to do next*.
+
 **Conventions.** Each row has a unique `ID`, a short `Gap` description, a chapter/section pointer, a `Source` indicating where the data or content needs to come from, and a `Status` field (`OPEN`, `IN PROGRESS`, `DONE`). Items group into five categories: DATA gaps (experiments not yet run), WRITING gaps (sections needing expansion), FIGURE gaps, TABLE gaps, and USER-OWED gaps (information only the author can provide).
 
 ---

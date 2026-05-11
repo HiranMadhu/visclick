@@ -2,7 +2,7 @@
 
 **Status:** living checklist. Whenever the report's prose introduces a placeholder of the form `[NUMBER]`, `[TABLE]`, `[FIGURE N.x]`, or `[CITATION]` that depends on work not yet finished, the matching entry below records what needs to be done to fill it. The author works through this list to bring the report from "first draft" to "submission-ready".
 
-**Action plan (phased checklists):** use `SUBMISSION_TASK_PLAN.md` for checkboxes. That file follows the **author priority order** below.
+**Action plan:** use **`PHASE_WORKLOG.md`** for ordered phases (1–8), plain-English steps, and a **findings log**. Use `SUBMISSION_TASK_PLAN.md` for gap-ID checklists. Both follow the **author priority order** below.
 
 **Author priority order (current plan).** Work in this sequence unless the supervisor says otherwise.
 

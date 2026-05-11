@@ -2,6 +2,8 @@
 
 **Purpose:** day-to-day checklist. Detailed gap rows and evidence pointers: `Final_Report_GAPS.md`.
 
+**Phase-by-phase execution (step list + paste your results):** use **`PHASE_WORKLOG.md`**. Work Phase 1 first; when you finish a phase, say so in chat so `Final_Report_GAPS.md` can be marked DONE for those gap IDs.
+
 **Author priority (locked):** **D → T → W → F → U**
 
 1. **D (DATA)** first: experiments and measurements.

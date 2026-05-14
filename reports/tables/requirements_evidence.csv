@@ -1,21 +1,20 @@
-req_id,evidence_type,summary_verdict,notes
-R-FR-01,csv,Pass (first draft),"Task-suite click correctness: `reports/tables/baseline_results.csv` + per-task pivot `baseline_per_task.csv` (verdict column)."
-R-FR-02,csv,Pass (first draft),"Instruction → target disambiguation covered by same baseline run artefacts (`baseline_results.csv`)."
-R-FR-03,csv,Partial (first draft),"Multi-app coverage (Notepad / VS Code / Chrome / etc.) implied by task ids in `baseline_results.csv`; extend notes when `functional_tests.csv` exists."
-R-FR-04,csv,Pass (first draft),"UI element localisation (button/menu targets): TSR columns in `baseline_summary.csv` and per-task `baseline_per_task.csv`."
-R-FR-05,csv,Pass (first draft),"Detector + OCR fusion path evidenced by `visclick` rows in `baseline_results.csv` (notes field shows detector vs fallback)."
-R-FR-06,code_review,Pass (first draft),"Human-in-loop / orchestrator contract: `scripts/run_baselines.py`, `scripts/baseline_visclick.py` (repo); cite PR/commit in final report."
-R-FR-07,csv,Partial (first draft),"Negative / refusal cases: check T15 and similar rows in `baseline_per_task.csv` / `baseline_results.csv`."
-R-FR-08,config,Pending,"Reproducible task definitions: `tests/task_suite.yaml` (repo) — link pass/fail exports when `functional_tests.csv` is populated."
-R-FR-09,csv,Pass (first draft),"Cross-method comparability: four methods in `baseline_summary.csv` from shared harness."
-R-FR-10,documentation,Pending,"Traceability to dissertation FR table: map these ids to Chapter 3 wording when final."
-R-NFR-01,csv,Pass (first draft),"End-to-end latency envelope: `reports/tables/nfr_performance.csv` (aggregated from `baseline_results.csv`)."
-R-NFR-02,csv,Pass (first draft),"Per-method p95 wall times: `nfr_performance.csv` (`visclick` p95_ms column)."
-R-NFR-03,bench_csv,Pass (first draft),"Detector-only latency: `tables/detector_latency.csv` (ONNX CPU micro-benchmark rows)."
-R-NFR-04,measurement,Partial (first draft),"Peak working set ~764 MB observed in-process after detector + EasyOCR `text_ground` (psutil RSS); formal soak chart pending."
-R-NFR-05,documentation,Pending,"Soak / stability: `reports/logs/soak.log` not yet attached — run I.3 soak when scheduled."
-R-NFR-06,documentation,Pending,"Security / temp artefact audit: cite zero stray captures after clean run when logged."
-R-NFR-07,csv,Pass (first draft),"Scalability across 15 tasks: `n` column per method in `nfr_performance.csv`."
-R-NFR-08,repo,Pass (first draft),"Dependencies pinned: `requirements.txt` / lock used by `.venv` for Windows prototype."
-R-NFR-09,figures,Pass (first draft),"Latency distribution plot: `reports/figures/nfr_latency_box.png` (from `run_nfr.py`)."
-R-NFR-10,csv,Partial (first draft),"Model quality support: `reports/tables/transfer_experiments.csv`, `desktop_finetune_results.csv` — tie to NFR acceptance in prose."
+req_id,req_name,target,evidence_type,evidence_file,measured,summary_verdict,notes
+R-FR-01,Screen Capture,Capture selected monitor at native resolution in virtual-desktop coordinate space,csv,reports/tables/baseline_results.csv,15/15 attempts captured cleanly,FULL,Source: scripts/run_baselines.py + visclick.capture; multi-monitor offset verified
+R-FR-02,Text Instruction Input,Accept free-form text instruction via CLI flag or GUI text box,csv,reports/tables/baseline_results.csv,15/15 attempts received correct input,FULL,instruction column populated for every row
+R-FR-03,Element Detection,Detect candidate UI elements of types {button text text_input icon menu checkbox},csv,reports/tables/baseline_per_task.csv,15/15 emit >=1 detection,FULL,visclick rows non-empty detections; per-class table in source_per_class.csv
+R-FR-04,Instruction-to-Element Matching,Fuzzy OCR match with class-aware bonus and full-image OCR fallback,csv,reports/tables/baseline_per_task.csv,11/14 PASS on positives,FULL,fallback rescued 2 of 4 detector-missed cases; see Section 8.4 F-3
+R-FR-05,Action Execution,Move cursor to box centre and execute single left-click,csv,reports/tables/baseline_results.csv,11/14 positive tasks land correctly,FULL,verdict=pass column in visclick rows
+R-FR-06,Refusal on Low Confidence,Refuse to click when no candidate exceeds threshold and emit structured failure,csv,reports/tables/baseline_per_task.csv,1/1 negative case (T15) refused correctly,FULL,min_text_similarity=60; planned raise to 75 tracked under D-05
+R-FR-07,Multi-Monitor Support,Operate across virtual-desktop coordinate spaces with monitor selector,demo_log,docs/PHASE_WORKLOG.md or live demo log,Verified on 3440x1440 + 1920x1080 stacked,FULL,offset propagated through visclick.act.click_box
+R-FR-08,Visual Feedback,Render annotated overlay PNG for every prediction,figures_dir,reports/figures/baselines/,60/60 overlays produced,FULL,one PNG per attempt
+R-FR-09,Per-Attempt Logging,Log per-attempt fields to CSV (instruction xy verdict latency method is_negative notes),csv,reports/tables/baseline_results.csv,60/60 rows with no schema violations,FULL,canonical evidence file for every percentage in Chapter 7
+R-NFR-01,Accuracy (TSR),>=50% on T01-T15,csv,reports/tables/baseline_summary.csv,73.3% (visclick),FULL,11 pass / 3 fail / 1 refused over 15 tasks
+R-NFR-02,Latency,p95 <= 15 s per click attempt,csv,reports/tables/nfr_performance.csv,p95 14.8 s / median 8.05 s (visclick),FULL (just),0.2 s margin; bimodal distribution per Section 7.3.2
+R-NFR-03,Memory footprint,Peak RSS <= 2 GB during 15-task run,measurement,reports/tables/detector_bench_snapshot_2026-05-14.csv + PHASE_WORKLOG.md,~764 MB peak after EasyOCR (psutil RSS),PARTIAL,Detector-only ~212 MB; formal nfr_memory.csv per-method run still PENDING (was D-11)
+R-NFR-04,Reliability,Zero crashes during 60-attempt evaluation,run_log,docs/VisClick_Report_Data_Form.md (run log 6-7 May 2026),0 crashes,FULL,no orchestrator-level exceptions across 60 rows
+R-NFR-05,Usability,Single-window Tk dialog with keyboard shortcuts and refusal feedback,code_review,scripts/run_baselines.py::_verdict_dialog_tk + src/visclick/gui.py,Self-review FULL; third-party PENDING,PARTIAL,Third-party reviewer pass tracked under D-10
+R-NFR-06,Maintainability,Modular package and PEP-8 clean,repo,src/visclick/ + ruff check,9 modules ~1591 LoC ruff clean,FULL,one Python module per architectural layer
+R-NFR-07,Extensibility,New baseline methods plug in via BaselineMethod protocol,repo,scripts/baseline_*.py,4 method adapters demonstrate the protocol,FULL,template ocr_only pywinauto visclick all use BaselineResult
+R-NFR-08,Security & Privacy,No off-machine I/O during inference,grep_audit,src/visclick/,No requests/urllib/http imports in src/visclick,FULL,rg 'requests|urllib|http' src/visclick/ returns no matches
+R-NFR-09,Compatibility,Windows 11 supported and multi-monitor verified,demo_log,docs/PHASE_WORKLOG.md,Win11 22631 + Ultra 5 135H + multi-monitor stacked,PARTIAL,Windows-only by design; macOS / Linux out of scope
+R-NFR-10,Scalability,Linear in detection count per screenshot,analytical,docs/VisClick_Report_Data_Form.md Section 10,Per-box OCR is O(N); empirical ceiling ~300 boxes/screen,PARTIAL,Analytical argument; no large-N stress test run

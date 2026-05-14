@@ -14,9 +14,11 @@
 
 ## Current phase (fill in)
 
-**You are on:** Phase 1 — not started
+**You are on:** **Phase 2 — ready to start** (Phase 1 complete on 14 May 2026)
 
-**Last updated by:** (you / assistant + date)
+**Last updated by:** assistant, 14 May 2026.
+
+**Companion file:** `PHASE_WORKLOG.md` at the **repo root** holds your raw local notes per phase (hardware bullets, bench numbers, paths). This `docs/PHASE_WORKLOG.md` keeps the **phase definitions, checklists, and findings log**.
 
 ---
 
@@ -34,19 +36,24 @@
 
 **Phase 1 checklist**
 
-- [ ] Step 1.1 U-05 hardware captured
-- [ ] Step 1.2 D-09 detector bench numbers recorded
-- [ ] Step 1.3 D-11 peak memory recorded (at least VisClick)
-- [ ] Step 1.4 T-04 requirements_evidence.csv created
-- [ ] Step 1.5 run_nfr.py run if needed
+- [x] Step 1.1 U-05 hardware captured (display **scaling** still PENDING)
+- [x] Step 1.2 D-09 detector bench numbers recorded (50 runs on `logo2.png`, n_detections=0; re-run on a real screenshot is nice-to-have)
+- [x] Step 1.3 D-11 peak memory recorded (rough psutil RSS; formal per-method `nfr_memory.csv` PARTIAL)
+- [x] Step 1.4 T-04 requirements_evidence.csv created (re-keyed to Chapter 3 R-FR-01..R-FR-09 + R-NFR-01..R-NFR-10)
+- [x] Step 1.5 run_nfr.py refreshed
 
-**Gaps this phase can close (after review):** U-05 (hardware captured), D-09, D-11, T-04. **D-08** is Phase 2 (notebook).
+**Gaps closed:** U-05 (DONE, scaling PENDING sub-item), D-09 (DONE, YOLOv8 only), D-11 (PARTIAL), T-04 (DONE).
 
 ### Your notes for Phase 1
 
-```
-(paste here when done)
-```
+See repo-root `PHASE_WORKLOG.md` and `docs/VisClick_Report_Data_Form.md` Section 1.1.
+
+Headline numbers:
+
+- Hardware: Win11 Enterprise 22631 / Intel Core Ultra 5 135H (14C/18T) / 32 GB / Intel Arc iGPU / 1920×1080.
+- Detector-only (ONNX, imgsz=640, 50 runs): **median 67.81 ms, p95 79.02 ms**. Snapshot: `reports/tables/detector_bench_snapshot_2026-05-14.csv`.
+- Peak RSS (psutil, in-process, same session): **~212 MB** detector-only, **~764 MB** after EasyOCR `text_ground` warm-up.
+- Requirements evidence: `reports/tables/requirements_evidence.csv` (19 rows, keyed to Chapter 3 wording, with `evidence_file` pointing at the CSV/figure backing each verdict).
 
 ---
 
@@ -210,11 +217,9 @@ Key numbers / new CSV paths:
 
 Append a row when a phase finishes.
 
-| Date | Phase | Gaps marked DONE | Notes |
-|------|-------|------------------|-------|
-|  |  |  |  |
-
-*(Add a new row after each "Phase N complete" message.)*
+| Date | Phase | Gaps marked DONE / PARTIAL | Notes |
+|------|-------|----------------------------|-------|
+| 2026-05-14 | 1 | U-05 (DONE; display scaling sub-PENDING); D-09 (DONE, YOLOv8 only); D-11 (PARTIAL); T-04 (DONE) | Hardware = Win11 22631 / Core Ultra 5 135H / 32 GB / Intel Arc iGPU / 1920×1080. ONNX bench 50 runs: median 67.81 ms, p95 79.02 ms (image had 0 detections). Peak RSS ~212 MB det-only, ~764 MB after EasyOCR. `requirements_evidence.csv` re-keyed to Chapter 3 (R-FR-01..R-FR-09 + R-NFR-01..R-NFR-10) with 8 columns. |
 
 ---
 

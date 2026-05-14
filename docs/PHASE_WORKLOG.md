@@ -102,25 +102,41 @@ Optional follow-up not run yet: `scripts/run_cpv.py --conf 0.10 --tag conf010` t
 
 ---
 
-## Phase 3 — More data (labels + unlabelled)
+## Phase 3 — More test data via a public benchmark (ScreenSpot)
 
-**Goal:** **D-07**, optional **D-06**.
+**Goal:** Close **D-07** by adding an *independent, third-party-labelled* CPV row from a public benchmark instead of hand-labelling 100 more screens. Skip **D-06** unless SSP/UDA is also planned.
 
-| Step | Gap | What you do |
-|-----|-----|-------------|
-| 3.1 | **D-07** | Annotate **more desktop screens** in CVAT/Roboflow (target: move toward **100**; any increase above **8** helps). Export YOLO labels into `datasets/handcorrected_desktop_test/` (or new folder) and update eval YAML if paths change. |
-| 3.2 | **D-06** | Only if you will run **SSP or UDA**: extend `capture_screenshots.py` usage toward **~2000** unlabelled PNGs; else **skip** and write *deferred* in Section 9.8 of the report later. |
+**Rationale:** the 8-image hand-corrected set is fragile (n is too small for stable per-class numbers). Rather than spend a day in CVAT, we evaluate the same ONNX detector against **ScreenSpot's desktop slice** (~280-310 real Windows/macOS screens, labelled by the SeeClick authors, used as a benchmark in other GUI grounding papers). CPV is class-agnostic, so the taxonomy mismatch (their `text|icon` vs our 6 classes) doesn't matter for the headline number. The hand-corrected set stays in the report for the *class-aware* mAP and CPV; ScreenSpot supplies the *out-of-domain, larger-N* row.
+
+| Step | Gap | What you do | You should get |
+|-----|-----|-------------|----------------|
+| 3.1 | **D-07** | On your Windows machine, inside the project venv: `pip install datasets`. (First-time only; ~30 MB of wheels.) | `datasets` importable from your venv. |
+| 3.2 | **D-07** | Smoke test first: `.\.venv\Scripts\python.exe scripts/run_cpv_screenspot.py --limit 20`. This downloads the dataset (~70 MB, cached at `datasets/_hf_cache/`) and processes 20 rows. | A printed `REPORT cpv_screenspot \| platform=desktop overall = X.XX% (..)`. CSVs in `reports/tables/`. |
+| 3.3 | **D-07** | Full run: `.\.venv\Scripts\python.exe scripts/run_cpv_screenspot.py`. Should take 1-3 minutes on the iGPU. | `reports/tables/cpv_screenspot_desktop.csv` (overall + per-data-source + per-data-type) and `..._rows.csv`. |
+| 3.4 | **D-07** | Paste the printed `REPORT cpv_screenspot ...` line below under **Your notes** plus the per-slice (`data_source`, `data_type`) numbers from the console. | A short results block we can fold into Section 8.2 in Phase 6 (writing sync). |
+| 3.5 | **D-06** | Explicit decision: **DEFERRED** unless you commit to a Phase 4 SSP/UDA experiment that consumes the 2000 unlabelled PNGs. | A one-line confirmation below. |
+
+**If HuggingFace is blocked by Synopsys VPN:** tell me and I'll add a fallback path (snapshot-download via `huggingface-cli` on a personal laptop, then copy the cache folder across).
 
 **Phase 3 checklist**
 
-- [ ] D-07: N new images annotated (write N below)
-- [ ] D-06: done or explicitly deferred
+- [ ] `pip install datasets` succeeded in the venv
+- [ ] Smoke test `--limit 20` produced numbers
+- [ ] Full `run_cpv_screenspot.py` produced `cpv_screenspot_desktop.csv`
+- [ ] Headline CPV % and per-slice numbers pasted below
+- [ ] D-06 explicitly deferred (or, if you choose otherwise, note here)
 
 ### Your notes for Phase 3
 
 ```
-N new labelled images = 
-D-06 status = 
+Headline ScreenSpot CPV (overall, desktop) = ____%   (hit/total = __/__)
+Per data_source rows: 
+  desktop_macos:    n=___  hit=___  cpv=___%
+  desktop_windows:  n=___  hit=___  cpv=___%
+Per data_type rows:
+  text:             n=___  hit=___  cpv=___%
+  icon:             n=___  hit=___  cpv=___%
+D-06 status = DEFERRED
 ```
 
 ---

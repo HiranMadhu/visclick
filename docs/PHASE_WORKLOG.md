@@ -14,7 +14,7 @@
 
 ## Current phase (fill in)
 
-**You are on:** **Phase 3 — ready to start** (Phases 1 and 2 complete on 14 May 2026)
+**You are on:** **Phase 5 / 6 — ready to start** (Phases 1, 2, 3 complete on 14 May 2026; Phase 4 heavy retraining is opt-in and currently deferred)
 
 **Last updated by:** assistant, 14 May 2026.
 
@@ -120,24 +120,35 @@ Optional follow-up not run yet: `scripts/run_cpv.py --conf 0.10 --tag conf010` t
 
 **Phase 3 checklist**
 
-- [ ] `pip install datasets` succeeded in the venv
-- [ ] Smoke test `--limit 20` produced numbers
-- [ ] Full `run_cpv_screenspot.py` produced `cpv_screenspot_desktop.csv`
-- [ ] Headline CPV % and per-slice numbers pasted below
-- [ ] D-06 explicitly deferred (or, if you choose otherwise, note here)
+- [x] `pip install datasets` succeeded in the venv
+- [x] Smoke test `--limit 20` produced numbers
+- [x] Full `run_cpv_screenspot.py` produced `cpv_screenspot_desktop.csv`
+- [x] Headline CPV % and per-slice numbers pasted below
+- [x] D-06 explicitly deferred
+
+**Script fixes applied during Phase 3** (commit `d7e0285`): ScreenSpot HF rows store bbox as **normalized xyxy fractions** (0..1 of W,H), not pixel xywh as I had defaulted; the script now defaults to `--bbox-space normalized --bbox-format xyxy`. Also moved the HF cache to `tempfile.gettempdir()/visclick_hf_cache` because the original under-OneDrive cache path overflowed Windows MAX_PATH on lockfile names. Filter logic also corrected: `--platform-prefix desktop` now maps to `data_source ∈ {windows, macos}` (HF schema doesn't use a `desktop_` prefix).
 
 ### Your notes for Phase 3
 
-```
-Headline ScreenSpot CPV (overall, desktop) = ____%   (hit/total = __/__)
-Per data_source rows: 
-  desktop_macos:    n=___  hit=___  cpv=___%
-  desktop_windows:  n=___  hit=___  cpv=___%
-Per data_type rows:
-  text:             n=___  hit=___  cpv=___%
-  icon:             n=___  hit=___  cpv=___%
-D-06 status = DEFERRED
-```
+ScreenSpot CPV on the ONNX detector at default conf 0.25 / iou 0.50:
+
+| slice_kind | slice_name | n | hits | cpv_% |
+|---|---|--:|--:|--:|
+| overall | desktop | 334 | 192 | **57.49** |
+| data_source | macos | 172 | 107 | 62.21 |
+| data_source | windows | 162 | 85 | 52.47 |
+| data_type | text | 194 | 145 | 74.74 |
+| data_type | icon | 140 | 47 | 33.57 |
+
+D-06 status = **DEFERRED** (Author decision; only needed if Phase 4 SSP/UDA experiments commit to running, which they are not at this point.)
+
+**Interpretation (critical for Section 8.2 prose):** ScreenSpot CPV (57.5 %) is *per-instruction grounding success* — one GT target per row, "did any prediction land in it?" Hand-corrected CPV (1.4 %, from Phase 2 / D-08) is *per-element recall* — every UI element on the screen is a GT box, ~44/screen × 8 screens = 356 GT boxes total. Same metric name, different protocols, different denominators. The 57.5 % puts VisClick's detector in the same ballpark as published LLM grounders on the same benchmark (SeeClick paper reports ~30-50 % on ScreenSpot-desktop). The 1.4 % stays as the recall ceiling on Win11 native screens. Section 8.2 must report both with the protocol distinction made explicit.
+
+CSV evidence:
+
+- `reports/tables/cpv_screenspot_desktop.csv` (overall + per-slice)
+- `reports/tables/cpv_screenspot_desktop_rows.csv` (334 per-row hits)
+- `reports/tables/cpv_summary.csv` and `cpv_per_image.csv` (from Phase 2, hand-corrected)
 
 ---
 
@@ -258,6 +269,7 @@ Append a row when a phase finishes.
 |------|-------|----------------------------|-------|
 | 2026-05-14 | 1 | U-05 (DONE; display scaling sub-PENDING); D-09 (DONE, YOLOv8 only); D-11 (PARTIAL); T-04 (DONE) | Hardware = Win11 22631 / Core Ultra 5 135H / 32 GB / Intel Arc iGPU / 1920×1080. ONNX bench 50 runs: median 67.81 ms, p95 79.02 ms (image had 0 detections). Peak RSS ~212 MB det-only, ~764 MB after EasyOCR. `requirements_evidence.csv` re-keyed to Chapter 3 (R-FR-01..R-FR-09 + R-NFR-01..R-NFR-10) with 8 columns. |
 | 2026-05-14 | 2 | D-08 (DONE); D-10 (DEFERRED); D-12 (DEFERRED) | Overall CPV = **1.40 %** (5/356) at conf 0.25 / iou 0.5 on the 8-image hand-corrected set. Best per class: `button` 13.3 %, `menu` 9.1 %; `text`, `text_input`, `icon`, `checkbox` all 0 %. Consistent with the 0.033 mAP@0.5 hand-corrected number in report Section 8.2; reinforces the recall-bound interpretation. Reviewers (D-10) and preprocessing A/B (D-12) deferred by author decision. Evidence: `reports/tables/cpv_summary.csv` and `reports/tables/cpv_per_image.csv`. |
+| 2026-05-14 | 3 | D-07 (DONE via ScreenSpot path); D-06 (DEFERRED) | ScreenSpot-desktop n=334 (macOS+Windows), **CPV = 57.49 %** (192/334) at conf 0.25 / iou 0.5. Per data_source: macos 62.2 %, windows 52.5 %. Per data_type: text 74.7 %, icon 33.6 %. ScreenSpot CPV measures *per-instruction grounding success* (one GT per row), distinct from the *per-element recall* protocol used in D-08. Both must be reported in Section 8.2 with this caveat explicit. Three script fixes applied (commit d7e0285): bbox space = normalized fractions, format = xyxy, HF cache moved out of OneDrive to escape Windows MAX_PATH. Evidence: `reports/tables/cpv_screenspot_desktop.csv` + `..._rows.csv`. D-06 (2000 unlabelled corpus) deferred by author decision; only required for SSP/UDA experiments, which are not committed to. |
 
 ---
 

@@ -14,7 +14,7 @@
 
 ## Current phase (fill in)
 
-**You are on:** **Phase 2 — ready to start** (Phase 1 complete on 14 May 2026)
+**You are on:** **Phase 3 — ready to start** (Phases 1 and 2 complete on 14 May 2026)
 
 **Last updated by:** assistant, 14 May 2026.
 
@@ -69,15 +69,36 @@ Headline numbers:
 
 **Phase 2 checklist**
 
-- [ ] D-08 CPV computed
-- [ ] D-12 skipped or done (note which)
-- [ ] D-10 skipped or done (note which)
+- [x] D-08 CPV computed via `scripts/run_cpv.py` (default conf 0.25)
+- [x] D-12 **DEFERRED** (author decision; future work in Section 9.7)
+- [x] D-10 **DEFERRED** (author decision; report keeps single-rater qualitative scope)
 
 ### Your notes for Phase 2
 
-```
-(paste here when done)
-```
+CPV on hand-corrected test set, ONNX detector at default conf 0.25 / iou 0.50.
+
+**Overall CPV = 1.40 %**  (5 hits / 356 GT boxes)
+
+Per class:
+
+| class | gt | hit | cpv_% |
+|-------|---:|---:|------:|
+| button | 15 | 2 | 13.33 |
+| text | 20 | 0 | 0.00 |
+| text_input | 189 | 0 | 0.00 |
+| icon | 89 | 0 | 0.00 |
+| menu | 33 | 3 | 9.09 |
+| checkbox | 10 | 0 | 0.00 |
+| OVERALL | 356 | 5 | 1.40 |
+
+Reading: the detector emits very few predictions per image at conf 0.25 (0-4 versus 30-50 GT boxes), so centre-in-box recall is naturally floor-bound. Consistent with the 0.033 mAP@0.5 hand-corrected number already in Section 8.2. The 78 % of GT boxes that are `text_input` + `icon` get zero CPV hits, which is the same recall ceiling the report flags under R-NFR-03 / gap D-07.
+
+CSV evidence:
+
+- `reports/tables/cpv_summary.csv` (per-class + OVERALL)
+- `reports/tables/cpv_per_image.csv` (per-image with prediction counts)
+
+Optional follow-up not run yet: `scripts/run_cpv.py --conf 0.10 --tag conf010` to publish a soft-threshold companion row. Worth doing later if the report wants a precision-vs-recall sensitivity sentence; not blocking Phase 3.
 
 ---
 
@@ -220,6 +241,7 @@ Append a row when a phase finishes.
 | Date | Phase | Gaps marked DONE / PARTIAL | Notes |
 |------|-------|----------------------------|-------|
 | 2026-05-14 | 1 | U-05 (DONE; display scaling sub-PENDING); D-09 (DONE, YOLOv8 only); D-11 (PARTIAL); T-04 (DONE) | Hardware = Win11 22631 / Core Ultra 5 135H / 32 GB / Intel Arc iGPU / 1920×1080. ONNX bench 50 runs: median 67.81 ms, p95 79.02 ms (image had 0 detections). Peak RSS ~212 MB det-only, ~764 MB after EasyOCR. `requirements_evidence.csv` re-keyed to Chapter 3 (R-FR-01..R-FR-09 + R-NFR-01..R-NFR-10) with 8 columns. |
+| 2026-05-14 | 2 | D-08 (DONE); D-10 (DEFERRED); D-12 (DEFERRED) | Overall CPV = **1.40 %** (5/356) at conf 0.25 / iou 0.5 on the 8-image hand-corrected set. Best per class: `button` 13.3 %, `menu` 9.1 %; `text`, `text_input`, `icon`, `checkbox` all 0 %. Consistent with the 0.033 mAP@0.5 hand-corrected number in report Section 8.2; reinforces the recall-bound interpretation. Reviewers (D-10) and preprocessing A/B (D-12) deferred by author decision. Evidence: `reports/tables/cpv_summary.csv` and `reports/tables/cpv_per_image.csv`. |
 
 ---
 

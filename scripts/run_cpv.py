@@ -90,6 +90,9 @@ def main() -> int:
     ap.add_argument("--lbl-dir", default=str(DEFAULT_LBL_DIR))
     ap.add_argument("--conf", type=float, default=0.25, help="Detector confidence threshold")
     ap.add_argument("--iou", type=float, default=0.50, help="NMS IoU threshold")
+    ap.add_argument("--tag", default="",
+                    help="Optional suffix for the output CSV filenames "
+                         "(e.g. --tag conf010 produces cpv_summary_conf010.csv).")
     args = ap.parse_args()
 
     ensure_unzipped()
@@ -137,8 +140,9 @@ def main() -> int:
               f"CPV={cpv_img:5.1f}%  (preds={len(preds)})")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    per_class_csv = OUT_DIR / "cpv_summary.csv"
-    per_image_csv = OUT_DIR / "cpv_per_image.csv"
+    suffix = f"_{args.tag}" if args.tag else ""
+    per_class_csv = OUT_DIR / f"cpv_summary{suffix}.csv"
+    per_image_csv = OUT_DIR / f"cpv_per_image{suffix}.csv"
 
     with per_class_csv.open("w", newline="", encoding="utf-8") as f:
         wr = csv.writer(f)

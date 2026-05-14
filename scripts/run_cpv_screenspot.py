@@ -27,13 +27,16 @@ Usage::
 
 If your corporate network blocks HuggingFace, point ``--cache-dir`` at a
 local snapshot you copied across and re-run; the script will use the
-cached arrow files without internet.
+cached arrow files without internet. The default cache directory is under
+the system temp folder (short path) so Windows ``MAX_PATH`` lock files work
+when the repo lives under deep paths such as OneDrive.
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import sys
+import tempfile
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -50,18 +53,33 @@ from visclick.detect import Detector  # noqa: E402
 
 DEFAULT_WEIGHTS = _REPO / "weights" / "visclick.onnx"
 DEFAULT_HF_ID = "rootsautomation/ScreenSpot"
-DEFAULT_CACHE = _REPO / "datasets" / "_hf_cache"
+# Short path avoids Windows MAX_PATH when HF `datasets` builds lock filenames
+# that embed the full cache directory (OneDrive repo paths often overflow).
+DEFAULT_CACHE = Path(tempfile.gettempdir()) / "visclick_hf_cache"
 OUT_DIR = _REPO / "reports" / "tables"
 
 
-def _bbox_to_xyxy(bbox: List[float], fmt: str) -> Tuple[float, float, float, float]:
-    """Normalise ScreenSpot bbox to absolute (x1, y1, x2, y2) pixels."""
+def _bbox_to_xyxy_pixels(
+    bbox: List[float], fmt: str, w: int, h: int, space: str
+) -> Tuple[float, float, float, float]:
+    """Convert ScreenSpot bbox list to absolute pixel (x1, y1, x2, y2).
+
+    The HuggingFace ``rootsautomation/ScreenSpot`` rows use **fractions of
+    image width/height** (not raw pixels). Default is ``space=normalized`` +
+    ``fmt=xyxy`` so x1,x2 scale by ``w`` and y1,y2 by ``h``.
+    """
     a, b, c, d = float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
-    if fmt == "xywh":
-        return a, b, a + c, b + d
-    if fmt == "xyxy":
-        return a, b, c, d
-    raise ValueError(f"unknown bbox format: {fmt}")
+    if space == "normalized":
+        if fmt == "xyxy":
+            return a * w, b * h, c * w, d * h
+        if fmt == "xywh":
+            return a * w, b * h, (a + c) * w, (b + d) * h
+    if space == "pixel":
+        if fmt == "xywh":
+            return a, b, a + c, b + d
+        if fmt == "xyxy":
+            return a, b, c, d
+    raise ValueError(f"unknown bbox space/format: {space!r} {fmt!r}")
 
 
 def main() -> int:
@@ -74,10 +92,18 @@ def main() -> int:
     ap.add_argument("--cache-dir", default=str(DEFAULT_CACHE),
                     help="HuggingFace cache directory (data is downloaded once)")
     ap.add_argument("--platform-prefix", default="desktop",
-                    help="Filter on data_source startswith (default: desktop). "
-                         "Use 'mobile' or 'web' for those slices.")
-    ap.add_argument("--bbox-format", default="xywh", choices=["xywh", "xyxy"],
-                    help="ScreenSpot bbox encoding. The original release uses xywh.")
+                    help="Filter on data_source: default 'desktop' = windows OR macos "
+                         "(HF ScreenSpot labels). Use 'windows', 'macos', 'web', … "
+                         "for a startswith match on data_source.")
+    ap.add_argument("--bbox-format", default="xyxy", choices=["xywh", "xyxy"],
+                    help="BBox layout: HF ScreenSpot uses xyxy.")
+    ap.add_argument(
+        "--bbox-space",
+        default="normalized",
+        choices=["normalized", "pixel"],
+        help="HF ScreenSpot bboxes are fractions of W/H (not pixels). "
+             "Use ``pixel`` only if your snapshot stores absolute coordinates.",
+    )
     ap.add_argument("--conf", type=float, default=0.25)
     ap.add_argument("--iou", type=float, default=0.50)
     ap.add_argument("--limit", type=int, default=0,
@@ -93,22 +119,35 @@ def main() -> int:
               file=sys.stderr)
         return 2
 
+    cache_path = Path(args.cache_dir)
+    cache_path.mkdir(parents=True, exist_ok=True)
     print(f"[info] loading HF dataset: {args.hf_id}  (cache={args.cache_dir})")
-    ds = load_dataset(args.hf_id, cache_dir=args.cache_dir)
+    ds = load_dataset(args.hf_id, cache_dir=str(cache_path))
     split_name = next(iter(ds.keys()))
     rows = ds[split_name]
-    print(f"[info] split '{split_name}' has {len(rows)} rows; filtering "
-          f"data_source startswith '{args.platform_prefix}'")
+    pfx = args.platform_prefix.lower()
+    # HF `rootsautomation/ScreenSpot` uses data_source in {windows, macos, ...};
+    # treat "desktop" as that published desktop slice (Win + macOS screens).
+    if pfx == "desktop":
+        def _source_match(src_norm: str) -> bool:
+            return src_norm in ("windows", "macos")
+        filter_desc = "data_source in {windows, macos}"
+    else:
+        def _source_match(src_norm: str) -> bool:
+            return src_norm.startswith(pfx)
+        filter_desc = f"data_source startswith '{args.platform_prefix}'"
+
+    print(f"[info] split '{split_name}' has {len(rows)} rows; filtering ({filter_desc})")
 
     keep = []
     for r in rows:
         src = str(r.get("data_source", "")).lower()
-        if src.startswith(args.platform_prefix.lower()):
+        if _source_match(src):
             keep.append(r)
     if args.limit > 0:
         keep = keep[: args.limit]
     if not keep:
-        print(f"[error] no rows matched platform prefix '{args.platform_prefix}'.",
+        print(f"[error] no rows matched filter ({filter_desc}).",
               file=sys.stderr)
         return 2
     print(f"[info] evaluating {len(keep)} rows")
@@ -135,7 +174,9 @@ def main() -> int:
         rgb = np.array(img.convert("RGB"))
         h, w = rgb.shape[:2]
         try:
-            x1, y1, x2, y2 = _bbox_to_xyxy(r["bbox"], args.bbox_format)
+            x1, y1, x2, y2 = _bbox_to_xyxy_pixels(
+                r["bbox"], args.bbox_format, w, h, args.bbox_space
+            )
         except Exception as e:  # noqa: BLE001
             print(f"  [skip] bad bbox row {i}: {e}")
             continue

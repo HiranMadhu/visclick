@@ -1542,7 +1542,7 @@ A related lesson is the calibration of trust in tooling and in the author's own 
 
 ## 9.4 Highly Relevant Academic Modules
 
-The MSc programme at `[INSTITUTION]` contributed to this project across four main module clusters and one lighter-weight one. The discussion below names each cluster, identifies the corresponding programme module by placeholder so the author can paste the exact handbook title at submission time, and points to the chapters of this dissertation where the module's content shows up most directly.
+The MSc Data Science programme, jointly delivered by Robert Gordon University Aberdeen and the Informatics Institute of Technology (IIT), contributed to this project across four main module clusters and one lighter-weight one. The discussion below names each cluster, identifies the corresponding programme module by placeholder so the author can paste the exact handbook title at submission time, and points to the chapters of this dissertation where the module's content shows up most directly.
 
 The **machine-learning foundations cluster** is the most directly upstream of the project. The relevant module is `[MODULE: Machine Learning / Deep Learning Foundations]`, which covered empirical-risk-minimisation framing, gradient-based training, regularisation, and the bias-variance trade-off at the level needed to reason about generalisation between datasets. The dissertation uses this material in Chapter 6's discussion of the four adaptation cells M0, M1, M2, and M3, and in Chapter 8's interpretation of the 22-fold mAP gap between auto-label evaluation and hand-corrected ground truth, both of which are at heart bias-variance arguments about evaluation methodology rather than about model capacity.
 

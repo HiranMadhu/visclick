@@ -1,0 +1,2 @@
+ts,weights,image,imgsz,n_runs,median_ms,p95_ms,mean_ms,min_ms,max_ms,n_detections
+2026-05-14 14:38:14,weights/visclick.onnx,.venv/Lib/site-packages/matplotlib/mpl-data/sample_data/logo2.png,640,50,67.81,79.02,69.68,62.22,91.65,0

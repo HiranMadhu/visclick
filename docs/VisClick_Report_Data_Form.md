@@ -101,15 +101,15 @@ These are **real issues we hit during acquisition / assembly** and the concrete 
 
 | Field | Value |
 |-------|-------|
-| Device name | `[FILL]` |
-| Processor (full string) | `[FILL]` |
-| Cores / threads | `[FILL]` |
-| Installed RAM (GB) | `[FILL]` |
-| Storage type + size | `[FILL]` |
-| Graphics card (if any) | `[FILL]` |
-| OS version | `[FILL]` (e.g. Windows 11 Pro 23H2) |
-| Display resolution | `[FILL]` (e.g. 1920×1080) |
-| Display scaling | `[FILL]` (e.g. 100% / 125% / 150%) |
+| Device name | SNPS-M8CMYRED1M — Dell Latitude 5450 |
+| Processor (full string) | Intel(R) Core(TM) Ultra 5 135H |
+| Cores / threads | 14 cores / 18 threads |
+| Installed RAM (GB) | 32 GB (32,213 MB total physical per `systeminfo`) |
+| Storage type + size | Fixed SSD (NVMe-class laptop drive), C: ≈ 476 GiB formatted (~511 GB capacity) |
+| Graphics card (if any) | Intel(R) Arc(TM) Graphics (integrated), primary panel 1920×1080 |
+| OS version | Microsoft Windows 11 Enterprise, build 22631 |
+| Display resolution | 1920×1080 |
+| Display scaling | `PENDING` — not read this session (fill from Settings → System → Display) |
 
 ### §1.2 — Google Colab observations
 

@@ -14,7 +14,7 @@
 
 ## Current phase (fill in)
 
-**You are on:** **Phase 5 / 6 — ready to start** (Phases 1, 2, 3 complete on 14 May 2026; Phase 4 heavy retraining is opt-in and currently deferred)
+**You are on:** **Phase 5 / 6 — writing sync done (W-02 PARTIAL); next is W-01 (reference renumbering) and W-03/W-04 (author personal voice in Sections 9.3-9.5).** Phases 1, 2, 3 complete; Phase 4 heavy retraining is opt-in and currently deferred.
 
 **Last updated by:** assistant, 14 May 2026.
 
@@ -270,6 +270,7 @@ Append a row when a phase finishes.
 | 2026-05-14 | 1 | U-05 (DONE; display scaling sub-PENDING); D-09 (DONE, YOLOv8 only); D-11 (PARTIAL); T-04 (DONE) | Hardware = Win11 22631 / Core Ultra 5 135H / 32 GB / Intel Arc iGPU / 1920×1080. ONNX bench 50 runs: median 67.81 ms, p95 79.02 ms (image had 0 detections). Peak RSS ~212 MB det-only, ~764 MB after EasyOCR. `requirements_evidence.csv` re-keyed to Chapter 3 (R-FR-01..R-FR-09 + R-NFR-01..R-NFR-10) with 8 columns. |
 | 2026-05-14 | 2 | D-08 (DONE); D-10 (DEFERRED); D-12 (DEFERRED) | Overall CPV = **1.40 %** (5/356) at conf 0.25 / iou 0.5 on the 8-image hand-corrected set. Best per class: `button` 13.3 %, `menu` 9.1 %; `text`, `text_input`, `icon`, `checkbox` all 0 %. Consistent with the 0.033 mAP@0.5 hand-corrected number in report Section 8.2; reinforces the recall-bound interpretation. Reviewers (D-10) and preprocessing A/B (D-12) deferred by author decision. Evidence: `reports/tables/cpv_summary.csv` and `reports/tables/cpv_per_image.csv`. |
 | 2026-05-14 | 3 | D-07 (DONE via ScreenSpot path); D-06 (DEFERRED) | ScreenSpot-desktop n=334 (macOS+Windows), **CPV = 57.49 %** (192/334) at conf 0.25 / iou 0.5. Per data_source: macos 62.2 %, windows 52.5 %. Per data_type: text 74.7 %, icon 33.6 %. ScreenSpot CPV measures *per-instruction grounding success* (one GT per row), distinct from the *per-element recall* protocol used in D-08. Both must be reported in Section 8.2 with this caveat explicit. Three script fixes applied (commit d7e0285): bbox space = normalized fractions, format = xyxy, HF cache moved out of OneDrive to escape Windows MAX_PATH. Evidence: `reports/tables/cpv_screenspot_desktop.csv` + `..._rows.csv`. D-06 (2000 unlabelled corpus) deferred by author decision; only required for SSP/UDA experiments, which are not committed to. |
+| 2026-05-14 | 5/6 | W-02 (PARTIAL) | Writing-sync pass on `docs/Final_Report.md`. Five precision edits folded Phase 2 + Phase 3 CPV results into the dissertation prose: Section 7.3.1 now reports both CPV numbers with per-class and per-slice tables; Section 8.2 interprets them via the per-element-recall vs per-instruction-grounding-success protocol caveat; Section 6.12 documents `run_cpv.py` and `run_cpv_screenspot.py` as part of the evaluation harness; Sections 8.8, 9.7, 9.8 updated to reflect that D-07's *evidence* side closed via ScreenSpot while the hand-correction expansion remains future work. References (W-01), Ch6 DETR/SSP/UDA stubs (still gated on D-01..D-04), and personal-voice paragraphs in Sections 9.3-9.5 (W-03/W-04) remain OPEN. Report line count 1632 → 1735. |
 
 ---
 

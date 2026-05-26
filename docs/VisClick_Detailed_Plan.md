@@ -1,5 +1,13 @@
 # VisClick — Detailed Step-Level Implementation & Report Plan
 
+> **ARCHIVED — kept for historical reference only.**
+>
+> This document was the original "how-to-build" plan from the start of the project. It has been **superseded** by the phased execution model captured in `PHASE_WORKLOG.md` (the canonical "what to do next" file) and `Final_Report_GAPS.md` (the per-item ledger). Step lists below may reference notebooks, scripts, or commands that have since been renamed, refactored, or replaced. Do **not** treat sections of this file as live instructions; use it only to understand the project's earlier reasoning.
+>
+> Last live use: ~April 2026. Archived: 26 May 2026.
+
+---
+
 **Companion to:** `VisClick_3_Month_Plan.md` (the *scope* doc).
 **This doc:** the *how*. Step-by-step instructions, dataset links, command lines, and where each output ends up in the final MSc project report.
 **Compute:** Google Colab Free (T4 GPU).

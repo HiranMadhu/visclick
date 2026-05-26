@@ -15,44 +15,136 @@
 
 | Phase | What it covers | Status |
 |---|---|---|
-| 1 — Easy evidence (hardware, det. latency, memory, T-04) | U-05, D-09, D-11, T-04, NFR refresh | **DONE** (D-11 PARTIAL: rough psutil RSS; formal per-method `nfr_memory.csv` not collected) |
-| 2 — CPV on hand-corrected set + optional A/B + reviewers | D-08, D-12, D-10 | **DONE** (D-08 closed; D-10 + D-12 deferred by author) |
-| 3 — Independent CPV via public benchmark | D-07, D-06 | **DONE** (D-07 closed via ScreenSpot; D-06 deferred — only needed for SSP/UDA) |
-| 4 — Heavy retraining experiments | D-01 DETR, D-02 SSP, D-03 Adaptive Teacher, D-04 SHOT, D-05 few-shot curve | **OPT-IN / DEFERRED** (none committed; documented as future work in Section 9.8) |
-| 5 — Tables | T-01, T-02, T-03 | **N/A unless Phase 4 runs** (T-04 already done in Phase 1) |
-| 6 — Writing sync | W-01, W-02, W-03, W-04 | **DONE** for what's possible without Phase 4 (W-01 done; W-02 PARTIAL gated on Phase 4; W-03 PARTIAL — 5 module placeholders; W-04 done; U-06 done) |
-| 7 — Figures | F-01 … F-12 | **OPEN** — minimum set still to export (F-03, F-05, F-07, F-08, repo tree Figure 5.4) |
-| 8 — Submission pack | U-01 … U-11 except U-05/U-06 | **OPEN** — front matter, style, word count, T16–T20 decision, demo decision |
+| 1 — Easy evidence (hardware, det. latency, memory, T-04) | U-05, D-09, D-11, T-04, NFR refresh | **DONE** (D-11 PARTIAL) |
+| 2 — CPV on hand-corrected set + optional A/B + reviewers | D-08, D-12, D-10 | **DONE** (D-08 closed; D-10 + D-12 deferred) |
+| 3 — Independent CPV via public benchmark | D-07, D-06 (initial deferral) | **DONE** (D-07 closed via ScreenSpot; D-06 was deferred here but is reopened in Phase 4) |
+| **4 — Heavy retraining: different transfer-learning approaches** | **D-06 corpus, D-01 DETR, D-05 few-shot curve, D-02 SSP+FT** | **IN PROGRESS — author committed 26 May 2026 to the recommended triple. D-03 / D-04 UDA remain DEFERRED.** |
+| 5 — Tables | T-01, T-02, T-03 | **OPEN** — fills after Phase 4 produces numbers |
+| 6 — Writing sync | W-01, W-02, W-03, W-04 | **DONE** for what's possible without Phase 4 (W-02 will need a refresh once Phase 4 numbers land) |
+| 7 — Figures | F-01 … F-12 | **OPEN** (paused — author has deprioritised final-report polish) |
+| 8 — Submission pack | U-01 … U-11 except U-05/U-06 | **OPEN** (paused — same as Phase 7) |
 
-**Net:** the underlying engineering, measurement, and writing are effectively done. What remains is **(a) Phase 7 figures + Phase 8 submission pack** for the dissertation itself, and **(b) optional Phase 4 retraining experiments** if the author wants to strengthen Chapters 7–8 with DETR / few-shot / UDA numbers.
+**Net:** Phase 4 is the active engineering lane. Phases 7 and 8 are paused. Phase 4 produces new mAP / CPV / sample-efficiency numbers that downstream Phase 5 tables (T-01, T-02) and Phase 6 W-02 sync will pick up once they land.
 
 ---
 
-## 2. What is next
+## 2. Active sprint — Phase 4 (different transfer-learning approaches)
 
-The author's instruction on 26 May 2026 was: *"don't think about the final report and demo. Other than that, are we done? What's the next plan?"*
+The proposal promised a comparison of three transfer-learning families on two backbones. Today the report has only one family (few-shot fine-tuning) on one backbone (YOLOv8). Phase 4 fills the missing cells:
 
-The honest answer is **yes, everything else is done**, and the only remaining engineering lane is **Phase 4 (opt-in)**. Two follow-on options are recorded below; pick zero, one, or both.
+| Family | Approach | Backbone(s) | Sub-phase |
+|---|---|---|---|
+| (a) | Few-shot fine-tuning | YOLOv8 (done in M0..M3), **DETR** (D-01), **YOLOv8 + curve** (D-05) | **4.2**, **4.3** |
+| (b) | Self-Supervised Pre-training + Fine-tune (SSP+FT) | YOLOv8 | **4.4** (needs D-06 corpus from **4.1**) |
+| (c) | Unsupervised Domain Adaptation (Adaptive Teacher, SHOT) | DEFERRED | not in this sprint; future work |
 
-### 2.A Recommended next sprint — high ROI, modest compute
+### Dependency chain
 
-These three items would strengthen the dissertation's empirical contribution without requiring a 2k-image data collection drive:
+```
+4.0 Setup ─► 4.1 D-06 corpus capture (~1-2 calendar days, passive) ─► 4.4 D-02 SSP+FT
+              │
+              └── 4.2 D-01 DETR (3-5 h Colab) ── independent
+              │
+              └── 4.3 D-05 few-shot curve (4-6 h Colab) ── independent
+```
 
-| ID | What | Effort | Closes |
-|----|------|--------|--------|
-| **D-01** | Train DETR-R50 on CLAY (source) → fine-tune on the 8-image hand-corrected set; produce the same mAP / CPV numbers VisClick's YOLOv8 model already has. | ~3-5 h on Colab Free (T4) | T-01 DETR row; W-02 "two backbones" claim |
-| **D-05** | Few-shot data-efficiency curve on YOLOv8 only: retrain at *k* = 1, 5, 10, 50, 100 labelled desktop images using a stratified subsample of the hand-corrected set + Roboflow CLAY checkpoint. | ~4-6 h on Colab Free | T-02 sample-efficiency table; F-11 figure |
-| **D-11** | Formal per-method `nfr_memory.csv`: instrument the four-method baseline harness with `psutil`, log peak RSS per method over T01-T15. | ~30 min on the Windows test machine | R-NFR-03 closed; D-11 from PARTIAL → DONE |
+The corpus capture runs in the background while D-01 and D-05 happen on Colab.
 
-If only one of these can be done, **D-01 is the highest priority** because Chapter 7 / 8 and the proposal explicitly promise a two-backbone comparison.
+### 2.0 — Setup (15 minutes)
 
-### 2.B Skip these unless the supervisor asks
+Before kicking off any sub-phase:
 
-| ID | What | Why skip | Already documented as |
-|----|------|----------|-----------------------|
-| D-02 SSP | Self-supervised pre-training on the 2k unlabelled corpus | Needs D-06 (corpus collection, ~half a day on Windows) + multi-day Colab training | Future work, Section 9.8 |
-| D-03 Adaptive Teacher / D-04 SHOT | Unsupervised domain adaptation | Multi-day compute each, requires D-06, low marginal return given D-07 (ScreenSpot) already supplies the third-party-labelled evidence | Future work, Section 9.8 |
-| D-06 unlabelled desktop corpus expansion | 2000 unlabelled screenshots | Only consumed by D-02/D-03/D-04, which are not committed | Future work, Section 9.8 |
+- [ ] Confirm Colab Free still allocates a GPU (open any of `notebooks/05_train_source.ipynb` or `06_finetune_desktop.ipynb`, check `nvidia-smi`).
+- [ ] Confirm the existing Drive-mounted dataset folders (`source_clay/`, `handcorrected_desktop_test/`) are still in place.
+- [ ] Confirm the YOLOv8 fine-tuned checkpoint exists (`weights/visclick.onnx` for inference; the `.pt` source-best lives in Drive next to the source-train notebook). DETR pre-training will start from `facebookresearch/detr` `detr-r50` HF weights, not from VisClick's YOLOv8 weights.
+- [ ] Optional but recommended: open a small Drive folder `visclick/phase4_results/` to hold the new training logs and weights.
+
+### 2.1 — Sub-phase 4.1: D-06 corpus capture (1-2 calendar days, mostly passive)
+
+**Goal:** 1500–2000 unlabelled desktop screenshots across 10-15 apps, written to `~/Documents/visclick_data/desktop_unlabeled/<app>/`. SSP needs *diversity* (different apps, themes, window sizes) more than *count*; aim for ≥10 apps with ≥100 screens each.
+
+Two capture modes are available. **Mode A (recommended)** is fully passive; **Mode B** is what `scripts/capture_screenshots.py` already does.
+
+**Mode A — auto-capture in the background:** new script `scripts/auto_capture_corpus.py` (added in this commit). Runs in a terminal, takes a screenshot every N seconds (default 60), buckets by foreground app name (read via the Win32 API). Stop with F10.
+
+Run on Windows as administrator so the F10 hotkey works:
+
+```
+.\.venv\Scripts\python.exe scripts\auto_capture_corpus.py --interval 60 --root %USERPROFILE%\Documents\visclick_data\desktop_unlabeled --max 2000
+```
+
+Then **just use your computer normally** for the rest of the day. The script samples once per minute. Over 6-8 active hours you'll accumulate 400-500 screens; over 2 days of normal work, 1500-2000.
+
+**Mode B — manual hotkey (existing script):** if you want curated coverage (10 of each app), the existing `scripts/capture_screenshots.py` lets you hold F9 to snap.
+
+**Phase 4.1 checklist**
+
+- [ ] Started `auto_capture_corpus.py` on Windows.
+- [ ] Verified screenshots are accumulating in the right folder (open the folder, see PNGs appear every minute).
+- [ ] Reached ≥1500 PNGs across ≥10 apps (check the per-app subfolder counts).
+- [ ] Stopped the script (F10) and confirmed final count.
+- [ ] Optional: zip the folder and upload to Drive (large; do not commit to git).
+
+When this is running, move to 4.2 and 4.3 in parallel.
+
+### 2.2 — Sub-phase 4.2: D-01 DETR baseline (3-5 hours Colab)
+
+**Goal:** Train DETR-R50 on CLAY (source) → fine-tune on the 8-image hand-corrected desktop test set → produce mAP@0.5 and CPV numbers comparable to VisClick's YOLOv8.
+
+Two new notebooks to be created in this sub-phase (will be drafted when you reach this step):
+
+- `notebooks/09_detr_source.ipynb` — DETR-R50, HuggingFace `transformers.DetrForObjectDetection`, train on CLAY for ~10-15 epochs with imgsz 800. Save best checkpoint to Drive.
+- `notebooks/10_detr_finetune.ipynb` — load the source checkpoint, fine-tune on hand-corrected for ~30 epochs, evaluate mAP / CPV.
+
+**Phase 4.2 checklist**
+
+- [ ] `09_detr_source.ipynb` runs end-to-end on Colab Free T4.
+- [ ] DETR source-best checkpoint saved to Drive.
+- [ ] `10_detr_finetune.ipynb` runs to completion.
+- [ ] mAP@0.5 + CPV numbers recorded in `reports/tables/transfer_experiments.csv` (new DETR rows).
+- [ ] Smoke-test: download fine-tuned DETR weights, run one inference on `samples/test_screenshots/T01.png`, confirm boxes look reasonable.
+
+### 2.3 — Sub-phase 4.3: D-05 few-shot curve (4-6 hours Colab)
+
+**Goal:** Show how YOLOv8 mAP scales with k = 1, 5, 10, 50, 100 labelled desktop images. The proposal's RQ on sample efficiency.
+
+Notebook to be created in this sub-phase:
+
+- `notebooks/08c_few_shot_curve.ipynb` — load CLAY-pretrained YOLOv8 best.pt, fine-tune at each k, log mAP@0.5 + CPV.
+
+**Note on k=100:** the hand-corrected set is only 8 images. For k>8 you'll need either (i) extend the hand-corrected set (a sub-task within D-07-2.0 if you want to do it), or (ii) limit the curve to k ∈ {1, 2, 4, 8} which is honest given the data budget. Option (ii) is acceptable for an MSc-scale finding; report it as "few-shot curve at small-k regime" rather than "to k=100."
+
+**Phase 4.3 checklist**
+
+- [ ] `08c_few_shot_curve.ipynb` runs end-to-end.
+- [ ] `reports/tables/sample_efficiency.csv` exported (one row per k, with mAP@0.5 + CPV).
+- [ ] Quick matplotlib line plot saved as `reports/figures/sample_efficiency_curve.png` (the F-11 figure).
+
+### 2.4 — Sub-phase 4.4: D-02 SSP + FT (1 day Colab; runs after 4.1 corpus is done)
+
+**Goal:** Self-Supervised Pre-training on the D-06 corpus, then few-shot fine-tune on hand-corrected. Compare to family (a).
+
+**Method choice:** SimCLR-style contrastive pre-training on the CSPDarknet backbone (YOLOv8's feature extractor). Two-stage:
+
+1. **SSP pretrain (`notebooks/11_ssp_pretrain.ipynb`):** take YOLOv8s backbone, attach a projection head, train with NT-Xent loss on the D-06 corpus for ~20-30 epochs with strong augmentation (RandomResizedCrop, ColorJitter, RandomGrayscale). The CSPDarknet learns desktop-specific features without labels.
+2. **SSP fine-tune (`notebooks/12_ssp_finetune.ipynb`):** load the SSP-pretrained backbone into YOLOv8s, fine-tune on hand-corrected for ~30 epochs with the same recipe as M3. Evaluate.
+
+**Phase 4.4 checklist**
+
+- [ ] D-06 corpus has ≥1500 screens before starting 4.4.
+- [ ] `11_ssp_pretrain.ipynb` produces an SSP backbone checkpoint.
+- [ ] `12_ssp_finetune.ipynb` produces a fine-tuned YOLOv8 + SSP model with mAP@0.5 + CPV recorded.
+- [ ] Numbers added to `reports/tables/transfer_experiments.csv` (new SSP row).
+- [ ] Side-by-side mAP / CPV comparison: M0 (zero-shot) vs M3 (few-shot FT) vs SSP+FT. Documented in Section 6 / 7 of `Final_Report.md` once Phase 4 is closed.
+
+### 2.5 — After Phase 4 lands
+
+Once 4.1-4.4 are all DONE:
+
+1. Update `Final_Report_GAPS.md`: D-01, D-02, D-05, D-06 from IN PROGRESS → DONE.
+2. Refresh `transfer_experiments.csv` (T-01 sub-task) and `sample_efficiency.csv` (T-02 sub-task).
+3. Rewrite Sections 6.5.5–6.5.8 of `Final_Report.md` (DETR + SSP + few-shot curve prose) — closes W-02 fully.
+4. Reopen the dissertation-polish lane (Phase 7 figures + Phase 8 submission pack) when the author is ready.
 
 ---
 
@@ -161,6 +253,7 @@ User said on 26 May 2026 to deprioritise final-report polish and the demo. This 
 | 2026-05-14 | 5/6 | W-02 (PARTIAL) | Writing-sync pass on `docs/Final_Report.md`. Five precision edits folded Phase 2 + Phase 3 CPV results into the dissertation prose: Section 7.3.1 now reports both CPV numbers with per-class and per-slice tables; Section 8.2 interprets them via the per-element-recall vs per-instruction-grounding-success protocol caveat; Section 6.12 documents `run_cpv.py` and `run_cpv_screenspot.py` as part of the evaluation harness; Sections 8.8, 9.7, 9.8 updated to reflect that D-07's *evidence* side closed via ScreenSpot while the hand-correction expansion remains future work. References (W-01), Ch6 DETR/SSP/UDA stubs (still gated on D-01..D-04), and personal-voice paragraphs in Sections 9.3-9.5 (W-03/W-04) remain OPEN. Report line count 1632 → 1735. |
 | 2026-05-14 | 5/6 | W-01 (DONE); W-03 (PARTIAL); W-04 (DONE); U-06 (DONE) | Personal-voice writing pass on `docs/Final_Report.md` Sections 9.3, 9.4, 9.5, 9.6, written in the author's voice drawing on actual Phase 1-3 project pivots (hand-correction-to-ScreenSpot pivot, auto-label-to-hand-corrected mAP retraction, ScreenSpot bbox-format bug, OneDrive MAX_PATH lockfile, public-benchmark integration workflow). Section 9.5 expanded from 4 to 5 self-taught areas. Section 9.4 module-mapping `[INSTITUTION]` placeholder filled from the title page; five module-name placeholders remain for the author to confirm against the RGU/IIT MSc Data Science programme handbook at submission time. References renumbered via reproducible `scripts/renumber_references.py`: 53 canonical refs, 5 aliases collapsed (L1, L3, L4, L7, L9), 92 inline citation groups preserved, list now `[1]..[53]` with no gaps. Script masks fenced and inline code blocks so patterns like `offset[0]` are not rewritten. |
 | 2026-05-26 | meta | n/a | Plan consolidation: deleted `docs/SUBMISSION_TASK_PLAN.md` (redundant with this file) and the repo-root `PHASE_WORKLOG.md` (its Phase 1 measurement notes already live in `VisClick_Report_Data_Form.md` Section 1.1 and `reports/tables/detector_bench_snapshot_2026-05-14.csv`). Added an archived banner to `VisClick_Detailed_Plan.md`. `docs/PHASE_WORKLOG.md` rewritten as the single canonical plan, organised around current state + what's next, with the full findings log preserved. |
+| 2026-05-26 | 4 (kick-off) | D-01, D-02, D-05, D-06 → IN PROGRESS | Author committed to the recommended Phase 4 triple: D-06 corpus capture → D-01 DETR + D-05 few-shot curve in parallel → D-02 SSP+FT. D-03 / D-04 UDA remain DEFERRED (multi-day each, low marginal return given D-07 ScreenSpot already supplies third-party-labelled evidence). Detailed sub-phase instructions (4.0 setup, 4.1 D-06, 4.2 D-01, 4.3 D-05, 4.4 D-02) added to Section 2 above. New script `scripts/auto_capture_corpus.py` written for D-06: background capture every 60 s with foreground-app bucketing, F10 to stop. Notebooks 09–12 (DETR + few-shot + SSP) to be written when the author reaches each sub-phase. |
 
 ---
 

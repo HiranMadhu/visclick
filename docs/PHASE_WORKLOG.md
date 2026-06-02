@@ -7,7 +7,7 @@
 - **Historical / original how-to-build plan** lives in `VisClick_Detailed_Plan.md` (archived; do not follow step-by-step).
 
 **Author:** Hiran Abeywardhana.
-**Last updated:** 26 May 2026.
+**Last updated:** 2 June 2026.
 
 ---
 
@@ -18,7 +18,7 @@
 | 1 — Easy evidence (hardware, det. latency, memory, T-04) | U-05, D-09, D-11, T-04, NFR refresh | **DONE** (D-11 PARTIAL) |
 | 2 — CPV on hand-corrected set + optional A/B + reviewers | D-08, D-12, D-10 | **DONE** (D-08 closed; D-10 + D-12 deferred) |
 | 3 — Independent CPV via public benchmark | D-07, D-06 (initial deferral) | **DONE** (D-07 closed via ScreenSpot; D-06 was deferred here but is reopened in Phase 4) |
-| **4 — Heavy retraining: different transfer-learning approaches** | **D-06 corpus, D-01 DETR, D-05 few-shot curve, D-02 SSP+FT** | **IN PROGRESS — author committed 26 May 2026 to the recommended triple. D-03 / D-04 UDA remain DEFERRED.** |
+| **4 — Heavy retraining: different transfer-learning approaches** | **D-06 corpus, D-01 DETR, D-05 few-shot curve, D-02 SSP+FT** | **IN PROGRESS — D-01 source-side DONE (2 June 2026, mAP@0.5 = 0.2438 on CLAY test). D-06 / D-05 / D-02 still in progress. D-01 target-side and D-03 / D-04 UDA remain DEFERRED.** |
 | 5 — Tables | T-01, T-02, T-03 | **OPEN** — fills after Phase 4 produces numbers |
 | 6 — Writing sync | W-01, W-02, W-03, W-04 | **DONE** for what's possible without Phase 4 (W-02 will need a refresh once Phase 4 numbers land) |
 | 7 — Figures | F-01 … F-12 | **OPEN** (paused — author has deprioritised final-report polish) |
@@ -98,11 +98,14 @@ Two new notebooks to be created in this sub-phase (will be drafted when you reac
 
 **Phase 4.2 checklist**
 
-- [ ] `09_detr_source.ipynb` runs end-to-end on Colab Free T4.
-- [ ] DETR source-best checkpoint saved to Drive.
-- [ ] `10_detr_finetune.ipynb` runs to completion.
+- [x] `09_detr_source.ipynb` runs end-to-end on Colab Free T4. (2 June 2026 — 6 epochs fp16 imgsz cap {600,800}.)
+- [x] DETR source-best checkpoint saved to Drive. (`weights/baseline_source_detr/best_source_detr_r50.pt`.)
+- [x] Source-side mAP recorded: **mAP@0.5 = 0.2438, mAP@0.5:0.95 = 0.1606** on CLAY test (7998 / 1000 / 1000). CSV: `reports/tables/source_domain_results_detr.csv`. **~54 % of YOLOv8s mAP@0.5 (0.4505) at ~6× the wall-clock time per training run** — clean compute-matched comparison.
+- [ ] `10_detr_finetune.ipynb` runs to completion. **PENDING author decision** — see Phase-4.2 follow-up below.
 - [ ] mAP@0.5 + CPV numbers recorded in `reports/tables/transfer_experiments.csv` (new DETR rows).
 - [ ] Smoke-test: download fine-tuned DETR weights, run one inference on `samples/test_screenshots/T01.png`, confirm boxes look reasonable.
+
+**Phase 4.2 follow-up (target-side):** the next move on D-01 is one of three paths; all leave Phase 4.3 (D-05) as the next sub-phase regardless. (a) Run a 5-minute zero-shot eval of `best_source_detr_r50.pt` on the 8-image hand-corrected desktop set (no fine-tune; cheapest way to close the proposal's "evaluated zero-shot on the labelled desktop test set" clause). (b) Run `10_detr_finetune.ipynb` to do head-only fine-tune on the 8 images + the zero-shot eval (more work; produces a fairer comparison but the 8-image fine-tune is likely to overfit). (c) Document the target-side as deferred (cite source-side number only, list target-side in Section 9.8 future work). Author preference recorded as: TBD.
 
 ### 2.3 — Sub-phase 4.3: D-05 few-shot curve (4-6 hours Colab)
 
@@ -254,6 +257,7 @@ User said on 26 May 2026 to deprioritise final-report polish and the demo. This 
 | 2026-05-14 | 5/6 | W-01 (DONE); W-03 (PARTIAL); W-04 (DONE); U-06 (DONE) | Personal-voice writing pass on `docs/Final_Report.md` Sections 9.3, 9.4, 9.5, 9.6, written in the author's voice drawing on actual Phase 1-3 project pivots (hand-correction-to-ScreenSpot pivot, auto-label-to-hand-corrected mAP retraction, ScreenSpot bbox-format bug, OneDrive MAX_PATH lockfile, public-benchmark integration workflow). Section 9.5 expanded from 4 to 5 self-taught areas. Section 9.4 module-mapping `[INSTITUTION]` placeholder filled from the title page; five module-name placeholders remain for the author to confirm against the RGU/IIT MSc Data Science programme handbook at submission time. References renumbered via reproducible `scripts/renumber_references.py`: 53 canonical refs, 5 aliases collapsed (L1, L3, L4, L7, L9), 92 inline citation groups preserved, list now `[1]..[53]` with no gaps. Script masks fenced and inline code blocks so patterns like `offset[0]` are not rewritten. |
 | 2026-05-26 | meta | n/a | Plan consolidation: deleted `docs/SUBMISSION_TASK_PLAN.md` (redundant with this file) and the repo-root `PHASE_WORKLOG.md` (its Phase 1 measurement notes already live in `VisClick_Report_Data_Form.md` Section 1.1 and `reports/tables/detector_bench_snapshot_2026-05-14.csv`). Added an archived banner to `VisClick_Detailed_Plan.md`. `docs/PHASE_WORKLOG.md` rewritten as the single canonical plan, organised around current state + what's next, with the full findings log preserved. |
 | 2026-05-26 | 4 (kick-off) | D-01, D-02, D-05, D-06 → IN PROGRESS | Author committed to the recommended Phase 4 triple: D-06 corpus capture → D-01 DETR + D-05 few-shot curve in parallel → D-02 SSP+FT. D-03 / D-04 UDA remain DEFERRED (multi-day each, low marginal return given D-07 ScreenSpot already supplies third-party-labelled evidence). Detailed sub-phase instructions (4.0 setup, 4.1 D-06, 4.2 D-01, 4.3 D-05, 4.4 D-02) added to Section 2 above. New script `scripts/auto_capture_corpus.py` written for D-06: background capture every 60 s with foreground-app bucketing, F10 to stop. Notebooks 09–12 (DETR + few-shot + SSP) to be written when the author reaches each sub-phase. |
+| 2026-06-02 | 4.2 | D-01 → SOURCE-SIDE DONE (target-side pending) | `09_detr_source.ipynb` completed end-to-end on Colab Free T4 with the compute-fit config: **6 epochs, imgsz cap {600, 800}, fp16 autocast + GradScaler, micro-batch 2 / grad-accum 8 (effective 16)**. Result on CLAY test split: **mAP@0.5 = 0.2438, mAP@0.5:0.95 = 0.1606** (`reports/tables/source_domain_results_detr.csv`). Compared to the existing YOLOv8s source baseline (mAP@0.5 = 0.4505 at 30 epochs imgsz=640 fp32), DETR-R50 reaches ~54 % of YOLOv8's mAP@0.5 while consuming ~6× the wall-clock time per training run — clean compute-matched evidence that supports the architectural choice of YOLOv8s for VisClick's production pipeline. Two pre-completion attempts informed the final config: (1) an 8-epoch imgsz=1333 fp32 run disconnected mid-training at ~2.5 epochs (mAP@0.5 = 0.0114, retracted as a partial-checkpoint artefact); (2) `processor.pad(..., return_tensors="pt")` raised a TypeError in recent transformers, replaced with manual variable-size padding + pixel-mask construction in the collate function (commits 08eeecc, eea04b5). The Drive bundle path was also augmented with a `_bootstrap_from_unified()` fallback (commit f2b9b4f) so the cell now recovers when the `.tar.gz` bundles have been pruned but `data/unified/` is intact. Target-side evaluation (zero-shot on the 8-image hand-corrected desktop set; optional head-only fine-tune via `10_detr_finetune.ipynb`) is the next decision under Phase 4.2 follow-up in Section 2.2. |
 
 ---
 

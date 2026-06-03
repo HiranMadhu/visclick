@@ -1,0 +1,6 @@
+k,weights,hc_eval_flag,hc_map_50,hc_map_50_95,screenspot_n,screenspot_cpv_pct,screenspot_cpv_text_pct,screenspot_cpv_icon_pct,screenspot_eval_min
+0,/content/drive/MyDrive/visclick/weights/baseline_source/best_source_v8s.pt,held_out,0.0117,0.0066,334,60.18,75.77,38.57,0.1
+1,/content/drive/MyDrive/visclick/weights/few_shot/k1/run1/weights/best.pt,fit_to_train,0.0125,0.0069,334,68.26,85.57,44.29,0.1
+2,/content/drive/MyDrive/visclick/weights/few_shot/k2/run1/weights/best.pt,fit_to_train,0.0832,0.0506,334,20.06,27.84,9.29,0.1
+4,/content/drive/MyDrive/visclick/weights/few_shot/k4/run1/weights/best.pt,fit_to_train,0.1834,0.0892,334,10.48,12.89,7.14,0.1
+8,/content/drive/MyDrive/visclick/weights/few_shot/k8/run1/weights/best.pt,fit_to_train,0.2712,0.1543,334,25.15,34.54,12.14,0.1

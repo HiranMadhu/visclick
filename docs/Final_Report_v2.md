@@ -322,3 +322,535 @@ The positioning relative to SeeClick and the LVLM family is explicit. This proje
 This chapter walked through the literature in the order the project consumes it. The mobile UI domain is data-rich, anchored by RICO and CLAY. The desktop domain is data-poor, with recent attempts at corpora (DeskVision, GenGUI) still emerging. Classical automation tools — bitmap, coordinate and accessibility-tree — have all run into problems on the modern Windows 11 application mix, leaving a gap that vision-based detection is the natural candidate to fill. Among deep-learning detectors, the two architectural families this project compares (YOLOv8 with its multi-scale PANet neck, DETR with its transformer set-prediction) have well-documented strengths and weaknesses. YOLOv8's multi-scale design is the favourite, with DETR included as a controlled comparison. Among adaptation methods, the three this project implements (few-shot, SSP+FT, UDA) span the continuum from labelled-only-on-target to no-labels-on-target. The published literature suggests SSP+FT will give the best practical return at the project's data budget. Among grounding frameworks, the IVGocr modular pipeline of Dardouri et al. (2024a) is the immediate architectural ancestor of this project's prototype; SeeClick and ScreenAI are the heavyweight reference points that anchor the dissertation's lightweight stance. The combined research gap is the absence of a lightweight, data-efficient, end-to-end-validated cross-domain UI adapter for the desktop, and the project's four research questions sit precisely inside that gap.
 
 The next chapter, Chapter 3, turns to requirement analysis. It begins with a stakeholder analysis and proceeds through functional and non-functional requirements with quantitative targets that the rest of the report measures against.
+
+---
+
+# CHAPTER 03 – REQUIREMENT ANALYSIS
+
+## 3.1 CHAPTER OVERVIEW
+
+This chapter sets out the requirements the system was built against. It begins with a stakeholder analysis using the Onion model. Requirements without stakeholders are arbitrary. The stakeholder analysis is then converted into a set of stakeholder viewpoints, each of which contributes some requirements. The methodologies used to gather requirements come next, together with the methodology for obtaining the datasets the system is trained on. UML use case diagrams formalise the system's interactions with its users, and the use cases are then written out in long form. The chapter ends with the explicit list of functional requirements (R-FR-01 to R-FR-09) and non-functional requirements (R-NFR-01 to R-NFR-10) the rest of the dissertation is evaluated against. Each requirement carries a unique identifier, a description, a target value where measurable, and a pointer to the testing chapter that validates it.
+
+A reader who is not interested in the requirements rationale can skip to Section 3.7 and Section 3.8 and read the requirement lists directly.
+
+## 3.2 STAKEHOLDER ANALYSIS
+
+Stakeholder analysis identifies the people and organisations who are affected by the system, or who affect the system. The motivation is to spot conflicting interests early and to capture requirements from each perspective before the design hardens around any single one. This section uses the Onion model, where stakeholders are placed in concentric rings according to their distance from the technical core.
+
+### 3.2.1 THE ONION MODEL
+
+The Onion model for this project has six rings.
+
+The **innermost ring** is the system itself: the VisClick prototype. The ONNX detector, the EasyOCR layer, the rapidfuzz matcher, the Tk GUI, and the PyAutoGUI action layer.
+
+The **second ring** is the **operational users**. Two distinct groups sit here. The first is the author, who runs the bot for evaluation and treats it as a research artefact. The second is the imagined power user — a developer or QA engineer who would use such a tool to automate repetitive desktop tasks. The two groups have meaningfully different requirements. The researcher wants observability above all else: overlay images, structured CSVs, verifiable verdicts. The power user wants reliability (zero crashes, predictable refusal-on-uncertainty) and convenience (a GUI rather than a CLI). The system addresses both by shipping a CLI for the researcher and a Tk GUI for the power user, layered over a common core.
+
+The **third ring** is the **academic operational stakeholders**: the project supervisor (Pumudu Fernando) and the second marker. Their concerns are different again. They want a reproducible artefact, an honest evaluation, an academic novelty argument, and a dissertation properly structured against the RGU programme handbook.
+
+The **fourth ring** is the **functional layer of downstream beneficiaries**. Three sub-groups belong here. QA and test-automation engineers who might adapt the project's code for production purposes. Accessibility users who could in principle benefit from a text-driven click bot when traditional input devices are not usable. And the research community — authors of any of the literature reviewed in Chapter 2 who might cite or extend this work, and future students inheriting the codebase.
+
+The **fifth ring** is the **containing organisations**. Robert Gordon University is the degree-awarding body and the source of the dissertation's ethical-review framework, style guide, and assessment criteria. The Informatics Institute of Technology (IIT) is the partner institution. The author's employer is mentioned only because professional context informs some of the architectural choices. An automation tool that is interpretable and locally-deployable is more aligned with corporate compliance concerns than one that calls out to a cloud LLM.
+
+The **outermost ring** is the **wider environment**. Microsoft is the platform owner — Windows 11 OS, the UI Automation framework, Notepad, File Explorer. Their decisions about which control libraries to ship and how to expose them through the accessibility tree have material effects on every measurement in Chapter 7. Google Colab is the compute provider for all training. Their Free-tier T4 quota is the binding budget constraint that shapes the data and experimental design. GitHub hosts the public artefact. The open-source community supplies the underlying libraries (Ultralytics for YOLOv8, JaidedAI for EasyOCR, the pywinauto and PyAutoGUI maintainers). Dataset providers sit here too — Deka et al. (2017) for RICO, Li et al. (2022a) for CLAY — as do the bad-actor groups whose existence motivates the social-impact discussion in Section 8.10.
+
+### 3.2.2 STAKEHOLDER VIEWPOINTS
+
+Each ring produces requirements. And the requirements sometimes conflict. The five viewpoints below capture the conflicts that mattered during design.
+
+**The researcher's viewpoint** prioritises observability and reproducibility. Every prediction must be inspectable. Every result must be regeneratable from a script that can be re-run. This pushes the design towards verbose CSV logging, per-attempt overlay images, and CLI flags that fix randomness and dump intermediate state.
+
+**The power user's viewpoint** prioritises a tight loop of action and feedback. Speed matters. Clarity of error messages matters. Refusal on uncertainty matters more than maximum coverage. This viewpoint produced R-FR-06 (refusal on low confidence), one of the harder-fought design decisions of the project.
+
+**The academic stakeholder's viewpoint** prioritises an honest, defensible evaluation. This viewpoint is the reason the report explicitly cites both the inflated mAP figure (0.7176, against pseudo-labels) and the corrected one (0.0330, against hand-corrected ground truth). It is also the reason the negative test case T15 is kept in the headline TSR denominator rather than removed.
+
+**The accessibility-user viewpoint** prioritises permission and refusal semantics over raw speed. A bot that confidently clicks the wrong thing is worse, for this group, than one that takes an extra second to be sure. This viewpoint reinforces R-FR-06 and motivates the human-in-the-loop verdict prompt in the evaluation harness.
+
+**The platform-and-OS viewpoint** prioritises portability, or more precisely makes the project acknowledge its lack of portability. Windows 11 only. Multi-monitor support. DPI-scaling-aware coordinate handling. These constraints are captured in R-NFR-09 (compatibility) and discussed at length in Section 9.7.
+
+Where the viewpoints conflict, the design rule is consistent: prefer the more conservative behaviour. When in doubt about whether to click, do not click; this is R-FR-06. When in doubt about which monitor to use, ask; this is the `--monitor` flag. When in doubt about whether a result should go into the CSV, log it with a `notes` field.
+
+## 3.3 REQUIREMENT GATHERING TECHNIQUES
+
+Four requirement-gathering techniques were used during the project, each in proportion to its cost-effectiveness on a single-developer MSc project.
+
+**Literature review.** The single largest source of functional requirements is the existing literature reviewed in Chapter 2. The IVGocr architecture of Dardouri et al. (2024a) directly contributed R-FR-01 to R-FR-05 (capture, instruction, detection, matching, action). The published failure modes of classical baselines — UIED's argument that neither pure deep learning nor pure CV suffices on its own (Chen et al., 2020), Apple's published in-distribution-to-out-of-distribution drop (Zhang et al., 2021) — directly contributed R-FR-06 (refusal on uncertainty). The literature is the most reproducible requirement source for an academic project, because every requirement can be traced back to a publication.
+
+**Self-as-stakeholder analysis.** The author is one of the operational users. Several requirements were derived from running early versions of the bot during the prototype phase. Multi-monitor coordinate confusion produced R-FR-07. Silent Tesseract failure produced part of R-NFR-04 (reliability). The difficulty of switching OCR engines from the CLI produced part of R-NFR-05 (usability). Self-as-stakeholder is a recognised method in agile and lean software engineering, though it is more often used in industrial projects than in dissertation work.
+
+**Stakeholder interviews.** A short interview was conducted with the project supervisor early in the proposal phase to clarify the academic-stakeholder viewpoint described in Section 3.2.2. No formal transcript was kept, but the interview output is reflected in the proposal's research questions and is therefore the source of all four RQ-grounded requirements implicitly.
+
+**Field observation of analogous systems.** The author used SikuliX, `pywinauto` and PyAutoGUI for short experimental sessions during the first month of the project. The observed failure modes from these sessions (template captures aging out, UIA `Name`s that do not match the visible labels, coordinate scripts that broke when DPI changed) were converted into the explicit failure-mode list in Section 8.4, and into the comparison baselines in Chapter 7. This is, in effect, the requirement-gathering technique that justifies the lightweight stance. The requirements *not* met by existing tools are the most concrete justification for the new tool.
+
+A fifth technique that the reference report at IIT/RGU uses but this project does not is **stakeholder questionnaires**. Questionnaires are sensible for projects with non-overlapping target users. For a developer-tooling artefact at MSc scale with the author as the primary user, the cost of designing and distributing a questionnaire would have exceeded the benefit.
+
+## 3.4 METHODOLOGY FOR OBTAINING DATASETS
+
+The data-engineering side follows a three-tier methodology dictated by the data-availability constraints reviewed in Section 2.2.
+
+**Tier 1: public source-domain corpora.** Three publicly available datasets are used as the source domain: RICO (Deka et al., 2017), CLAY (Li et al., 2022a), and VINS. Acquisition is straightforward — a download from the respective project pages and a checksum check — but the cleaning and class-collapse work is non-trivial and is documented in Chapter 6. The combined corpus is the 6-class "Zenodo unified bundle" of approximately 9,646 screens used in the source-training notebook.
+
+**Tier 2: captured target-domain unlabelled corpus.** The proposal commits to roughly 2,000 unlabelled desktop screenshots captured from 10 to 15 applications. The capture methodology is implemented in `scripts/auto_capture_corpus.py` and uses `mss` for the screen grab plus the foreground-window title for the per-image filename. The script is parameterised so the eventual corpus covers the in-the-wild variability the bot encounters. As of submission this corpus is in active accumulation.
+
+**Tier 3: hand-curated target-domain labelled corpus.** A small set of hand-corrected screens with 356 ground-truth boxes serves as the gold-standard test pool. Annotation methodology follows the CVAT shape-and-label convention used in the wider literature: rectangular bounding boxes only, no rotated boxes, no segmentation masks. Class labels are restricted to the 6-class taxonomy `{button, text, text_input, icon, menu, checkbox}`. Annotators (in practice, the author alone) follow a written guideline document that mirrors the conventions used in the CLAY release notes.
+
+A practical note about scale. The hand-corrected pool is small by deliberate choice, not by oversight. Building a 100-image labelled set at a single-developer MSc cadence is hard. Building one with high-quality boundaries on dense Windows 11 toolbars is harder. The project's response is layered: a small hand-corrected pool for fine-grained per-element recall, supplemented by the ScreenSpot benchmark (Cheng et al., 2024) for held-out per-instruction grounding. Both protocols are reported side by side in Chapter 7 so the reader can see the limitation directly rather than inferring it.
+
+The three tiers feed three different experimental purposes. Tier 1 is the source-domain training set. Tier 2 is the unlabelled target corpus needed for SSP+FT and UDA. Tier 3 is the labelled target test set used for evaluating every adaptation method, and is also the training source for the few-shot fine-tuning experiment.
+
+## 3.5 USE CASE DIAGRAMS (UML)
+
+The system supports six use cases, four of which are user-facing and two of which are internal to evaluation.
+
+[FIGURE 7: UML use case diagram for VisClick.
+Source: `reports/figures/ch3_use_cases.png` (to be produced; one actor "User", six use cases UC-01 to UC-06 with `<<include>>` relationships where appropriate).
+Caption: Use case diagram for the VisClick prototype. UC-01 to UC-04 are user-facing; UC-05 and UC-06 are run during evaluation. Each use case maps to one or more functional requirements in Section 3.7.]
+
+The six use cases:
+
+- **UC-01: Click a labelled element.** The user provides a text instruction; the system captures the screen, detects elements, matches the instruction, and clicks the chosen element.
+- **UC-02: Refuse a click on low confidence.** The user provides an instruction for which no high-confidence target exists; the system reports a structured failure rather than clicking.
+- **UC-03: Select a specific monitor.** The user selects which monitor the bot should operate on, via either the CLI flag or the GUI dropdown.
+- **UC-04: Inspect a prediction overlay.** The user opens the saved overlay PNG for any past click to verify what the bot did.
+- **UC-05: Run a baseline evaluation.** The evaluator runs `scripts/run_baselines.py` to evaluate one or more methods across the canonical task suite.
+- **UC-06: Generate result tables and figures.** The evaluator runs the analysis scripts to regenerate the report's tables and figures from the per-attempt CSV.
+
+## 3.6 USE CASE DESCRIPTIONS
+
+Each of the four user-facing use cases is described below at a more practical level than the UML. UC-05 and UC-06 are evaluation tooling and are documented in Chapter 6 rather than here.
+
+**UC-01: Click a labelled element.**
+
+- *Primary actor:* End user (developer or power user).
+- *Pre-condition:* The bot is launched, the model weights are loaded, and the target monitor is selected.
+- *Main success flow:* (1) User types an instruction such as "click Save" into the GUI. (2) User presses Run or hits Enter. (3) The system pauses 3 seconds, allowing the user to switch focus to the target window. (4) The system captures the configured monitor. (5) The detector emits N candidate boxes. (6) The OCR layer reads the text on each box. (7) The matcher selects the best-fitting box above the similarity threshold. (8) The action layer moves the cursor to the box centre and clicks. (9) The system saves the overlay PNG and writes the CSV row.
+- *Alternative flow:* If no candidate exceeds the similarity threshold, the system follows UC-02 instead of clicking.
+- *Post-condition:* The targeted element has received a single left-click. The action has been logged.
+
+**UC-02: Refuse a click on low confidence.**
+
+- *Primary actor:* End user.
+- *Pre-condition:* As UC-01.
+- *Main success flow:* (1) User types an instruction. (2) System captures and detects as in UC-01. (3) Matcher computes the best-fitting box, but its similarity score is below the threshold (`min_text_similarity = 60` in the current build). (4) System emits a structured `FAIL: cannot find <target>` message. (5) System still saves the overlay PNG (with no click marker) and writes a CSV row with verdict `refused`.
+- *Post-condition:* No click was issued. The decision is logged.
+
+**UC-03: Select a specific monitor.**
+
+- *Primary actor:* End user on a multi-monitor setup.
+- *Pre-condition:* The system has detected more than one monitor at start-up.
+- *Main success flow:* The user selects the target monitor from the GUI's dropdown (or passes `--monitor <id>` to the CLI). The system queries `mss.monitors` for the selected index, recovers the `(left, top)` offset, and uses that offset throughout the subsequent capture-detect-match-click flow.
+- *Post-condition:* All subsequent clicks issued by the bot land on the chosen monitor regardless of where the GUI window itself is sitting.
+
+**UC-04: Inspect a prediction overlay.**
+
+- *Primary actor:* Researcher or end user reviewing past behaviour.
+- *Pre-condition:* The bot has previously processed at least one instruction.
+- *Main success flow:* The user opens the saved overlay PNG. The overlay shows the detected boxes coloured by class, the chosen box highlighted, the click point marked with a crosshair, and (when relevant) the OCR text overlaid above each box. The user can confirm or refute the bot's decision visually.
+- *Post-condition:* No state change. The use case is purely diagnostic.
+
+## 3.7 FUNCTIONAL REQUIREMENTS
+
+The functional requirements R-FR-01 to R-FR-09 are listed in Table 2. Each requirement carries a unique identifier, a description, a priority, the use cases it serves, and the section of the testing chapter that validates it. The pass-rate column reports the headline empirical result already measured against the requirement; the exact computation is in Chapter 7.
+
+**Table 2: Functional requirements.**
+
+| ID | Requirement | Description | Priority | Use cases | Test section | Status |
+|----|-------------|-------------|----------|-----------|--------------|--------|
+| R-FR-01 | Screen Capture | The system shall capture a screenshot of the user-selected monitor at native resolution, in the virtual-desktop coordinate space. | Essential | UC-01, UC-03 | Section 7.3.1 | FULL: 15/15 on T01-T15 |
+| R-FR-02 | Text Instruction Input | The system shall accept a free-form text instruction via CLI flag or GUI text box. | Essential | UC-01, UC-02 | Section 7.3.1 | FULL: 15/15 |
+| R-FR-03 | Element Detection | The system shall detect candidate UI elements of types `{button, text, text_input, icon, menu, checkbox}` on the captured screenshot. | Essential | UC-01 | Section 7.2 | FULL: 15/15 emit ≥1 detection |
+| R-FR-04 | Instruction-to-Element Matching | The system shall match the user instruction to one detected element using fuzzy OCR text similarity, with a class-aware bonus, and shall fall back to full-image OCR when no per-box candidate exceeds the threshold. | Essential | UC-01 | Section 7.3.1, Section 8.2 | FULL: 11/14 PASS on positives |
+| R-FR-05 | Action Execution | The system shall move the mouse cursor to the centre of the chosen element and execute a single left-click. | Essential | UC-01 | Section 7.3.1 | FULL: 11/14 verdict |
+| R-FR-06 | Refusal on Low Confidence | The system shall refuse to click when no candidate exceeds the similarity threshold, and shall emit a structured failure message. | Essential | UC-02 | Section 7.3.1 | PARTIAL: 0/1 on T15; planned threshold fix |
+| R-FR-07 | Multi-Monitor Support | The system shall operate correctly across virtual-desktop coordinate spaces on multi-monitor setups, with an explicit monitor selector. | Important | UC-03 | live demo log | FULL: verified on 3440×1440 + 1920×1080 stacked layout |
+| R-FR-08 | Visual Feedback | The system shall render an annotated overlay PNG of every prediction (detected boxes, chosen element, click marker, OCR text) for human verification. | Important | UC-04 | Section 7.3.1 | FULL: 60/60 overlays |
+| R-FR-09 | Per-Attempt Logging | The system shall log per-attempt fields (instruction, capture path, predicted xy, verdict, latency, method, is_negative, notes) to a CSV file for evaluation. | Important | UC-05 | `reports/tables/baseline_results.csv` | FULL: 60/60 rows |
+
+The classification "Essential" vs "Important" follows the MoSCoW convention. An Essential requirement must be met for the system to be considered fit for purpose. An Important requirement is needed for the system to be considered fit for evaluation, but is not on the critical functional path.
+
+## 3.8 NON-FUNCTIONAL REQUIREMENTS
+
+The non-functional requirements are quantitative wherever possible. Each row in Table 3 records the target value, the measured value, the source of the measurement, and a status.
+
+**Table 3: Non-functional requirements.**
+
+| ID | NFR | Target | Measured | Source | Status |
+|----|-----|--------|---------|--------|--------|
+| R-NFR-01 | Accuracy (TSR) | ≥ 50 % on T01-T15 | 73.3 % | `baseline_summary.csv` row `visclick` | FULL |
+| R-NFR-02 | Latency | p95 ≤ 15 s per click attempt | 14.8 s p95 / 8.05 s median | `nfr_performance.csv` row `visclick` | FULL (just) |
+| R-NFR-03 | Memory footprint | Peak RSS ≤ 2 GB during a 15-task run | PARTIAL | gap D-11 | PARTIAL |
+| R-NFR-04 | Reliability | Zero crashes during 60-attempt evaluation | 0 crashes | run log 6-7 May 2026 | FULL |
+| R-NFR-05 | Usability | Single-window Tk dialog; keyboard shortcuts for Pass/Fail/Skip | implemented in `scripts/run_baselines.py::_verdict_dialog_tk` | source review | FULL (single-reviewer) |
+| R-NFR-06 | Maintainability | Modular package (`visclick.{capture, detect, ocr, match, act, bot, gui}`); PEP-8 clean | 9 modules, ~1,591 LoC total, `ruff check` clean | source review | FULL |
+| R-NFR-07 | Extensibility | New baseline methods plug in by implementing `predict(image_rgb, instruction) -> BaselineResult` | Demonstrated for 4 methods | `scripts/baseline_*.py` | FULL |
+| R-NFR-08 | Security & Privacy | No off-machine I/O during inference; no telemetry; no credentials handled | verified by `rg 'requests|urllib|http' src/visclick/` | source review | FULL |
+| R-NFR-09 | Compatibility | Windows 11 supported; multi-monitor verified | Windows 11 + 3440×1440 + 1920×1080 PASS | live demo | PARTIAL (Windows-only by design) |
+| R-NFR-10 | Scalability | Pipeline complexity scales linearly in #candidates per screenshot | per-box OCR is O(N); ceiling ≈ 300 boxes/screenshot | analytical | PARTIAL |
+
+The classification of each NFR as Essential, Important, or Optional follows the same MoSCoW convention used for FRs. Accuracy, latency, reliability, security, and compatibility are Essential. The rest are Important or Optional. None of the NFRs are marked Failed. The PARTIAL items (R-NFR-03, R-NFR-09, R-NFR-10) are timeline matters or scope-deliberate choices, not fundamental capability gaps.
+
+## 3.9 CHAPTER SUMMARY
+
+The requirements above are the contract the rest of the dissertation is evaluated against. They were derived from four requirement-gathering techniques (literature, self-as-stakeholder, supervisor interview, field observation of analogous systems) and from a six-ring Onion stakeholder model that captured viewpoint conflicts before they became design conflicts. Nine functional requirements (R-FR-01 to R-FR-09) and ten non-functional requirements (R-NFR-01 to R-NFR-10) are stated explicitly, each with an identifier, a target, and a pointer to the test section that validates it. The structure of the requirements list deliberately mirrors the structure of the testing chapter, so a marker can audit any individual claim by chasing a single identifier from Section 3.7 or Section 3.8 down into Chapter 7.
+
+The next chapter, Chapter 4, describes the project management approach: the research methodology, the software methodology, the risk register, and the four-phase project plan.
+
+---
+
+# CHAPTER 04 – PROJECT MANAGEMENT
+
+## 4.1 CHAPTER OVERVIEW
+
+This chapter explains how the project was run. It begins with the research methodology — the philosophical and procedural framework that determined the kind of evidence the project chased. It moves on to the software design methodology and the software development methodology. Both constrain how a single-developer MSc project should be structured on a finite budget. The project management methodology is described next. The risk register is then made explicit. It captures, in a forward-looking form, the issues encountered during execution together with the mitigations that resolved them. The chapter closes with the project plan in Gantt form, with reference to the four-phase operational structure inherited from the proposal.
+
+A reader interested only in the empirical findings can skip Chapter 4 and pick up at Chapter 5 (Design). The contents here are required by the RGU MSc dissertation rubric, and they perform a real function: they tell a marker which research-philosophical commitments the rest of the dissertation expects to be evaluated against.
+
+## 4.2 RESEARCH METHODOLOGY
+
+The project is in the design-science research (DSR) tradition (Hevner et al., 2004). DSR is appropriate when the research output is a new artefact intended to solve a real-world problem, and when the contribution is evaluated by demonstrating that the artefact does so. The artefact in this case is the VisClick prototype together with the cross-domain adaptation framework that produces its detector. The output is evaluated by measuring the prototype's performance against three quantitative metrics (mAP, CPV, TSR), and against the three classical baselines that constitute the practical comparison set.
+
+A purely positivist methodology was considered and rejected. A positivist framing would treat the project as a hypothesis test — for example, "training on CLAY transfers well to Windows 11" as a falsifiable hypothesis — and would seek a single binary answer. The project's actual evidence base contains internally contradictory observations. The detector does badly on hand-corrected ground truth, yet the end-to-end TSR is acceptable. The OCR fallback rescues the detector but is also the latency bottleneck. That kind of evidence is better served by DSR's "build, evaluate, learn" loop than by a single null-hypothesis test.
+
+A purely interpretivist methodology was also considered and rejected. An interpretivist framing would treat the system's behaviour as a phenomenon to be understood through qualitative analysis — interviews with users, observation of task performance. The project does have a small qualitative-evaluation slot, but the primary evidence is quantitative. The qualitative layer is supplementary rather than central.
+
+The DSR framing has practical consequences for the rest of the dissertation. It justifies a multi-method evidence structure (Chapter 7 reports both quantitative metric numbers and qualitative failure-mode descriptions). It justifies an iterative narrative in which an early result (the 22-fold mAP collapse from auto-label evaluation to hand-corrected ground truth) directly motivates a later methodological change (hand-correcting more test data). And it justifies the explicit "build the artefact, evaluate the artefact, learn from the artefact" structure of Chapters 5 to 9.
+
+## 4.3 SOFTWARE DESIGN METHODOLOGY
+
+The system was designed against three principles, each carrying through from the literature reviewed in Chapter 2.
+
+**Modularity.** The system is decomposed into seven Python packages under `src/visclick/` (`capture`, `detect`, `ocr`, `match`, `act`, `bot`, `gui`). Each package has a single responsibility and a small public surface, so any one component can be replaced without touching the others. This is the architectural choice that made it possible to plug in three classical baselines and the VisClick full pipeline as four interchangeable `predict()` implementations in the same evaluation harness. Modularity is also what allows the dissertation to make the comparison chart in Section 7.4 a fair one. The four methods share the screenshot capture, the verdict-collection harness, and the per-attempt logging schema. Only the perception-and-grounding code differs.
+
+**Reproducibility.** Every numerical claim in the report is regeneratable from a script in the public repository, against a result table on disk, with a commit hash documented in the data form. The supporting convention is that every notebook cell which produces a report number prints a marker line identifying the report section it serves. The same principle drives the explicit version-control of the desktop screenshot corpus and the ONNX detector weights inside the repository, rather than only on cloud storage.
+
+**Refusal on uncertainty.** A click bot that issues a confident wrong click is worse than one that issues an honest failure. This principle is captured in R-FR-06. It is the architectural reason the matcher has a `min_text_similarity` threshold rather than always returning the highest-scoring candidate.
+
+A separate architectural pattern worth flagging is the **pre-flight probe**. The OCR layer exposes an `ocr_status()` function that runs at start-up and prints a tick or cross for each backend (EasyOCR, Tesseract, falling back to a pure-Python OCR). The detector layer exposes an equivalent `detect_status()` for ONNX model loading. The first time any of these probes fails, a `_warn_once()` helper prints the underlying error, the configured path, and three concrete fixes. This pattern was introduced after a silent Tesseract failure during the live demo and has been propagated to every external dependency in the stack. It is one of the strongest practical lessons of the project and is recorded as such in Section 9.3.
+
+## 4.4 SOFTWARE DEVELOPMENT METHODOLOGY
+
+The development process is best described as an agile/waterfall hybrid. The four-phase project plan from the proposal is essentially a waterfall structure: data engineering, then modelling, then prototype, then evaluation. Inside each phase, the actual day-to-day work was iterative. The observation log records the cycles of "try, hit a wall, document the wall, fix the wall, move on" that drove progress through each phase.
+
+The agile elements are concrete. Continuous integration is provided by Git, with commits at a granularity that maps individual problems to individual fixes (the commit log includes entries such as `fix(make_prototype): load tasks from T01_T20.json tasks array`). Backlog management is provided by the Phase L checklist in `docs/PHASE_WORKLOG.md`. The dissertation and the working code consult it in lock-step. Retrospective is performed at the end of each phase: the observation log in the data form serves as the retrospective output, with each O-numbered entry describing what happened and what it taught the project.
+
+The waterfall elements are equally concrete. Phase ordering was preserved. Data engineering really did precede model training, model training really did precede the prototype, and the prototype really did precede the evaluation. No phase was started before the prior phase's deliverable existed. This is more rigid than a pure agile project would be, but it is appropriate for a research project where each phase's output is a measurement that the next phase's design depends on.
+
+The choice of an agile/waterfall hybrid over pure agile or pure waterfall was made for one reason. A single-developer MSc project does not have the team structure that justifies a pure agile process — no scrum, no stand-ups, no separate product-owner role. But it also cannot afford the inflexibility of pure waterfall. A single mid-project disconnect, like the auto-label evaluation crisis, requires the freedom to re-scope upstream phases without throwing out the whole plan. The hybrid is what allowed the auto-label evaluation crisis to be turned into a controlled re-evaluation rather than into a project failure.
+
+## 4.5 PROJECT MANAGEMENT METHODOLOGY
+
+Project tracking used two artefacts. The first is a static Gantt chart at the level of the four phases (Figure 8). The second is the rolling Phase L checklist in `docs/PHASE_WORKLOG.md`, which is more granular and is updated continuously.
+
+[FIGURE 8: Project Gantt chart over the 12 months of the MSc.
+Source: `reports/figures/ch4_gantt.png` (to be produced; suggested format is Phase 1 over Months 1-3, Phase 2 over Months 4-7, Phase 3 over Months 8-9, Phase 4 over Months 10-12, with overlaps at phase boundaries to indicate continuous work).
+Caption: Twelve-month project plan over the four operational phases. Phase boundaries are deliberately drawn with overlap; in practice each phase's documentation continued while the next phase's experiments began.]
+
+The two artefacts have different update cadences. The Gantt is updated at most monthly and is treated as a contract between the author and the supervisor. The Phase L checklist is updated continuously and is treated as the working memory of the project. Every commit to the repository typically toggles at least one `[ ]` to `[x]`.
+
+Time accounting was kept informally. The detailed plan recorded an original time budget of approximately 120 hours over twelve weeks (the proposal's reference cadence). The actual time spent is significantly higher and is not formally logged. For a future-work entry, an honest answer to "how long did this dissertation take" would be in the region of 200 to 250 hours.
+
+## 4.6 RISK MITIGATION PLAN
+
+The risk register is a forward-looking transformation of the observation log. Each risk has a probability, an impact, a mitigation, and a status. Table 4 mirrors the data form's Section 17 but is reproduced here for completeness.
+
+**Table 4: Risk register.**
+
+| ID | Risk | Source | Prob | Impact | Mitigation | Status |
+|----|------|--------|:----:|:------:|------------|--------|
+| RR-01 | Pseudo-label evaluation overstates accuracy | observation log | High | High | Hand-correct test images; report both auto-label and hand-corrected mAP | Mitigated |
+| RR-02 | Source-domain training distribution does not generalise to Win11 native | observation log | High (confirmed) | High | OCR text-grounding fallback; recall-ceiling acknowledged; Phase 4 planned | Mitigated |
+| RR-03 | Silent dependency failure (Tesseract not on PATH) | live demo | Med | High | Startup probe `ocr.ocr_status()`; `_warn_once()` helper | Mitigated |
+| RR-04 | Multi-monitor virtual-desktop coordinate confusion | observation log | High | High | `(left, top)` offset propagated through `act.click_box`; `--monitor` flag | Mitigated |
+| RR-05 | Confident wrong action on negative case | observation log | Med | High | `min_text_similarity` threshold; planned raise from 60 to 75 | Open |
+| RR-06 | OCR latency dominates total wall-clock | NFR profile | Certain | Med | Detector-first short-circuit (skip OCR on confident classes) | Open |
+| RR-07 | Colab Free disconnect mid-training | training log | Med | Med | `last.pt` per-epoch; resume-from-disconnect built in | Mitigated |
+| RR-08 | Drive FUSE I/O instability on directories with 10k+ files | observation log | High | Med | Retry + shell `find` fallback; cached listings | Mitigated |
+| RR-09 | Drive FUSE `stat` cache lags `readdir` cache | observation log | Med | High | Set-of-stems via `find` retry; never `os.path.isfile()` on Drive | Mitigated |
+| RR-10 | Auto-labeller class collapse (menu/checkbox ≈ 0) | observation log | Med | Med | Hand-correct ground truth; class top-up | Open |
+| RR-11 | Licence / IP concerns on dataset use | design review | Low | High | All datasets public; AGPL inherited from Ultralytics; documented in Section 8.10 | Mitigated |
+| RR-12 | Personal-data leakage from desktop seed screenshots | design review | Low | High | All seed PNGs manually reviewed before commit | Mitigated |
+| RR-13 | Bot misuse for click-fraud or automated account creation | LEPSI review | Low (research scope) | Med | Human-in-the-loop verdict step; no headless service mode shipped | Monitored |
+| RR-14 | Labelled-data budget falls below the proposal's nominal target | small-data triage | High (confirmed) | High | Layered response: auto-labelled seed → hand-corrected ground truth → ScreenSpot import for per-instruction grounding → passive unlabelled accumulation. Each tier is reported alongside its protocol caveat so the dissertation's claims stay calibrated to the data actually held. | Mitigated |
+
+Three observations about the register are worth pulling out for prose.
+
+First, **the highest-impact risks are all data-quality risks**, not modelling or deployment risks. RR-01, RR-02, RR-10 and RR-14 between them account for the project's biggest empirical findings: the auto-label vs hand-correct mAP gap, the recall-bounded source-domain backbone, the icon class-distribution skew, and the small-data triage that determined which mAP and CPV protocols the dissertation could report. Each is a reminder that the modelling chain is no stronger than its weakest data link.
+
+Second, **most of the Open risks have costed mitigations**. RR-05 (refusal threshold), RR-06 (OCR latency), and RR-10 (class top-up) all have a documented work item that would move them from Open to Mitigated. Whether those work items are completed before submission is a separate triage call.
+
+Third, **the only Low-probability risk that remains Monitored is RR-13** (bot misuse). The probability is low because the project ships an interactive verdict step by default and no headless service mode. The risk is kept on the register because the *category* — vision-driven UI automation can be misused at the systemic level — does not disappear merely because this particular prototype mitigates it. The social-impact discussion in Section 8.10 takes the category seriously.
+
+## 4.7 PROJECT PLAN
+
+The project plan is the four-phase structure inherited from the proposal. The Gantt-equivalent rendering is in Figure 8 above; the text below makes each phase's scope and deliverable explicit.
+
+**Phase 1: Data engineering and baseline establishment (Months 1-3, completed).** Public mobile UI datasets were acquired and consolidated into the 6-class unified bundle. A baseline detector was trained on the unified bundle. A small desktop seed set was captured and auto-labelled. The hand-corrected test pool was assembled. The transfer-learning ablations were run on Colab Free, and the headline desktop fine-tune was selected. Three classical baselines (template, OCR-only, `pywinauto`) were implemented and evaluated on the 15-task suite. **Deliverable D1 (baseline performance report) is the content of Section 7.2 of this dissertation.**
+
+**Phase 2: Model adaptation experiments (Months 4-7, partially completed).** The DETR backbone source-side is done; the DETR target-side is pending. The few-shot sample-efficiency curve is done. SSP+FT and the two UDA experiments (Adaptive Teacher and SHOT) are the outstanding pieces. These are listed as gaps D-01 to D-04 in `docs/Final_Report_GAPS.md`. **Deliverable D2 (ablation study and model-comparison report) is partially complete; the completed sub-experiments are reported in Section 7.2 and Section 7.3.**
+
+**Phase 3: Prototype integration (Months 8-9, completed).** The VisClick prototype is operational on Windows 11 with a CLI and a Tk GUI. The IVGocr architecture is implemented end-to-end. The interactive evaluation harness supports the four-method comparison and the verdict-collection dialog. **Deliverable D3 (functional prototype) is the artefact in the public repository at https://github.com/HiranMadhu/visclick.**
+
+**Phase 4: Evaluation and thesis composition (Months 10-12, ongoing).** The 15-task evaluation is complete. TSR, latency, and failure-mode analysis are reported in Chapter 7. The qualitative third-party evaluation and the memory profiling are outstanding. **Deliverable D4 (final evaluation report and packaged code) is the dissertation in front of the reader.**
+
+The phase boundaries on the Gantt are deliberately drawn with overlap. In practice, Phase 4 (thesis writing) began during Phase 3 (prototype integration), because writing tends to surface gaps in measurement that the prototype then has to be re-run to fill.
+
+## 4.8 CHAPTER SUMMARY
+
+The project follows a design-science research methodology, with a modular, reproducible, refusal-on-uncertainty software design, executed under an agile/waterfall hybrid development process. The risk register captures fourteen risks distilled from the observation log: most are mitigated, three are open with costed plans, and one is monitored. The project plan is the four-phase structure inherited from the proposal. Phase 1 and Phase 3 are complete, Phase 2 is partially complete with the outstanding work listed in `docs/Final_Report_GAPS.md`, and Phase 4 is ongoing.
+
+The next chapter, Chapter 5, presents the design: the high-level architecture, the block diagram and flow chart of the runtime, the research design, and the wireframes for the prototype GUI.
+
+---
+
+# CHAPTER 05 – DESIGN
+
+## 5.1 CHAPTER OVERVIEW
+
+This chapter is the design half of the build-then-evaluate loop. It begins with the research design, which lays out the experimental matrix the rest of the dissertation populates. It moves on to the system architecture, presented as a block diagram in Section 5.3 and as a per-instruction flow chart in Section 5.4. The module-level design is presented next: which Python package contains which logical responsibility, and how the modules connect. The GUI side is covered in Section 5.6 with wireframes. The storage design (file layout, CSV schemas, ONNX weights) is in Section 5.7. The chapter closes with the algorithm design for the two non-trivial components: the fuzzy text-plus-class matcher in `visclick.match`, and the refusal rule that implements R-FR-06.
+
+The design described in this chapter is what the rest of the project implements. Chapter 6 walks through the code in the order this chapter lays out. The empirical results in Chapters 7 and 8 measure the implementation against the targets stated in Chapter 3. A reader who only wants the operational picture can read Section 5.3 and Section 5.4 and skip the rest.
+
+## 5.2 RESEARCH DESIGN
+
+The research design is an experimental matrix that crosses three axes. The first axis is **architectural family**: YOLOv8s and DETR-R50. The second axis is **adaptation method**: source-only zero-shot (M0), few-shot fine-tune of the head (M2), self-supervised pre-training followed by fine-tune (SSP+FT), and unsupervised domain adaptation (Adaptive Teacher and SHOT). The third axis is **labelled-target budget**: a small range of `k` values for the methods that use any labelled target data.
+
+A fully populated matrix would contain 2 × 5 × 5 = 50 cells. But many of those cells degenerate — zero-shot does not depend on `k`, UDA does not depend on `k` in the same way. The reduced matrix the project actually executes is shown in Table 5. The cells marked DONE are reported in Chapter 7. The remaining cells are listed in gaps D-01 to D-05 of `docs/Final_Report_GAPS.md` and would close the matrix to its full proposal-committed shape.
+
+**Table 5: Experimental matrix.**
+
+| Backbone | Method | k | Status |
+|----------|--------|----:|--------|
+| YOLOv8s | M0 zero-shot (CLAY → desktop) | n/a | DONE |
+| YOLOv8s | M1 COCO direct (control) | n/a | DONE |
+| YOLOv8s | M2 head fine-tune | 50 | DONE (headline detector) |
+| YOLOv8s | M3 frozen layers 22 | 50 | DONE (ablation) |
+| DETR-R50 | source-domain training | n/a | DONE (D-01 source-side, 2 June 2026) |
+| DETR-R50 | M0 zero-shot on target | n/a | PENDING (D-01 target-side) |
+| DETR-R50 | M2 head fine-tune | 50 | PENDING (D-01 target-side) |
+| YOLOv8s | M2 few-shot curve | 1, 2, 4, 8 | DONE (D-05, 3 June 2026) |
+| YOLOv8s | SSP + M2 | small-k | PENDING (D-02) |
+| YOLOv8s | UDA Adaptive Teacher | n/a | PENDING (D-03) |
+| YOLOv8s | UDA SHOT | n/a | PENDING (D-04) |
+
+The end-to-end TSR evaluation is run only against the single headline detector (YOLOv8s M2 fine-tune) rather than against every cell. The rationale is twofold. First, the prototype's downstream behaviour depends on detection plus OCR plus matching plus action, so a fair end-to-end comparison across detectors would require re-running the full 15-task suite for each adaptation cell — roughly an hour of human verdict-collection per cell, which scales poorly. Second, RQ4 (end-to-end practicality) is about whether *one* viable adapter can be turned into a working bot, not about which of several adapters does so best end-to-end. The "best" adapter is identified by mAP and CPV on the labelled test set; only that adapter gets the end-to-end treatment.
+
+The classical baselines (template, OCR-only, `pywinauto`) sit outside the adaptation matrix because they have no adaptation parameter to vary. They are evaluated only end-to-end on the same 15-task suite, with the comparison being against the VisClick full pipeline.
+
+## 5.3 SYSTEM ARCHITECTURE
+
+The system architecture is captured in two diagrams. Figure 9 is the static block diagram: boxes are logical components, arrows are data dependencies. Figure 10 is the dynamic flow chart, tracing a single instruction from text input to clicked element.
+
+[FIGURE 9: Block diagram of the VisClick system.
+Source: `reports/figures/ch5_block_diagram.png` (to be produced; regenerate from the Mermaid source in `docs/VisClick_Report_Data_Form.md` Section 18.1 via mermaid-cli).
+Caption: Block diagram of VisClick. The capture, detect, OCR, match and act components are each a Python module under `src/visclick/`. Logging components live in `scripts/run_baselines.py`.]
+
+The architecture has six logical layers. Each layer is realised as exactly one Python module under `src/visclick/`, with one small exception (logging is handled at the script level rather than as a dedicated module).
+
+**Layer 1: User input.** Either a text instruction from the GUI (`visclick.gui`) or a `--target` argument from the CLI (`visclick.__main__`).
+
+**Layer 2: Screen capture.** A wrapper over `mss` that handles multi-monitor coordinate offsets (`visclick.capture`). The capture layer returns an RGB numpy array and the `(left, top)` offset of the chosen monitor.
+
+**Layer 3: Detection.** An ONNX wrapper that loads the trained YOLOv8s weights and emits a list of `(class_id, confidence, xyxy)` tuples (`visclick.detect`). The wrapper supports both an `onnxruntime` backend (the default, CPU only) and an Ultralytics `model.predict()` backend (used during training and during ablations).
+
+**Layer 4: OCR.** A two-mode OCR layer (`visclick.ocr`). The per-box mode runs EasyOCR on each detected bounding box and returns the most confident text string. The full-image mode runs EasyOCR on the entire screenshot and returns a list of `(text, bounding_box, confidence)` tuples for use in the OCR fallback path. The module exposes the `ocr_status()` probe described in Section 4.3.
+
+**Layer 5: Matching.** A fuzzy matcher built on `rapidfuzz` (`visclick.match`). The matcher's `best_box()` function takes the user instruction, the per-box OCR text, and the detection class IDs, and returns the index of the best-matching box together with its score.
+
+**Layer 6: Action.** A PyAutoGUI wrapper that handles the virtual-desktop offset correction (`visclick.act`). The wrapper exposes `click_box(box, offset=(left, top))` and `move_to_box(...)`.
+
+Above the six layers sits the orchestrator `visclick.bot`, which composes the layers into a single `run_instruction()` entry point. The orchestrator is what both the CLI and the GUI invoke. It is also what the evaluation harness's VisClick baseline calls.
+
+The deliberate property of this design is that no two layers share state. The capture layer hands an image to the detect layer. The detect layer hands a box list to the OCR layer. The OCR layer hands text to the matcher, and so on. This is what makes each layer independently testable. It is also what made the four-baseline comparison possible without duplicating code.
+
+## 5.4 PROCESS FLOW
+
+The flow chart in Figure 10 makes the runtime behaviour explicit. The single decision point worth pulling out for discussion is the OCR-fallback decision at the matcher.
+
+[FIGURE 10: Process flow chart for a single click instruction.
+Source: `reports/figures/ch5_flowchart.png` (to be produced; regenerate from the Mermaid source in `docs/VisClick_Report_Data_Form.md` Section 18.2).
+Caption: Per-instruction flow chart. The decision diamond at the matcher determines whether the detector's top candidate is accepted (Yes), whether the full-image OCR fallback is invoked (No, retry), or whether the system refuses to click (No, refuse).]
+
+The flow has six stages. **Capture** acquires the screenshot from the chosen monitor. **Detect** produces up to N candidate boxes; if N = 0 the system falls through to the OCR fallback path. **Per-box OCR** annotates each box with its text. **Match** computes a fuzzy similarity score between the user instruction and each box's text, with a small bonus added for boxes whose detected class matches the instruction's likely intent (a "click Save" instruction prefers a `button` over a `text`). **Decision** compares the top score against `min_text_similarity` (currently 60 on a 0-100 scale). If the score clears the threshold, the system proceeds to **Action**. If it does not, the system enters the **fallback** branch, runs full-image OCR, and re-matches the instruction against every recognised text region. If the fallback also fails to clear the threshold, the system **refuses**.
+
+The fallback is the architectural compromise that pays for the source-domain detector's limited recall on Windows 11 native dialogs. Without the fallback, the bot would refuse on roughly half the test tasks because the detector simply does not see the target box. With the fallback, the bot recovers the visible-text-but-no-box cases at the cost of a roughly 6-second latency penalty. The cost-benefit is recorded in Section 7.3.2 and is one of the two design trade-offs that Chapter 8 returns to.
+
+## 5.5 MODULE DESIGN
+
+The module diagram below makes the per-package responsibilities explicit. Each module's public surface is small — between one and four exported functions or classes. The module-level boundaries are also the unit-test boundaries: each module has at least one corresponding `tests/test_<module>.py` file.
+
+```text
+src/visclick/
+  __init__.py          # package re-exports
+  __main__.py          # CLI entry point: python -m visclick.bot ...
+  capture.py           # mss wrapper; multi-monitor offset
+  detect.py            # ONNX YOLOv8s wrapper; Ultralytics fallback
+  ocr.py               # EasyOCR per-box + full-image; status probe
+  match.py             # rapidfuzz best_box; class-aware bonus
+  act.py               # PyAutoGUI click_box; offset correction
+  bot.py               # orchestrator: run_instruction()
+  gui.py               # Tk GUI; monitor selector; verdict logging
+  utils.py             # logging helpers; _warn_once
+scripts/
+  run_baselines.py        # 4-method evaluation harness
+  analyse_baselines.py    # TSR computation, p50/p95 latency
+  baseline_visclick.py    # VisClick BaselineResult adapter
+  baseline_template.py    # cv2.matchTemplate adapter
+  baseline_ocr_only.py    # OCR-only adapter
+  baseline_pywinauto.py   # accessibility-tree adapter
+  auto_capture_corpus.py  # corpus expansion
+  make_prototype_figures.py # report figure generation
+  run_nfr.py              # NFR latency + memory profiling
+```
+
+The module dependency graph is intentionally a directed acyclic graph: `bot` depends on `capture, detect, ocr, match, act`; the five depended-on modules are mutually independent; `gui` depends on `bot`. The acyclic property is what lets the four baselines reuse `capture` and `act` without dragging in the detector. A circular dependency would have collapsed this composition.
+
+## 5.6 GUI WIREFRAMES
+
+The prototype ships a single-window Tk dialog. The wireframe in Figure 11 captures the layout. There are deliberately few controls. The goal is to make the bot's behaviour obvious to a first-time user, not to put every parameter on the surface.
+
+[FIGURE 11: Wireframe of the VisClick GUI.
+Source: `reports/figures/ch5_gui_wireframe.png` (to be produced; hand-drawn rectangles or a screenshot of the actual Tk window with annotations overlaid; the existing screenshot `reports/figures/proto_2_captured.png` can be used with arrow annotations).
+Caption: GUI wireframe. (1) Monitor dropdown. (2) Instruction text box. (3) Run / Stop buttons. (4) Live status line. (5) Last-overlay thumbnail. (6) Verbose log toggle.]
+
+The six elements:
+
+1. **Monitor dropdown** (`gui.MonitorSelector`). Populated at start-up from `mss.monitors`. Selection sets the `--monitor` index for every subsequent run. Defaults to the primary monitor.
+2. **Instruction text box** (single line, `tk.Entry`). The user types a free-form instruction. Enter triggers Run.
+3. **Run / Stop buttons.** Run kicks off the orchestrator. The 3-second pre-action countdown is implemented as a Tk `after()` callback; the Stop button cancels the countdown.
+4. **Status line.** Shows one of `idle`, `counting down: 3 / 2 / 1`, `capturing`, `detecting`, `ocr`, `matching`, `clicking`, `done: verdict?`, `FAIL: cannot find target`.
+5. **Last-overlay thumbnail.** A 320×180 thumbnail of the most recent `overlay.png`. Clicking the thumbnail opens the full-resolution PNG in the system viewer. This is the diagnostic affordance that supports UC-04.
+6. **Verbose log toggle.** A check box that, when on, prints the per-stage timings to stdout. Off by default to avoid noise.
+
+The wireframe is deliberately small. Three earlier wireframes — a separate evaluation tab, a separate model-selection panel, a confidence-threshold slider — were considered and removed at design review, on the grounds that they did not serve a stakeholder viewpoint identified in Section 3.2.2.
+
+## 5.7 REPOSITORY LAYOUT AND DATA STORAGE DESIGN
+
+The project does not use a database. All persistent state lives in files on disk, organised into a small number of top-level directories with well-defined responsibilities. The repository layout is presented once, in Figure 12, and every other chapter that names a file does so as a leaf inside this tree. A reader without the source-code repository in front of them can use Figure 12 together with the role descriptions below to follow every artefact reference in the report.
+
+[FIGURE 12: Repository directory tree.
+Source: `reports/figures/ch5_repo_tree.png` (to be produced; a single-panel directory tree exported from the actual repository at submission time using `tree -L 3 --dirsfirst`, or a hand-drawn equivalent in draw.io).
+Caption: Repository directory tree. Top-level directories group the artefact's responsibilities: source code, dependency packaging, training data, model weights, evaluation scripts, notebooks, tests, reports, and documentation. Every path quoted elsewhere in this report is a node in this tree.]
+
+The plain-text rendering of the same tree, for readers viewing the dissertation as plain text:
+
+```text
+visclick/                                # project root
+  src/visclick/                          # the runnable Python package
+    capture.py  detect.py  ocr.py
+    match.py    act.py     bot.py     gui.py
+  scripts/                               # evaluation and utility scripts
+    run_baselines.py        # 4-method evaluation harness
+    analyse_baselines.py    # TSR + latency summary
+    baseline_visclick.py    # full-pipeline adapter
+    baseline_template.py    # cv2.matchTemplate adapter
+    baseline_ocr_only.py    # OCR-only adapter
+    baseline_pywinauto.py   # accessibility-tree adapter
+    auto_capture_corpus.py  # corpus expansion
+    make_prototype_figures.py
+    run_nfr.py              # NFR latency and memory profile
+  notebooks/                             # 01..14 training + ablations
+  tests/                                 # pytest suites for each module
+  weights/                               # trained ONNX + .pt checkpoints
+  configs/                               # YOLO/dataset YAMLs
+  datasets/                              # training and test data
+    source_zenodo_unified/{images,labels}/{train,val}
+    desktop_seed/{images,labels}
+    handcorrected_desktop_test/{images,labels}
+  samples/                               # seed images and templates
+  tasks/                                 # canonical T01..T15 task definitions
+  reports/                               # everything the dissertation cites
+    tables/                              # result CSVs
+    figures/                             # result PNGs
+    references/                          # literature PDFs cited
+  docs/                                  # this report + plan + style guide
+    Final_Report.md
+    Final_Report_v2.md
+    Final_Report_GAPS.md
+    REPORT_STYLE_GUIDE.md
+    PHASE_WORKLOG.md
+    VisClick_Report_Data_Form.md
+  runs/                                  # transient Ultralytics output
+                                         # (regeneratable, not committed)
+```
+
+The top-level directories and their roles:
+
+**The runnable package (`src/visclick/`).** Seven modules implementing the six-layer architecture from Section 5.3, plus a Tk GUI module. This is what `pip install -e .` installs and what `import visclick` resolves to.
+
+**The evaluation scripts (`scripts/`).** A dozen Python entry points for jobs that are not part of the importable package: the evaluation harness, four per-method adapters, the NFR profiler, the figure regenerator, the corpus-expansion script.
+
+**The notebooks (`notebooks/`).** Numbered Jupyter notebooks containing the training, fine-tuning and ablation experiments. Notebook 01 acquires and unifies the source-domain corpora. Notebook 05 trains the source-domain YOLOv8s detector. Notebook 08 runs the Phase 1.B transfer-learning ablations. Notebook 08c runs the few-shot sample-efficiency curve (D-05). Notebooks 09 and 10 are the DETR pair (source and fine-tune). Notebooks 11 to 14 are reserved for the pending adaptation experiments.
+
+**The tests (`tests/`).** One pytest file per module under `src/visclick/`. Test command is `pytest -q tests/`.
+
+**The trained weights (`weights/`).** The deployed ONNX detector at the canonical name `weights/visclick.onnx`, plus the per-ablation Ultralytics checkpoints. The deployed file is approximately 45 MB.
+
+**The configs (`configs/`).** YAML configuration files for the YOLO/Ultralytics training pipeline plus the unified 6-class taxonomy file.
+
+**The datasets (`datasets/`).** The training and test data, laid out in the YOLO/Ultralytics directory convention so the training command consumes the layout without modification. Three sub-trees: the unified source-domain bundle, the desktop seed, and the hand-corrected desktop test set.
+
+**The task definitions (`tasks/`).** A single JSON file `T01_T20.json` listing the 15 canonical evaluation tasks plus 5 reserved slots. Each task carries the natural-language instruction together with per-method hints.
+
+**The reports artefacts (`reports/`).** Everything the dissertation cites. Two principal sub-directories: a CSVs directory (the evidence file for every quantitative claim) and a PNGs directory (the figures). One additional sub-directory holds the PDF copies of the literature references.
+
+**The documentation (`docs/`).** This dissertation, the gaps tracker, the style guide, the phase worklog, and the data form. The first five are submission and operational artefacts; the data form is the working memory of the project.
+
+**The transient output (`runs/`).** Per-experiment Ultralytics training output. This directory is not version-controlled because the contents are deterministic outputs of the notebooks; only the relevant final weights are promoted into the trained-weights directory.
+
+The principal data schema for the evaluation evidence is the per-attempt CSV that the harness writes after every task. The schema is stable across all 60 attempts collected so far and across the four method adapters. It is reproduced below for completeness:
+
+```text
+columns: task_id, method, instruction, capture_path, predicted_xy,
+         verdict, latency_seconds, is_negative, notes
+verdict in {pass, fail, skip, refused}
+method  in {template, ocr_only, pywinauto, visclick}
+```
+
+Every per-attempt row is the smallest unit of evaluation evidence in the dissertation. The 60 rows currently on disk are what every percentage figure in Chapter 7 is computed from.
+
+## 5.8 ALGORITHM DESIGN
+
+Two algorithms in the system are non-trivial enough to warrant a dedicated design statement. The fuzzy matcher in `visclick.match`, and the refusal rule in the orchestrator.
+
+### 5.8.1 THE MATCHER
+
+The matcher's job is to pick which of the N detected boxes the user is asking the bot to click. The input is the user instruction (a short string), the list of per-box OCR texts, and the list of detection class IDs. The output is the index of the chosen box plus a confidence score on a 0-100 scale.
+
+The matcher scores each box by combining two signals. The **text-similarity signal** is `rapidfuzz.fuzz.WRatio(instruction, box_text)`, which is a normalised mix of partial-string, token-set, and token-sort scores. WRatio is preferred over a single ratio metric because it is robust to word-order variation. "Click Save button" and "click the Save button" both score near 100 against an OCR string `Save`. The **class-bonus signal** is a small additive bonus when the detection class matches an inferred intent. The intent inference is a tiny rule table: instruction contains "type" or "enter" → prefers `text_input`; instruction contains "select" → prefers `menu` or `checkbox`; everything else prefers `button`. The bonus is set to +10 on a 0-100 scale. That is enough to break ties between two same-text boxes of different classes but not enough to override a strong text mismatch.
+
+The final score is `min(100, text_similarity + class_bonus)`. The chosen box is the one with the highest final score, ties broken by detection confidence (higher first).
+
+The Python implementation:
+
+```python
+def best_box(instruction: str,
+             box_texts: list[str],
+             box_classes: list[str]) -> tuple[int, float]:
+    intent_class = _infer_intent(instruction)
+    scores = []
+    for text, cls in zip(box_texts, box_classes):
+        ts = rapidfuzz.fuzz.WRatio(instruction.lower(), (text or "").lower())
+        bonus = 10 if cls == intent_class else 0
+        scores.append(min(100, ts + bonus))
+    best_idx = max(range(len(scores)), key=scores.__getitem__)
+    return best_idx, scores[best_idx]
+```
+
+The threshold for accepting the chosen box is `min_text_similarity = 60` in the current build. This threshold was selected empirically. The 15-task suite was run at thresholds of 40, 50, 60, 75 and 85, and the lowest threshold at which the negative test case (T15) was refused while the 14 positive tasks were still accepted was chosen. A higher threshold of 75 is being considered as part of risk RR-05; the change is contingent on widening the negative-case set beyond a single task.
+
+### 5.8.2 THE REFUSAL RULE
+
+The refusal rule is the orchestrator-level decision that determines whether a click is issued. It has three branches.
+
+The **first branch** is the no-candidates branch. If the detector emits zero boxes, the orchestrator skips the per-box OCR stage entirely and goes directly to the OCR fallback. The fallback may itself find no candidates, in which case the system refuses.
+
+The **second branch** is the low-confidence branch. If the matcher's chosen box has a score below `min_text_similarity` after per-box OCR, the orchestrator goes to the OCR fallback. If the fallback also returns a low-confidence result, the system refuses.
+
+The **third branch** is the high-confidence branch. If the matcher's chosen box has a score at or above the threshold, the orchestrator proceeds directly to action. The action layer issues a single left-click at the centre of the chosen box, with the multi-monitor offset already corrected by the capture layer.
+
+In all three branches the system writes a CSV row to `baseline_results.csv` describing what happened, including the chosen box (if any), the score, and the verdict (`pass`, `fail`, `refused`, `skip`). The CSV is what the analysis pipeline consumes in Section 7.3 and Section 8.2.
+
+## 5.9 CHAPTER SUMMARY
+
+The design described in this chapter is the contract that Chapter 6 implements and that Chapters 7 and 8 evaluate. The system has six logical layers (capture, detect, OCR, match, act, bot) each realised as one Python module, plus a thin GUI and an evaluation harness. The architecture is deliberately acyclic, which is what made the four-baseline comparison possible inside a shared harness. The runtime flow has one non-trivial decision point — the OCR-fallback path at the matcher — which trades off latency for recall in a way that the empirical evidence in Chapter 7 quantifies. Data is stored as files on disk in a layout that supports both YOLOv8/Ultralytics training conventions and per-attempt CSV evaluation logs. Two algorithms (the rapidfuzz-plus-class-bonus matcher and the three-branch refusal rule) are made explicit because they encode the project's twin commitments: fuzzy human-text tolerance and refusal-on-uncertainty.
+
+The next chapter walks through the implementation of every element of this design.

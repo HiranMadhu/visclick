@@ -109,6 +109,7 @@ Rules to stay in budget:
 | As of | Chapters drafted | Unique references | Headroom (against 40) |
 |---|---|---|---|
 | 3 June 2026 | Ch 1, Ch 2 | ~18 | 22 |
+| 3 June 2026 | Ch 1, Ch 2, Ch 3, Ch 4, Ch 5 | ~19 (added Hevner et al., 2004 for DSR) | 21 |
 
 Updated as each chapter is added.
 

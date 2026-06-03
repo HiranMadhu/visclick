@@ -68,6 +68,53 @@ Front matter is added in Word, not in `Final_Report_v2.md`. Required pages in or
 - Alignment: Justified body text; headings left-aligned.
 - Use Word's built-in Heading 1 / 2 / 3 styles for automatic TOC.
 
+### 1.6 Page budget
+
+**Hard limit: 100 pages of body chapters.** This excludes front matter (title, declaration, abstract, TOC, lists of figures and tables), references, and appendices. Only the nine numbered chapters count.
+
+Per-page word counts at the institutional formatting (Times New Roman 11 pt, 1.5 line spacing, A4) vary by content density:
+
+| Page content | Typical words/page |
+|---|---:|
+| Pure prose | 350-400 |
+| Bullet lists and structured prose | 280-340 |
+| Tables and code blocks | 200-260 |
+
+Mixed chapters (the realistic case) average around **340 words/page**.
+
+Per-chapter budget. These are targets, not floors. Coming in under budget is fine and welcome; overrunning has to be paid for by another chapter or by cutting figures.
+
+| Chapter | Target pages | Target words | Style notes |
+|---|---:|---:|---|
+| Ch 1 INTRODUCTION | 9-10 | ~3,000 | Mixed prose and figures |
+| Ch 2 LITERATURE REVIEW | 10-12 | ~3,500 | Heavy citations and one table |
+| Ch 3 REQUIREMENT ANALYSIS | 9-11 | ~3,200 | Two large requirement tables |
+| Ch 4 PROJECT MANAGEMENT | 7-9 | ~2,400 | Risk register dominates |
+| Ch 5 DESIGN | 10-12 | ~3,300 | Four figures, one code block |
+| Ch 6 IMPLEMENTATION | 18-20 | ~4,500-5,000 | Heavy code blocks; biggest overrun risk |
+| Ch 7 TESTING | 13-15 | ~3,500-4,000 | All result tables and figures land here |
+| Ch 8 EVALUATION | 11-13 | ~3,500-4,000 | Discussion of RQs, NFRs, ethics |
+| Ch 9 CONCLUSION | 6-8 | ~2,000-2,500 | Lightweight prose; reflection and future work |
+| **Total** | **93-100** | **~28,900-31,900** | At submission formatting |
+
+Tracker. Updated as each chapter is drafted.
+
+| As of | Chapters drafted | Words to date | Est. pages | Headroom (against 100) |
+|---|---|---:|---:|---:|
+| 3 June 2026 | Ch 1, 2 | 6,500 | ~19 | 81 |
+| 3 June 2026 | Ch 1-5 | 15,400 | ~46-49 | 51-54 |
+
+### 1.7 Discipline rules to stay in budget
+
+These rules apply to every remaining chapter, especially Ch 6 where the overrun risk is highest.
+
+- **No re-explanation of design decisions.** Once a decision is justified in Ch 3 (requirements), Ch 4 (project management), or Ch 5 (design), later chapters only point to the implementation or measurement, not the rationale.
+- **One representative code block per module in Ch 6.** Pick the most informative function. Do not copy whole files. Reader has the repository link.
+- **Tables are summaries, not data dumps.** A per-attempt CSV with 60 rows becomes a 4-row summary table in the report. The raw CSV lives in `reports/tables/`.
+- **Figures only if they add information that prose cannot.** Two figures showing the same thing is one figure too many.
+- **Cut "Chapter Overview" paragraphs to 1-2 short paragraphs.** They are signposting, not content.
+- **Strict 9.x cap on sub-sections.** Heading level 3 only where the structure benefits the reader, never to pad the TOC.
+
 ---
 
 ## 2. Citation and reference rules

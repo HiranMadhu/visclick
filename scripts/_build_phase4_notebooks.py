@@ -83,50 +83,58 @@ print("REPORT git_head =", subprocess.check_output(
 
 def common_publish(artifacts: list[str], commit_msg: str) -> str:
     arts_repr = ",\n    ".join(repr(a) for a in artifacts)
-    return f"""import os, subprocess
+    return f"""# ---------------------------------------------------------------------------
+# Paste your GitHub personal-access token (PAT) on the line below before
+# running this cell. Replace the placeholder string. The token is NOT
+# committed to git or saved anywhere; it lives only in the Colab runtime
+# memory for this session, and disappears when the runtime is recycled.
+# ---------------------------------------------------------------------------
+TOKEN = "PASTE_GITHUB_TOKEN_HERE"
+
+import os, subprocess
 
 REPO_ROOT = "/content/visclick"
 ARTIFACTS = [
     {arts_repr},
 ]
 
+assert TOKEN and TOKEN != "PASTE_GITHUB_TOKEN_HERE", (
+    "Paste your GitHub personal-access token into the TOKEN variable above "
+    "before running this cell."
+)
+
 for rel in ARTIFACTS:
     p = os.path.join(REPO_ROOT, rel)
     assert os.path.exists(p), f"Missing artifact in repo clone: {{p}}. Run the previous section first."
     print(f"OK  {{p}}  ({{os.path.getsize(p)}} bytes)")
 
-token_path = os.path.join(REPO_ROOT, "token")
-if not os.path.exists(token_path):
-    print(f"WARN: no token file at {{token_path}}; skipping git push. Copy artifacts in by hand or restore the token.")
+
+def run(cmd, **kw):
+    r = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, **kw)
+    if r.returncode != 0:
+        print("STDOUT:", r.stdout)
+        print("STDERR:", r.stderr)
+        raise RuntimeError(f"git command failed: {{' '.join(cmd)}}")
+    return r.stdout
+
+
+run(["git", "config", "user.email", "hiran@iit.ac.lk"])
+run(["git", "config", "user.name",  "Hiran Abeywardhana"])
+
+run(["git", "add", *ARTIFACTS])
+
+status = run(["git", "status", "--porcelain"])
+if not status.strip():
+    print("REPORT step = GIT_PUBLISH | status = NOTHING_TO_COMMIT")
 else:
-    with open(token_path) as fh:
-        token = fh.read().strip()
-
-    def run(cmd, **kw):
-        r = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True, **kw)
-        if r.returncode != 0:
-            print("STDOUT:", r.stdout)
-            print("STDERR:", r.stderr)
-            raise RuntimeError(f"git command failed: {{' '.join(cmd)}}")
-        return r.stdout
-
-    run(["git", "config", "user.email", "hiran@iit.ac.lk"])
-    run(["git", "config", "user.name",  "Hiran Abeywardhana"])
-
-    run(["git", "add", *ARTIFACTS])
-
-    status = run(["git", "status", "--porcelain"])
-    if not status.strip():
-        print("REPORT step = GIT_PUBLISH | status = NOTHING_TO_COMMIT")
-    else:
-        run(["git", "commit", "-m", {commit_msg!r}])
-        url = f"https://{{token}}@github.com/HiranMadhu/visclick.git"
-        push = subprocess.run(["git", "push", url, "HEAD:main"],
-                              cwd=REPO_ROOT, capture_output=True, text=True)
-        if push.returncode != 0:
-            print("PUSH STDERR:", push.stderr)
-            raise RuntimeError("git push failed")
-        print("REPORT step = GIT_PUBLISH | status = PUSHED")
+    run(["git", "commit", "-m", {commit_msg!r}])
+    url = f"https://{{TOKEN}}@github.com/HiranMadhu/visclick.git"
+    push = subprocess.run(["git", "push", url, "HEAD:main"],
+                          cwd=REPO_ROOT, capture_output=True, text=True)
+    if push.returncode != 0:
+        print("PUSH STDERR:", push.stderr)
+        raise RuntimeError("git push failed")
+    print("REPORT step = GIT_PUBLISH | status = PUSHED")
 """
 
 
@@ -424,7 +432,9 @@ shutil.copy2(LOSS_CSV, os.path.join(REPO_TBL, "ssp_loss_log.csv"))
     cells.append(md(
         """## 11.5 — Publish loss log to git
 
-The backbone .pt itself stays on Drive (too large for the repo). The training loss CSV is what we commit so the report's Figure showing the SSP loss curve has a regeneratable source on disk.
+The backbone `.pt` itself stays on Drive (too large for the repo). The training loss CSV is what we commit so the report's Figure showing the SSP loss curve has a regeneratable source on disk.
+
+**Before running the cell below**, paste your GitHub personal-access token (PAT) into the `TOKEN = "PASTE_GITHUB_TOKEN_HERE"` line. The token lives only in Colab runtime memory and disappears when the runtime is recycled.
 """
     ))
 
@@ -727,7 +737,10 @@ shutil.copy2(OUT_CSV, os.path.join(REPORTS_TBL, "ssp_few_shot.csv"))
     ))
 
     cells.append(md(
-        """## 12.6 — Publish to git"""
+        """## 12.6 — Publish to git
+
+**Before running the cell below**, paste your GitHub personal-access token (PAT) into the `TOKEN = "PASTE_GITHUB_TOKEN_HERE"` line. The token lives only in Colab runtime memory and disappears when the runtime is recycled.
+"""
     ))
 
     cells.append(code(common_publish(
@@ -1041,7 +1054,10 @@ shutil.copy2(OUT_CSV, os.path.join(REPORTS_TBL, "uda_adaptive_teacher.csv"))
     ))
 
     cells.append(md(
-        """## 13.5 — Publish to git"""
+        """## 13.5 — Publish to git
+
+**Before running the cell below**, paste your GitHub personal-access token (PAT) into the `TOKEN = "PASTE_GITHUB_TOKEN_HERE"` line. The token lives only in Colab runtime memory and disappears when the runtime is recycled.
+"""
     ))
 
     cells.append(code(common_publish(
@@ -1295,7 +1311,10 @@ shutil.copy2(OUT_CSV, os.path.join(REPORTS_TBL, "uda_shot.csv"))
     ))
 
     cells.append(md(
-        """## 14.6 — Publish to git"""
+        """## 14.6 — Publish to git
+
+**Before running the cell below**, paste your GitHub personal-access token (PAT) into the `TOKEN = "PASTE_GITHUB_TOKEN_HERE"` line. The token lives only in Colab runtime memory and disappears when the runtime is recycled.
+"""
     ))
 
     cells.append(code(common_publish(

@@ -138,9 +138,15 @@ def build_nb11() -> list[dict]:
     cells: list[dict] = []
 
     cells.append(md(
-        """# VisClick — Phase 4.4 / D-02 (step 1 of 2): self-supervised pretrain on desktop corpus
+        """# VisClick — Phase 4.4 / D-02 (step 1 of 2): self-supervised pretrain on the broad UI corpus
 
-**Goal.** Adapt the source-trained YOLOv8s *backbone* to the desktop domain via self-supervised pretraining on the unlabelled desktop corpus (D-06). The output is a domain-adapted backbone that the next notebook (`12_ssp_finetune.ipynb`) plugs into a YOLOv8s detector and few-shot fine-tunes.
+**Goal.** Adapt the source-trained YOLOv8s *backbone* to the UI image distribution via self-supervised pretraining on the ~9,646-image Zenodo unified bundle (mobile UI screens from RICO + CLAY + VINS). The output is a UI-domain-adapted backbone that the next notebook (`12_ssp_finetune.ipynb`) plugs into a YOLOv8s detector and few-shot fine-tunes on desktop.
+
+**Corpus choice.** The proposal originally specified ~2000 unlabelled *desktop* screenshots. Live capture of that volume requires multi-day passive accumulation on the author's Windows box, which falls outside the time budget. The practical replacement is the Zenodo unified bundle the project already holds (~9.6k UI screens, mobile-rich). For SSP this is acceptable because:
+
+- SimSiam learns *visual structure*, not domain semantics: rectangles, text blobs, icon-shaped regions, grid layouts. These are shared between mobile and desktop UI.
+- 9.6k images at batch 64 gives ~150 steps per epoch, which is in the right neighbourhood for SimSiam fine-tuning of an already-pretrained backbone (we start from `best_source_v8s.pt`, not random init).
+- The Limitations section names this swap explicitly: SSP pretraining is on mobile-rich UI, evaluation is on desktop, the gap is honest.
 
 **Method.** **SimSiam** (Chen and He, 2021) on top of the source-trained CSPDarknet backbone. Chosen because:
 
@@ -150,15 +156,15 @@ def build_nb11() -> list[dict]:
 
 **Pipeline:**
 1. Mount Drive → `git pull` → install deps.
-2. Build an `ImageFolder`-style loader over the unlabelled desktop corpus produced by `scripts/auto_capture_corpus.py` (D-06). Falls back to the 50-image seed if the corpus is still small.
+2. Build a TwoView loader over the unlabelled Zenodo bundle at `<DRIVE>/datasets/source_zenodo_unified/images/train/`. Labels are *ignored* — we treat the bundle as an unlabelled corpus for SSP.
 3. Extract the YOLOv8s backbone from `best_source_v8s.pt`, attach a 3-layer projection head and a 2-layer predictor.
-4. Train SimSiam for 50 epochs at batch 32, two augmentation streams (RandomResizedCrop + ColorJitter + GaussianBlur + RandomGrayscale + horizontal flip).
+4. Train SimSiam for 20 epochs at batch 64, imgsz 224, two augmentation streams.
 5. Save the adapted backbone to `<DRIVE>/weights/ssp/backbone_simsiam.pt` and a training-loss CSV.
-6. Publish to git.
+6. Publish loss-log CSV to git.
 
-**Compute reality.** 50 epochs × ~1500 images at batch 32, imgsz 256 is roughly 30-45 minutes on T4. Headroom for one Colab Free session.
+**Compute reality.** 20 epochs × ~150 steps × ~0.5 s/step ≈ 25 min on T4. One Colab Free session.
 
-**Report.** Every step prints `REPORT ...` lines for the data form and `Final_Report_GAPS.md` D-02.
+**Report.** Every step prints `REPORT ...` lines.
 """
     ))
 
@@ -179,53 +185,52 @@ print("torchvision:", torchvision.__version__, "| ultralytics:", ultralytics.__v
     ))
 
     cells.append(md(
-        """## 11.1 — Build unlabelled desktop corpus loader
+        """## 11.1 — Build unlabelled UI corpus loader (Zenodo unified bundle)
 
-The corpus is whatever `scripts/auto_capture_corpus.py` has accumulated to `<DRIVE>/datasets/auto_corpus/`. If that is too small, fall back to the committed seed at `samples/desktop_seed/`. The loader emits two random augmentations of each image per `__getitem__` call (the SimSiam two-view protocol).
+The SSP corpus is the labelled Zenodo unified bundle (RICO + CLAY + VINS), with labels *ignored*. This sits at `<DRIVE>/datasets/source_zenodo_unified/images/train/` — the same path used by `05_train_source.ipynb`.
+
+Each `__getitem__` emits two random augmentations of the same image (SimSiam two-view protocol). The 50-image desktop seed at `samples/desktop_seed/` is appended too, so the corpus includes a small in-distribution slice as well.
 """
     ))
 
     cells.append(code(
-        '''import os, glob, random
+        '''import os, glob
 from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as T
 
 DRIVE        = "/content/drive/MyDrive/visclick"
-CORPUS_DIRS  = [
-    os.path.join(DRIVE, "datasets", "auto_corpus"),
-    os.path.join(DRIVE, "datasets", "auto_corpus_v2"),
-]
+ZENODO_TRAIN = os.path.join(DRIVE, "datasets", "source_zenodo_unified", "images", "train")
+ZENODO_VAL   = os.path.join(DRIVE, "datasets", "source_zenodo_unified", "images", "val")
 SEED_DIR     = "/content/visclick/samples/desktop_seed"
 IMG_EXT      = (".png", ".jpg", ".jpeg")
 
 
 def collect_corpus():
     paths = []
-    for d in CORPUS_DIRS:
+    for d in [ZENODO_TRAIN, ZENODO_VAL]:
         if not os.path.isdir(d):
             continue
-        for root, _, files in os.walk(d):
-            for f in files:
-                if f.lower().endswith(IMG_EXT):
-                    paths.append(os.path.join(root, f))
-    if len(paths) < 200:
-        # Fallback. Better some pretraining than none.
-        for f in glob.glob(os.path.join(SEED_DIR, "*.*")):
+        # Drive FUSE is slow with os.walk; one-level listdir is enough here.
+        for f in os.listdir(d):
             if f.lower().endswith(IMG_EXT):
-                paths.append(f)
+                paths.append(os.path.join(d, f))
+    if os.path.isdir(SEED_DIR):
+        for f in os.listdir(SEED_DIR):
+            if f.lower().endswith(IMG_EXT):
+                paths.append(os.path.join(SEED_DIR, f))
     return sorted(set(paths))
 
 
 CORPUS = collect_corpus()
 print(f"REPORT corpus | size = {len(CORPUS)} | head = {CORPUS[:2]}")
-assert len(CORPUS) >= 50, (
-    f"Corpus too small ({len(CORPUS)}). Run scripts/auto_capture_corpus.py "
-    f"or fall back to samples/desktop_seed."
+assert len(CORPUS) >= 1000, (
+    f"Corpus too small ({len(CORPUS)}). Check that `<DRIVE>/datasets/source_zenodo_unified/images/train/` exists. "
+    f"It should after running 04_assemble_source.ipynb."
 )
 
-IMG_SIZE = 256
+IMG_SIZE = 224  # standard SimSiam input; smaller than 256 to save memory at batch 64.
 
 
 def simsiam_aug():
@@ -250,12 +255,17 @@ class TwoViewDataset(Dataset):
 
     def __getitem__(self, idx):
         p = self.paths[idx]
-        with Image.open(p) as im:
-            im = im.convert("RGB")
+        try:
+            with Image.open(p) as im:
+                im = im.convert("RGB")
+        except Exception:
+            # Drive FUSE can throw transient errors; return a noise pair so the
+            # batch survives. The augmentation pipeline handles arbitrary RGB.
+            im = Image.new("RGB", (IMG_SIZE, IMG_SIZE))
         return self.aug(im), self.aug(im)
 
 
-BATCH = 32
+BATCH = 64
 loader = DataLoader(
     TwoViewDataset(CORPUS, simsiam_aug()),
     batch_size=BATCH, shuffle=True, num_workers=2,
@@ -333,8 +343,8 @@ SimSiam loss is the negative cosine similarity between the predictor output and 
 
 Hyperparameters follow Chen & He (2021):
 - Optimizer: SGD with momentum 0.9, weight decay 1e-4.
-- Learning rate: 0.05 × batch / 256 = 0.00625 at batch 32, cosine schedule.
-- 50 epochs (paper uses 100, halved to fit Colab Free session).
+- Learning rate: 0.05 × batch / 256 = 0.0125 at batch 64, cosine schedule.
+- 20 epochs (paper uses 100; we use 20 because we start from `best_source_v8s.pt` rather than random init, and 20 × ~150 steps fits one Colab Free session).
 """
     ))
 
@@ -342,7 +352,7 @@ Hyperparameters follow Chen & He (2021):
         '''import torch.nn.functional as F
 import csv, time
 
-EPOCHS = 50
+EPOCHS = 20
 BASE_LR = 0.05 * BATCH / 256.0
 WD = 1e-4
 SSP_DIR = os.path.join(DRIVE, "weights", "ssp")
@@ -740,11 +750,18 @@ def build_nb13() -> list[dict]:
 
 **Goal.** Adapt the source-trained YOLOv8s detector to the desktop domain using **unlabelled** desktop images only. Method: simplified offline Adaptive Teacher (after Li et al., 2022).
 
-**Why simplified.** The full Adaptive Teacher of Li et al. 2022 runs an online EMA teacher–student loop inside the detector's training stage, with mixed batches of weakly-augmented teacher and strongly-augmented student forwards. Implementing that inside Ultralytics' YOLO trainer requires hooking the optimizer and reordering the dataloader, which is brittle. The simplified version below preserves the **structural idea** of teacher-student mutual learning while running offline pseudo-labelling between standard YOLO training runs.
+**Corpus.** The unlabelled target is built from data we already hold:
 
-**Pipeline (3 outer iterations of teacher→pseudo-labels→student):**
+- **ScreenSpot** (Cheng et al., 2024) desktop slice — ~334 macOS + Windows screenshots, downloaded from HuggingFace `rootsautomation/ScreenSpot`. We use the *images only*; the instructions and GT boxes are ignored at adaptation time (UDA is label-free).
+- **`samples/desktop_seed/`** — 50 hand-selected desktop screenshots in the repo.
+
+Total ~384 unlabelled desktop images. ScreenSpot already powers the D-07 CPV evaluation, so the cache is reused. Note this is a *test-time* benchmark; reusing it as an adaptation corpus is unconventional but defensible because UDA only consumes the images, never the labels. The protocol caveat is named in the report.
+
+**Why simplified.** The full Adaptive Teacher of Li et al. 2022 runs an online EMA teacher-student loop inside the detector's training stage, with mixed batches of weakly-augmented teacher and strongly-augmented student forwards. Implementing that inside Ultralytics' YOLO trainer requires hooking the optimizer and reordering the dataloader, which is brittle. The simplified version below preserves the **structural idea** of teacher-student mutual learning while running offline pseudo-labelling between standard YOLO training runs.
+
+**Pipeline (3 outer iterations of teacher → pseudo-labels → student):**
 1. Mount Drive → `git pull` → install.
-2. Build the unlabelled corpus (D-06 output; falls back to seed if too small).
+2. Build the unlabelled target corpus from ScreenSpot + seed.
 3. Iteration `t`:
    - Teacher `T_t` generates pseudo-labels on the unlabelled corpus at confidence ≥ 0.30 (filter).
    - Student `S_t` = retrain YOLOv8s for 10 epochs on (source GT pool + pseudo-labelled target).
@@ -776,14 +793,19 @@ print("ultralytics:", ultralytics.__version__)
     ))
 
     cells.append(md(
-        """## 13.1 — Bootstrap source weights and the unlabelled corpus
+        """## 13.1 — Bootstrap source weights and the unlabelled desktop target corpus
 
-The teacher starts as `best_source_v8s.pt`. The unlabelled corpus is `<DRIVE>/datasets/auto_corpus/` (D-06). The hand-corrected set is unzipped for evaluation only.
+The teacher starts as `best_source_v8s.pt`. The unlabelled *target* corpus is built from two sources we already hold:
+
+- **ScreenSpot desktop slice** (Cheng et al., 2024) downloaded via HuggingFace `rootsautomation/ScreenSpot`. We extract the images to PNGs and ignore the instructions / GT boxes (UDA is label-free at adaptation time).
+- **`samples/desktop_seed/`** in the repo (50 images).
+
+Together: ~384 unlabelled desktop screenshots. The hand-corrected set is unzipped for evaluation only.
 """
     ))
 
     cells.append(code(
-        '''import os, glob, shutil, zipfile
+        '''import os, glob, shutil, zipfile, tempfile
 
 DRIVE        = "/content/drive/MyDrive/visclick"
 SOURCE_WTS   = os.path.join(DRIVE, "weights", "baseline_source", "best_source_v8s.pt")
@@ -794,22 +816,44 @@ os.makedirs(REPORTS_TBL, exist_ok=True)
 
 assert os.path.isfile(SOURCE_WTS), f"Source weights missing: {SOURCE_WTS}"
 
-# Unlabelled target corpus (D-06).
+# --- Materialise ScreenSpot desktop slice as PNGs on local disk. ---
+SCREENSPOT_DIR = "/content/screenspot_desktop_pngs"
+os.makedirs(SCREENSPOT_DIR, exist_ok=True)
+
+import subprocess, sys
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "datasets"], check=False)
+from datasets import load_dataset
+
+HF_CACHE = os.path.join(tempfile.gettempdir(), "visclick_hf_cache")
+ds = load_dataset("rootsautomation/ScreenSpot", split="test", cache_dir=HF_CACHE)
+print(f"loaded ScreenSpot rows = {len(ds)}")
+
+n_written = 0
+for i, row in enumerate(ds):
+    if row.get("data_source") not in ("macos", "windows"):
+        continue
+    out = os.path.join(SCREENSPOT_DIR, f"ss_{i:04d}.png")
+    if os.path.isfile(out):
+        continue
+    row["image"].save(out)
+    n_written += 1
+print(f"REPORT screenspot_pngs | written = {n_written} | dir = {SCREENSPOT_DIR}")
+
+# --- Collect unlabelled target paths. ---
 TGT_DIRS = [
-    os.path.join(DRIVE, "datasets", "auto_corpus"),
+    SCREENSPOT_DIR,
     "/content/visclick/samples/desktop_seed",
 ]
 TARGET_PATHS = []
 for d in TGT_DIRS:
     if not os.path.isdir(d):
         continue
-    for root, _, files in os.walk(d):
-        for f in files:
-            if f.lower().endswith((".png", ".jpg", ".jpeg")):
-                TARGET_PATHS.append(os.path.join(root, f))
+    for f in os.listdir(d):
+        if f.lower().endswith((".png", ".jpg", ".jpeg")):
+            TARGET_PATHS.append(os.path.join(d, f))
 TARGET_PATHS = sorted(set(TARGET_PATHS))
-print(f"REPORT target_corpus | n = {len(TARGET_PATHS)}")
-assert len(TARGET_PATHS) >= 50, f"too few unlabelled targets ({len(TARGET_PATHS)}); run auto_capture_corpus.py"
+print(f"REPORT target_corpus | n = {len(TARGET_PATHS)} | first = {TARGET_PATHS[:2]}")
+assert len(TARGET_PATHS) >= 100, f"too few unlabelled targets ({len(TARGET_PATHS)})."
 
 # Hand-corrected set (eval only).
 HC_ZIP  = "/content/visclick/datasets/handcorrected_desktop_test/visclick3.yolov8.zip"
@@ -1020,6 +1064,8 @@ def build_nb14() -> list[dict]:
 
 **Goal.** Adapt the source-trained YOLOv8s to the desktop domain using **only unlabelled target images** and **no source data at adaptation time**. Method: simplified SHOT (after Liang et al., 2020).
 
+**Corpus.** Same unlabelled desktop target corpus as notebook 13: ScreenSpot desktop slice (~334) + `samples/desktop_seed/` (50) ≈ 384 images. ScreenSpot is reused; the labels are ignored at adaptation time.
+
 **Why simplified.** The full SHOT freezes the classifier head and adapts the feature extractor with information maximization (entropy + diversity) plus self-supervised pseudo-label refinement. For a detection model like YOLOv8 — multi-scale heads, three feature pyramid levels, anchor-free regression — implementing IM at the detector head is not faithful to SHOT's original classification setup.
 
 The simplified version we run is **detection-pseudo-label SHOT**:
@@ -1056,12 +1102,12 @@ print("ultralytics:", ultralytics.__version__)
     cells.append(md(
         """## 14.1 — Bootstrap
 
-Loads `best_source_v8s.pt` and the unlabelled corpus (same D-06 output as in notebook 13).
+Loads `best_source_v8s.pt` and the unlabelled desktop target corpus (ScreenSpot desktop slice + `samples/desktop_seed/`, ~384 images total — same loader as notebook 13).
 """
     ))
 
     cells.append(code(
-        '''import os, glob, shutil, zipfile
+        '''import os, glob, shutil, zipfile, tempfile
 
 DRIVE        = "/content/drive/MyDrive/visclick"
 SOURCE_WTS   = os.path.join(DRIVE, "weights", "baseline_source", "best_source_v8s.pt")
@@ -1071,21 +1117,41 @@ os.makedirs(SHOT_DIR, exist_ok=True)
 os.makedirs(REPORTS_TBL, exist_ok=True)
 assert os.path.isfile(SOURCE_WTS), f"Missing source: {SOURCE_WTS}"
 
+# --- Materialise ScreenSpot desktop slice as PNGs (skip if notebook 13 already did it). ---
+SCREENSPOT_DIR = "/content/screenspot_desktop_pngs"
+os.makedirs(SCREENSPOT_DIR, exist_ok=True)
+
+import subprocess, sys
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "datasets"], check=False)
+from datasets import load_dataset
+
+n_existing = sum(1 for f in os.listdir(SCREENSPOT_DIR) if f.lower().endswith(".png"))
+if n_existing < 100:
+    HF_CACHE = os.path.join(tempfile.gettempdir(), "visclick_hf_cache")
+    ds = load_dataset("rootsautomation/ScreenSpot", split="test", cache_dir=HF_CACHE)
+    for i, row in enumerate(ds):
+        if row.get("data_source") not in ("macos", "windows"):
+            continue
+        out = os.path.join(SCREENSPOT_DIR, f"ss_{i:04d}.png")
+        if not os.path.isfile(out):
+            row["image"].save(out)
+print(f"REPORT screenspot_pngs | dir = {SCREENSPOT_DIR} | n = "
+      f"{sum(1 for f in os.listdir(SCREENSPOT_DIR) if f.lower().endswith('.png'))}")
+
 TGT_DIRS = [
-    os.path.join(DRIVE, "datasets", "auto_corpus"),
+    SCREENSPOT_DIR,
     "/content/visclick/samples/desktop_seed",
 ]
 TARGET_PATHS = []
 for d in TGT_DIRS:
     if not os.path.isdir(d):
         continue
-    for root, _, files in os.walk(d):
-        for f in files:
-            if f.lower().endswith((".png", ".jpg", ".jpeg")):
-                TARGET_PATHS.append(os.path.join(root, f))
+    for f in os.listdir(d):
+        if f.lower().endswith((".png", ".jpg", ".jpeg")):
+            TARGET_PATHS.append(os.path.join(d, f))
 TARGET_PATHS = sorted(set(TARGET_PATHS))
 print(f"REPORT target_corpus | n = {len(TARGET_PATHS)}")
-assert len(TARGET_PATHS) >= 50
+assert len(TARGET_PATHS) >= 100, f"too few unlabelled targets ({len(TARGET_PATHS)})."
 
 CLASSES = ["button", "text", "text_input", "icon", "menu", "checkbox"]
 '''

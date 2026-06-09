@@ -202,7 +202,7 @@ Each `__getitem__` emits two random augmentations of the same image (SimSiam two
     ))
 
     cells.append(code(
-        '''import os, glob
+        '''import os, tarfile
 from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -210,20 +210,54 @@ import torchvision.transforms as T
 
 DRIVE        = "/content/drive/MyDrive/visclick"
 UNIFIED      = os.path.join(DRIVE, "data", "unified")
+BUNDLES      = os.path.join(DRIVE, "data", "source_train_bundles")
 SEED_DIR     = "/content/visclick/samples/desktop_seed"
 IMG_EXT      = (".png", ".jpg", ".jpeg")
+
+# Drive FUSE struggles to listdir() huge directories (>10k files), so we don't.
+# Instead we extract the tiny manifests from the source_train_bundles that
+# 04_assemble_source.ipynb already wrote, and resolve each filename to its
+# absolute path under <DRIVE>/data/unified/<split>/images/. Opening individual
+# files by full path is reliable; only the enumeration is broken.
+
+MANIFEST_CACHE = "/content/_ssp_manifests"
+os.makedirs(MANIFEST_CACHE, exist_ok=True)
+
+
+def _manifest_for(split):
+    out = os.path.join(MANIFEST_CACHE, f"{split}.txt")
+    if os.path.isfile(out) and os.path.getsize(out) > 0:
+        return out
+    bundle = os.path.join(BUNDLES, f"{split}.tar.gz")
+    if not os.path.isfile(bundle):
+        return None
+    with tarfile.open(bundle, "r:gz") as tf:
+        member = None
+        for m in tf.getmembers():
+            if m.name.endswith(f"manifests/{split}.txt") or m.name == f"manifests/{split}.txt":
+                member = m; break
+        if member is None:
+            return None
+        f = tf.extractfile(member)
+        with open(out, "wb") as fh:
+            fh.write(f.read())
+    return out
 
 
 def collect_corpus():
     paths = []
     for split in ("train", "val", "test"):
-        d = os.path.join(UNIFIED, split, "images")
-        if not os.path.isdir(d):
+        mf = _manifest_for(split)
+        if mf is None:
+            print(f"  {split}: no manifest (skipped)")
             continue
-        # Drive FUSE is slow with os.walk; one-level listdir is enough here.
-        for f in os.listdir(d):
-            if f.lower().endswith(IMG_EXT):
-                paths.append(os.path.join(d, f))
+        with open(mf) as fh:
+            names = [ln.strip() for ln in fh if ln.strip()]
+        img_dir = os.path.join(UNIFIED, split, "images")
+        before = len(paths)
+        for fn in names:
+            paths.append(os.path.join(img_dir, fn))
+        print(f"  {split}: {len(paths) - before} paths from manifest")
     if os.path.isdir(SEED_DIR):
         for f in os.listdir(SEED_DIR):
             if f.lower().endswith(IMG_EXT):
@@ -234,8 +268,8 @@ def collect_corpus():
 CORPUS = collect_corpus()
 print(f"REPORT corpus | size = {len(CORPUS)} | head = {CORPUS[:2]}")
 assert len(CORPUS) >= 1000, (
-    f"Corpus too small ({len(CORPUS)}). Check that `<DRIVE>/data/unified/{{train,val,test}}/images/` exists "
-    f"(should after `04_assemble_source.ipynb` ran). If only the desktop seed is found, the path is wrong."
+    f"Corpus too small ({len(CORPUS)}). Expected manifests under <DRIVE>/data/source_train_bundles/. "
+    f"Re-run 04_assemble_source.ipynb if those bundles are missing."
 )
 
 IMG_SIZE = 224  # standard SimSiam input; smaller than 256 to save memory at batch 64.

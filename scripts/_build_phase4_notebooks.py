@@ -164,7 +164,7 @@ def build_nb11() -> list[dict]:
 
 **Pipeline:**
 1. Mount Drive → `git pull` → install deps.
-2. Build a TwoView loader over the unlabelled Zenodo bundle at `<DRIVE>/datasets/source_zenodo_unified/images/train/`. Labels are *ignored* — we treat the bundle as an unlabelled corpus for SSP.
+2. Build a TwoView loader over the unlabelled Zenodo bundle at `<DRIVE>/data/unified/<split>/images/` (same path 04_assemble_source.ipynb uses). Labels are *ignored* — we treat the bundle as an unlabelled corpus for SSP.
 3. Extract the YOLOv8s backbone from `best_source_v8s.pt`, attach a 3-layer projection head and a 2-layer predictor.
 4. Train SimSiam for 20 epochs at batch 64, imgsz 224, two augmentation streams.
 5. Save the adapted backbone to `<DRIVE>/weights/ssp/backbone_simsiam.pt` and a training-loss CSV.
@@ -195,7 +195,7 @@ print("torchvision:", torchvision.__version__, "| ultralytics:", ultralytics.__v
     cells.append(md(
         """## 11.1 — Build unlabelled UI corpus loader (Zenodo unified bundle)
 
-The SSP corpus is the labelled Zenodo unified bundle (RICO + CLAY + VINS), with labels *ignored*. This sits at `<DRIVE>/datasets/source_zenodo_unified/images/train/` — the same path used by `05_train_source.ipynb`.
+The SSP corpus is the labelled Zenodo unified bundle (RICO + CLAY + VINS), with labels *ignored*. This sits at `<DRIVE>/data/unified/<split>/images/` — the same path `04_assemble_source.ipynb` references as `UNIFIED = <DRIVE>/data/unified`.
 
 Each `__getitem__` emits two random augmentations of the same image (SimSiam two-view protocol). The 50-image desktop seed at `samples/desktop_seed/` is appended too, so the corpus includes a small in-distribution slice as well.
 """
@@ -209,15 +209,15 @@ from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as T
 
 DRIVE        = "/content/drive/MyDrive/visclick"
-ZENODO_TRAIN = os.path.join(DRIVE, "datasets", "source_zenodo_unified", "images", "train")
-ZENODO_VAL   = os.path.join(DRIVE, "datasets", "source_zenodo_unified", "images", "val")
+UNIFIED      = os.path.join(DRIVE, "data", "unified")
 SEED_DIR     = "/content/visclick/samples/desktop_seed"
 IMG_EXT      = (".png", ".jpg", ".jpeg")
 
 
 def collect_corpus():
     paths = []
-    for d in [ZENODO_TRAIN, ZENODO_VAL]:
+    for split in ("train", "val", "test"):
+        d = os.path.join(UNIFIED, split, "images")
         if not os.path.isdir(d):
             continue
         # Drive FUSE is slow with os.walk; one-level listdir is enough here.
@@ -234,8 +234,8 @@ def collect_corpus():
 CORPUS = collect_corpus()
 print(f"REPORT corpus | size = {len(CORPUS)} | head = {CORPUS[:2]}")
 assert len(CORPUS) >= 1000, (
-    f"Corpus too small ({len(CORPUS)}). Check that `<DRIVE>/datasets/source_zenodo_unified/images/train/` exists. "
-    f"It should after running 04_assemble_source.ipynb."
+    f"Corpus too small ({len(CORPUS)}). Check that `<DRIVE>/data/unified/{{train,val,test}}/images/` exists "
+    f"(should after `04_assemble_source.ipynb` ran). If only the desktop seed is found, the path is wrong."
 )
 
 IMG_SIZE = 224  # standard SimSiam input; smaller than 256 to save memory at batch 64.
@@ -893,12 +893,50 @@ The `freeze=0` argument means we fine-tune the whole network, which is what Adap
     ))
 
     cells.append(code(
-        '''import time, yaml
+        '''import time, yaml, tarfile
 from ultralytics import YOLO
 
-# Source GT pool (Zenodo unified bundle copy already on Drive).
-SOURCE_DATA = os.path.join(DRIVE, "datasets", "source_zenodo_unified")
-assert os.path.isdir(SOURCE_DATA), f"Source GT pool missing: {SOURCE_DATA}"
+# Source GT pool: the 6-class source_train set assembled by 04_assemble_source.ipynb.
+# Fast-restore it from the tiny Drive bundles + manifests, same pattern as 05_train_source.ipynb.
+UNIFIED      = os.path.join(DRIVE, "data", "unified")
+BUNDLES      = os.path.join(DRIVE, "data", "source_train_bundles")
+SOURCE_DATA  = "/content/source_train"        # local, ephemeral
+SRC_YAML     = os.path.join(SOURCE_DATA, "data.yaml")
+SPLITS       = ["train", "val"]
+
+
+def _bootstrap_source_train():
+    if os.path.isfile(SRC_YAML):
+        return
+    os.makedirs(SOURCE_DATA, exist_ok=True)
+    for sp in SPLITS:
+        b = os.path.join(BUNDLES, f"{sp}.tar.gz")
+        assert os.path.isfile(b), f"Drive bundle missing: {b} (run 04_assemble_source.ipynb first)"
+        with tarfile.open(b, "r:gz") as tf:
+            tf.extractall(SOURCE_DATA)
+        manifest = os.path.join(SOURCE_DATA, "manifests", f"{sp}.txt")
+        assert os.path.isfile(manifest), f"manifest missing in bundle: {manifest}"
+        with open(manifest) as fh:
+            names = [ln.strip() for ln in fh if ln.strip()]
+        src_img_dir = os.path.join(UNIFIED, sp, "images")
+        dst_img_dir = os.path.join(SOURCE_DATA, "images", sp)
+        os.makedirs(dst_img_dir, exist_ok=True)
+        for fn in names:
+            dst = os.path.join(dst_img_dir, fn)
+            if os.path.exists(dst):
+                continue
+            try:
+                os.symlink(os.path.join(src_img_dir, fn), dst)
+            except OSError:
+                pass
+    with open(SRC_YAML, "w") as fh:
+        yaml.safe_dump({"path": SOURCE_DATA, "train": "images/train", "val": "images/val",
+                        "nc": len(CLASSES), "names": CLASSES}, fh, sort_keys=False)
+    print(f"bootstrap done at {SOURCE_DATA}")
+
+
+_bootstrap_source_train()
+assert os.path.isdir(os.path.join(SOURCE_DATA, "images", "train")), "source_train bootstrap failed"
 
 PSEUDO_CONF = 0.30
 N_OUTER = 3

@@ -379,14 +379,16 @@ print(f"REPORT simsiam | total_params = {sum(p.numel() for p in model.parameters
     ))
 
     cells.append(md(
-        """## 11.3 — Train SimSiam for 50 epochs
+        """## 11.3 — Train SimSiam for 10 epochs (with resume-on-disconnect)
 
 SimSiam loss is the negative cosine similarity between the predictor output and the stop-gradient projection of the other view, symmetrised across views. No labels, no negatives.
 
 Hyperparameters follow Chen & He (2021):
 - Optimizer: SGD with momentum 0.9, weight decay 1e-4.
 - Learning rate: 0.05 × batch / 256 = 0.0125 at batch 64, cosine schedule.
-- 20 epochs (paper uses 100; we use 20 because we start from `best_source_v8s.pt` rather than random init, and 20 × ~150 steps fits one Colab Free session).
+- 10 epochs (paper uses 100; we use 10 because we start from `best_source_v8s.pt` rather than random init, and the Colab Free idle window can drop a 20-epoch run mid-way).
+
+**Resume.** After every epoch the model + optimizer + scheduler + epoch index are written to `<DRIVE>/weights/ssp/ssp_ckpt.pt`. If you reconnect after a disconnect, just re-run all cells — this cell picks up where it stopped and only the in-progress epoch is lost.
 """
     ))
 
@@ -394,11 +396,13 @@ Hyperparameters follow Chen & He (2021):
         '''import torch.nn.functional as F
 import csv, time
 
-EPOCHS = 20
+EPOCHS = 10
 BASE_LR = 0.05 * BATCH / 256.0
 WD = 1e-4
 SSP_DIR = os.path.join(DRIVE, "weights", "ssp")
 os.makedirs(SSP_DIR, exist_ok=True)
+CKPT_PATH = os.path.join(SSP_DIR, "ssp_ckpt.pt")
+LOSS_CSV  = os.path.join(SSP_DIR, "ssp_loss_log.csv")
 
 
 def simsiam_loss(p1, z2, p2, z1):
@@ -409,12 +413,23 @@ def simsiam_loss(p1, z2, p2, z1):
 optimizer = torch.optim.SGD(model.parameters(), lr=BASE_LR, momentum=0.9, weight_decay=WD)
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
 
-LOSS_CSV = os.path.join(SSP_DIR, "ssp_loss_log.csv")
-with open(LOSS_CSV, "w", newline="") as fh:
-    w = csv.writer(fh)
-    w.writerow(["epoch", "avg_loss", "lr", "elapsed_s"])
+start_epoch = 0
+if os.path.isfile(CKPT_PATH):
+    ck = torch.load(CKPT_PATH, map_location=device)
+    if ck.get("epochs_target") == EPOCHS:
+        model.load_state_dict(ck["model"])
+        optimizer.load_state_dict(ck["optimizer"])
+        scheduler.load_state_dict(ck["scheduler"])
+        start_epoch = ck["epoch"]
+        print(f"RESUME from epoch {start_epoch}/{EPOCHS} (checkpoint found)")
+    else:
+        print(f"checkpoint targets EPOCHS={ck.get('epochs_target')} != {EPOCHS}; ignoring (training fresh)")
 
-for epoch in range(EPOCHS):
+if start_epoch == 0:
+    with open(LOSS_CSV, "w", newline="") as fh:
+        csv.writer(fh).writerow(["epoch", "avg_loss", "lr", "elapsed_s"])
+
+for epoch in range(start_epoch, EPOCHS):
     t0 = time.time()
     model.train()
     losses = []
@@ -434,6 +449,13 @@ for epoch in range(EPOCHS):
     print(f"epoch {epoch+1:02d}/{EPOCHS} | loss = {avg:+.4f} | lr = {scheduler.get_last_lr()[0]:.5f} | {dt:.1f}s")
     with open(LOSS_CSV, "a", newline="") as fh:
         csv.writer(fh).writerow([epoch + 1, round(avg, 4), round(scheduler.get_last_lr()[0], 5), round(dt, 1)])
+    torch.save({
+        "epoch": epoch + 1,
+        "epochs_target": EPOCHS,
+        "model": model.state_dict(),
+        "optimizer": optimizer.state_dict(),
+        "scheduler": scheduler.state_dict(),
+    }, CKPT_PATH)
 
 print("REPORT step = SSP_TRAIN | status = done")
 '''

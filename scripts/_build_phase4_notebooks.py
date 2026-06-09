@@ -182,7 +182,7 @@ def build_nb11() -> list[dict]:
         """import sys, subprocess
 subprocess.run(
     [sys.executable, "-m", "pip", "install", "-q",
-     "ultralytics", "torch", "torchvision", "pillow", "opencv-python", "matplotlib"],
+     "ultralytics", "torch", "torchvision", "pillow", "opencv-python", "matplotlib", "pi-heif"],
     check=False,
 )
 import torch, torchvision, ultralytics
@@ -537,7 +537,7 @@ def build_nb12() -> list[dict]:
         """import sys, subprocess
 subprocess.run(
     [sys.executable, "-m", "pip", "install", "-q",
-     "ultralytics", "datasets", "pillow", "opencv-python", "matplotlib"],
+     "ultralytics", "datasets", "pillow", "opencv-python", "matplotlib", "pi-heif"],
     check=False,
 )
 import torch, ultralytics
@@ -851,7 +851,7 @@ Total ~384 unlabelled desktop images. ScreenSpot already powers the D-07 CPV eva
         """import sys, subprocess
 subprocess.run(
     [sys.executable, "-m", "pip", "install", "-q",
-     "ultralytics", "pillow", "opencv-python", "matplotlib"],
+     "ultralytics", "pillow", "opencv-python", "matplotlib", "pi-heif"],
     check=False,
 )
 import torch, ultralytics
@@ -1199,7 +1199,7 @@ This preserves the SHOT spirit (source-free, head-frozen, target self-supervisio
         """import sys, subprocess
 subprocess.run(
     [sys.executable, "-m", "pip", "install", "-q",
-     "ultralytics", "pillow", "opencv-python", "matplotlib"],
+     "ultralytics", "pillow", "opencv-python", "matplotlib", "pi-heif"],
     check=False,
 )
 import torch, ultralytics

@@ -389,6 +389,8 @@ Hyperparameters follow Chen & He (2021):
 - 10 epochs (paper uses 100; we use 10 because we start from `best_source_v8s.pt` rather than random init, and the Colab Free idle window can drop a 20-epoch run mid-way).
 
 **Resume.** After every epoch the model + optimizer + scheduler + epoch index are written to `<DRIVE>/weights/ssp/ssp_ckpt.pt`. If you reconnect after a disconnect, just re-run all cells — this cell picks up where it stopped and only the in-progress epoch is lost.
+
+**Force a clean run.** Set `FORCE_FRESH = True` in the cell below before running. It deletes the checkpoint and loss-log on Drive so training starts from epoch 0, regardless of any prior state.
 """
     ))
 
@@ -404,6 +406,10 @@ os.makedirs(SSP_DIR, exist_ok=True)
 CKPT_PATH = os.path.join(SSP_DIR, "ssp_ckpt.pt")
 LOSS_CSV  = os.path.join(SSP_DIR, "ssp_loss_log.csv")
 
+# Flip this to True to ignore any existing checkpoint and start fresh.
+# Useful when you changed hyperparameters or just want a clean curve.
+FORCE_FRESH = False
+
 
 def simsiam_loss(p1, z2, p2, z1):
     return -(F.cosine_similarity(p1, z2, dim=-1).mean()
@@ -414,7 +420,11 @@ optimizer = torch.optim.SGD(model.parameters(), lr=BASE_LR, momentum=0.9, weight
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
 
 start_epoch = 0
-if os.path.isfile(CKPT_PATH):
+if FORCE_FRESH:
+    for p in (CKPT_PATH, LOSS_CSV):
+        if os.path.isfile(p):
+            os.remove(p); print(f"FORCE_FRESH: removed {p}")
+elif os.path.isfile(CKPT_PATH):
     ck = torch.load(CKPT_PATH, map_location=device)
     if ck.get("epochs_target") == EPOCHS:
         model.load_state_dict(ck["model"])

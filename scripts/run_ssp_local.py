@@ -9,9 +9,10 @@ Typical usage on a local GPU machine:
     export VISCLICK_DATA=/path/to/visclick_data
     # VISCLICK_DATA should contain:
     #   unified/{train,val,test}/images/*.{png,jpg}     (~9k images total)
-    #   source_train_bundles/{train,val,test}.tar.gz    (label+manifest tarballs)
     #   weights/baseline_source/best_source_v8s.pt      (YOLOv8s source weights)
     #   samples/desktop_seed/*.png                      (50 desktop seeds, optional)
+    #   source_train_bundles/{train,val,test}.tar.gz    (OPTIONAL; if present,
+    #       use the same image subset notebook 04 selected on Colab)
 
     python scripts/run_ssp_local.py
 
@@ -83,26 +84,48 @@ def extract_manifest(bundle_path: Path, split: str, cache_dir: Path) -> list[str
 
 
 def collect_corpus(data_root: Path, max_corpus: int = 0) -> list[str]:
+    """Build the SSP corpus from a local data root.
+
+    Two paths to find images:
+      1) If `source_train_bundles/<split>.tar.gz` exists, use the manifests
+         inside (same set notebook 04 selected on Colab). Reproduces the
+         Colab run image-for-image.
+      2) Otherwise (typical for a fresh gpu064 setup that wget'd the Zenodo
+         bundle directly), list `unified/<split>/images/` and use everything.
+         Local filesystems handle directory listing fine, unlike Drive FUSE.
+    """
     unified = data_root / "unified"
     bundles = data_root / "source_train_bundles"
     seed = data_root / "samples" / "desktop_seed"
+
+    use_manifests = bundles.is_dir() and any((bundles / f"{sp}.tar.gz").is_file()
+                                              for sp in ("train", "val", "test"))
     cache = Path("/tmp/_ssp_manifests_local")
     cache.mkdir(parents=True, exist_ok=True)
 
     paths: list[str] = []
     for split in ("train", "val", "test"):
-        names = extract_manifest(bundles / f"{split}.tar.gz", split, cache)
-        if not names:
-            print(f"  {split}: no manifest")
-            continue
         img_dir = unified / split / "images"
-        paths.extend(str(img_dir / fn) for fn in names)
-        print(f"  {split}: {len(names)} paths")
+        if not img_dir.is_dir():
+            print(f"  {split}: image dir missing ({img_dir})")
+            continue
+        if use_manifests:
+            names = extract_manifest(bundles / f"{split}.tar.gz", split, cache)
+            if not names:
+                print(f"  {split}: manifest empty, falling back to directory listing")
+                names = [f.name for f in img_dir.iterdir() if f.suffix.lower() in IMG_EXT]
+            paths.extend(str(img_dir / fn) for fn in names)
+            print(f"  {split}: {len(names)} paths (from manifest)")
+        else:
+            names = [f.name for f in img_dir.iterdir() if f.suffix.lower() in IMG_EXT]
+            paths.extend(str(img_dir / fn) for fn in names)
+            print(f"  {split}: {len(names)} paths (listdir)")
 
     if seed.is_dir():
-        for f in seed.iterdir():
-            if f.suffix.lower() in IMG_EXT:
-                paths.append(str(f))
+        seed_paths = [str(f) for f in seed.iterdir() if f.suffix.lower() in IMG_EXT]
+        paths.extend(seed_paths)
+        if seed_paths:
+            print(f"  desktop_seed: {len(seed_paths)} paths")
 
     paths = sorted(set(paths))
     if max_corpus and len(paths) > max_corpus:

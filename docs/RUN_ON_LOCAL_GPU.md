@@ -48,68 +48,134 @@ If you find the bundle on a shared FS, skip Step 2. Otherwise rsync from
 wherever you have it (Windows desktop, another Linux box, or Google Drive
 via `rclone`).
 
-## 2. Stage data into a working dir (if not already shared)
+## 2. Stage data into a working dir
 
-Pick a path with at least 15 GB free:
+Pick a path with at least 20 GB free. On gpu064 there is no `/scratch`, so
+use home NFS (verified to have ~4.6 TB free):
 
 ```bash
-export VISCLICK_DATA=/scratch/$USER/visclick_data    # or wherever
+export VISCLICK_DATA=$HOME/visclick_data
 mkdir -p "$VISCLICK_DATA"
 ```
 
-### 2a. From Google Drive via `rclone`
+### 2a. Zenodo unified bundle (RECOMMENDED — direct download, no Drive needed)
 
-If your unified bundle is on Drive (the Colab setup), set up `rclone`
-once on this box (see `https://rclone.org/drive/`), then:
-
-```bash
-# Replace `gdrive` with whatever you named the remote in rclone config.
-rclone copy gdrive:visclick/data/unified                 "$VISCLICK_DATA/unified"               --progress --transfers 8
-rclone copy gdrive:visclick/data/source_train_bundles    "$VISCLICK_DATA/source_train_bundles"  --progress
-rclone copy gdrive:visclick/weights/baseline_source      "$VISCLICK_DATA/weights/baseline_source" --progress
-```
-
-Note: the `unified/` directory is large (~5-10 GB). Expect 10-30 min on a
-reasonable link.
-
-### 2b. From another Linux box you control
+The bundle is publicly hosted at Zenodo record **19195885**. Three zips
+(train / val / test) totalling ~8-12 GB once extracted:
 
 ```bash
-rsync -avh --info=progress2 \
-    other-host:/path/to/visclick/data/unified                "$VISCLICK_DATA/"
-rsync -avh \
-    other-host:/path/to/visclick/data/source_train_bundles   "$VISCLICK_DATA/"
-rsync -avh \
-    other-host:/path/to/visclick/weights/baseline_source     "$VISCLICK_DATA/weights/"
+cd "$VISCLICK_DATA"
+mkdir -p raw unified
+
+for sp in train val test; do
+    echo "=== downloading $sp.zip ==="
+    wget -c "https://zenodo.org/records/19195885/files/${sp}.zip?download=1" \
+         -O "raw/${sp}.zip"
+done
+
+echo "=== extracting ==="
+for sp in train val test; do
+    mkdir -p "unified/$sp"
+    unzip -q "raw/${sp}.zip" -d "unified/$sp"
+done
+
+# Some Zenodo bundles nest images/ and labels/ one level deeper.
+# Verify structure:
+ls "unified/train" | head
 ```
 
-### 2c. Verify the layout
+Expected post-extract layout:
 
-```bash
-tree -L 3 "$VISCLICK_DATA"   # should look like:
-# $VISCLICK_DATA/
-#   unified/
-#     train/images/*.png  (a lot)
-#     val/images/*.png
-#     test/images/*.png
-#   source_train_bundles/
-#     train.tar.gz
-#     val.tar.gz
-#     test.tar.gz
-#   weights/baseline_source/best_source_v8s.pt
+```
+$VISCLICK_DATA/unified/<sp>/images/*.{png,jpg}
+$VISCLICK_DATA/unified/<sp>/labels/*.txt          # 12-class YOLO labels
 ```
 
-Quick file counts:
+If the extracted folder nests one level deeper (e.g. `unified/train/train/images/`),
+flatten with:
 
 ```bash
 for sp in train val test; do
-    echo -n "$sp images: "
-    find "$VISCLICK_DATA/unified/$sp/images" -maxdepth 1 -type f 2>/dev/null | wc -l
+    if [ -d "unified/$sp/$sp/images" ]; then
+        mv "unified/$sp/$sp"/* "unified/$sp/"
+        rmdir "unified/$sp/$sp"
+    fi
 done
 ```
 
-You want ~6000 / 1600 / 2000 (train / val / test) for the standard
-unified bundle. Anything else and notebook 04 wasn't run in standard config.
+Sanity counts (expect ~6000 / 1600 / 2000 for train/val/test):
+
+```bash
+for sp in train val test; do
+    echo -n "$sp: "
+    ls "$VISCLICK_DATA/unified/$sp/images" 2>/dev/null | wc -l
+done
+```
+
+Once extraction is verified, you can free the ~3-4 GB of raw zips:
+
+```bash
+rm -rf "$VISCLICK_DATA/raw"
+```
+
+### 2b. Source-trained YOLOv8s weights
+
+The file `best_source_v8s.pt` (~22 MB) is the output of
+`05_train_source.ipynb` on Colab and lives on Google Drive at
+`MyDrive/visclick/weights/baseline_source/best_source_v8s.pt`. Two ways
+to get it onto gpu064:
+
+**Quick path — manual transfer (5 min):**
+
+1. In Colab (or any browser with Drive access), open that file and
+   download it to your laptop.
+2. Drag-drop it into the Cursor remote workspace on gpu064 (Cursor lets
+   you upload binaries via the file tree), or:
+
+```bash
+# from your laptop:
+scp best_source_v8s.pt madhus@us01odc-sc4-1-gpu064:~/visclick_data/weights/baseline_source/
+```
+
+**Reproducible path — re-train on gpu064 (~15 min on H100):**
+
+If you want zero Drive dependency, you can re-train the source baseline
+on gpu064. There isn't a standalone script for that yet — ping the
+edit-host agent to write `scripts/run_source_baseline_local.py` mirroring
+`notebooks/05_train_source.ipynb`.
+
+After staging, verify:
+
+```bash
+ls -la "$VISCLICK_DATA/weights/baseline_source/best_source_v8s.pt"
+# expect ~22 MB
+```
+
+### 2c. Optional: copy desktop seeds from the repo
+
+Tiny (~3 MB) and already in the repo checkout:
+
+```bash
+mkdir -p "$VISCLICK_DATA/samples"
+cp -r samples/desktop_seed "$VISCLICK_DATA/samples/"
+```
+
+### 2d. Final layout
+
+```
+$VISCLICK_DATA/
+  unified/
+    train/images/*.{png,jpg}   (~6000)
+    train/labels/*.txt
+    val/  images/*.{png,jpg}   (~1600)
+    test/ images/*.{png,jpg}   (~2000)
+  weights/baseline_source/best_source_v8s.pt
+  samples/desktop_seed/*.png   (optional)
+```
+
+`source_train_bundles/` is NOT required on a local filesystem; the script
+falls back to listing `unified/<split>/images/` directly when no
+manifests are present.
 
 ## 3. Clone visclick and pull latest
 
@@ -125,19 +191,24 @@ If you already have a checkout, just `git pull --rebase` inside it.
 
 ## 4. Create a Python env
 
-We need PyTorch with CUDA, ultralytics, and a couple of small deps. The
-simplest setup is a venv:
+We need PyTorch with CUDA, ultralytics, and a couple of small deps. Python
+3.9.16 is the system Python on gpu064 — fine for our use, ultralytics 8
+supports 3.8+.
 
 ```bash
-cd ~/code/visclick
+# Use the workspace directory (shared NFS) as the venv home so it persists
+# across sessions and is visible from both Cursor windows.
+cd /remote/edageuclidevhdlbm1/hiran/RTLAssistent/8-CodeAgent/11-AprilBuild/4-case/gui_temp/visclick
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip wheel
 
-# PyTorch with CUDA 12.1 wheels. Pick the right index for your driver:
+# PyTorch with CUDA wheels. Pick the right index for your driver -- check
+# `nvidia-smi` top-right for the runtime CUDA version reported by the host.
+#   - CUDA 12.4 driver -> cu124
 #   - CUDA 12.1 driver -> cu121
 #   - CUDA 11.8 driver -> cu118
-# Check `nvidia-smi` top-right for the runtime CUDA version.
+# H100 needs sm_90, supported on torch >= 2.0 with cu118 or newer.
 pip install torch==2.3.* torchvision==0.18.* --index-url https://download.pytorch.org/whl/cu121
 
 # VisClick deps
@@ -149,13 +220,22 @@ Sanity-check CUDA wiring:
 ```bash
 python - <<'PY'
 import torch
-print("torch:", torch.__version__, "cuda:", torch.cuda.is_available(),
-      "device:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu")
+print("torch:", torch.__version__,
+      "cuda:", torch.cuda.is_available(),
+      "device_count:", torch.cuda.device_count(),
+      "device_0:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu")
 PY
 ```
 
-Expected: `cuda: True` and a real GPU name. If `cuda: False`, the wheel
-doesn't match the driver — reinstall with the right `--index-url`.
+Expected on gpu064: `cuda: True`, `device_count: 4`, `device_0: NVIDIA H100 80GB HBM3`.
+If `cuda: False`, the wheel doesn't match the driver — reinstall with the
+right `--index-url`.
+
+> **Note on multi-GPU.** The current `scripts/run_ssp_local.py` uses a
+> single GPU. With 4× H100 available, single-GPU is still fine for SSP
+> (the model is tiny, ~12M params; bottleneck is data I/O not compute).
+> If you want true multi-GPU later, ping the edit-host agent to add a
+> DistributedDataParallel wrapper. For now we run on `cuda:0`.
 
 ## 5. Run training
 

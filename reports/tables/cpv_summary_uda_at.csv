@@ -1,0 +1,8 @@
+class,gt_boxes,centres_inside,cpv_pct
+button,15,10,66.67
+text,20,0,0.00
+text_input,189,2,1.06
+icon,89,4,4.49
+menu,33,22,66.67
+checkbox,10,1,10.00
+OVERALL,356,39,10.96

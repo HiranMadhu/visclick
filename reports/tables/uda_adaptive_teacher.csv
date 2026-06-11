@@ -1,0 +1,2 @@
+method,outer_iters,epochs_per_iter,n_pseudo_imgs,cpv_screenspot_%,cpv_handcorrected_%,elapsed_s
+adaptive_teacher_simplified,1,5,348,68.56,10.96,217.1

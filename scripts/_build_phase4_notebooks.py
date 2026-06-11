@@ -714,7 +714,11 @@ The ScreenSpot CPV is the headline number reported in Section 7.x. The hand-corr
     ))
 
     cells.append(code(
-        '''import subprocess, tempfile
+        '''import os, sys, subprocess
+
+REPO_ROOT = "/content/visclick"
+TBL_DIR = os.path.join(REPO_ROOT, "reports", "tables")
+os.makedirs(TBL_DIR, exist_ok=True)
 
 per_k_results = {}
 
@@ -724,35 +728,42 @@ for k in K_VALUES:
         weights = os.path.join(FEWSHOT_DIR, f"k{k}", "weights", "last.pt")
     assert os.path.isfile(weights), f"No checkpoint for k={k}"
 
-    # Export ONNX for the CPV scripts (they accept .onnx or .pt; .pt is fine).
     onnx_out = weights.replace(".pt", ".onnx")
     if not os.path.isfile(onnx_out):
         YOLO(weights).export(format="onnx", imgsz=IMGSZ, dynamic=False, opset=12)
 
-    with tempfile.TemporaryDirectory() as tmp:
-        ss_csv = os.path.join(tmp, f"ss_k{k}.csv")
-        subprocess.run([
-            sys.executable, "/content/visclick/scripts/run_cpv_screenspot.py",
-            "--weights", onnx_out, "--out", ss_csv,
-        ], check=True)
-        with open(ss_csv) as fh:
-            head = next(fh); ss_overall = next(fh).strip().split(",")
-        cpv_ss = float(ss_overall[-1])
+    tag = f"ssp_k{k}"
+    ss_csv = os.path.join(TBL_DIR, f"cpv_screenspot_desktop_{tag}.csv")
+    hc_csv = os.path.join(TBL_DIR, f"cpv_summary_{tag}.csv")
 
-        hc_csv = os.path.join(tmp, f"hc_k{k}.csv")
-        subprocess.run([
-            sys.executable, "/content/visclick/scripts/run_cpv.py",
-            "--weights", onnx_out, "--out", hc_csv,
-        ], check=True)
-        with open(hc_csv) as fh:
-            head = next(fh)
-            hc_overall = None
-            for line in fh:
-                parts = line.strip().split(",")
-                if parts and parts[0] == "OVERALL":
-                    hc_overall = parts
-                    break
-        cpv_hc = float(hc_overall[-1]) if hc_overall else float("nan")
+    r = subprocess.run([
+        sys.executable, os.path.join(REPO_ROOT, "scripts", "run_cpv_screenspot.py"),
+        "--weights", onnx_out, "--tag", tag,
+    ], capture_output=True, text=True)
+    if r.returncode != 0:
+        print("STDOUT:", r.stdout); print("STDERR:", r.stderr)
+        raise RuntimeError(f"run_cpv_screenspot failed for k={k}")
+    print(r.stdout)
+    with open(ss_csv) as fh:
+        next(fh); ss_overall = next(fh).strip().split(",")
+    cpv_ss = float(ss_overall[-1])
+
+    r = subprocess.run([
+        sys.executable, os.path.join(REPO_ROOT, "scripts", "run_cpv.py"),
+        "--weights", onnx_out, "--tag", tag,
+    ], capture_output=True, text=True)
+    if r.returncode != 0:
+        print("STDOUT:", r.stdout); print("STDERR:", r.stderr)
+        raise RuntimeError(f"run_cpv failed for k={k}")
+    print(r.stdout)
+    hc_overall = None
+    with open(hc_csv) as fh:
+        next(fh)
+        for line in fh:
+            parts = line.strip().split(",")
+            if parts and parts[0] == "OVERALL":
+                hc_overall = parts; break
+    cpv_hc = float(hc_overall[-1]) if hc_overall else float("nan")
 
     per_k_results[k] = {"cpv_screenspot_%": cpv_ss, "cpv_handcorrected_%": cpv_hc}
     print(f"REPORT ssp_eval | k = {k} | cpv_screenspot = {cpv_ss:.2f} | cpv_handcorrected = {cpv_hc:.2f}")
@@ -946,68 +957,94 @@ CLASSES = ["button", "text", "text_input", "icon", "menu", "checkbox"]
     ))
 
     cells.append(md(
-        """## 13.2 — Three outer iterations of pseudo-label → train → swap
+        """## 13.2 — Pseudo-label → train (Colab Free budget)
 
-For each outer iteration `t`:
-1. Run teacher `T_t` on all unlabelled target images → write YOLO `.txt` pseudo-labels with confidence ≥ 0.30.
-2. Build a mixed dataset: source GT pool (already on Drive) + pseudo-labelled target.
-3. Train YOLOv8s for 10 epochs starting from `T_t`.
-4. The trained model becomes `T_{t+1}`.
+One outer iteration (simplified Adaptive Teacher):
+1. Teacher predicts pseudo-labels on the ~384 unlabelled desktop targets (conf ≥ 0.30).
+2. Mixed train set = **500 subsampled source GT images** + pseudo-labelled target (~348).
+3. Student trains 5 epochs on GPU (`device=0`, `cache=True`).
 
-The `freeze=0` argument means we fine-tune the whole network, which is what Adaptive Teacher does in its student branch.
+**Colab Free reality.** The full ~8348-image source pool takes 40+ min just to scan labels and hours to train on CPU. We subsample source to 500 images (seed=0) and persist Ultralytics label caches on Drive (`data/uda_label_caches/`) so reconnects skip the rescan. **Requires GPU runtime** — CPU is not viable.
+
+If `weights/uda_at/iter1/weights/best.pt` already exists on Drive, this cell skips retraining.
 """
     ))
 
     cells.append(code(
-        '''import time, yaml, tarfile
+        '''import os, time, yaml, tarfile, shutil, random
 from ultralytics import YOLO
 
-# Source GT pool: the 6-class source_train set assembled by 04_assemble_source.ipynb.
-# Fast-restore it from the tiny Drive bundles + manifests, same pattern as 05_train_source.ipynb.
-UNIFIED      = os.path.join(DRIVE, "data", "unified")
-BUNDLES      = os.path.join(DRIVE, "data", "source_train_bundles")
-SOURCE_DATA  = "/content/source_train"        # local, ephemeral
-SRC_YAML     = os.path.join(SOURCE_DATA, "data.yaml")
-SPLITS       = ["train", "val"]
+# --- Colab Free knobs ---
+SOURCE_CAP      = 500
+N_OUTER         = 1
+EPOCHS_PER_ITER = 5
+PSEUDO_CONF     = 0.30
+IMGSZ           = 640
+BATCH           = 16   # drop to 8 if OOM
+
+UNIFIED     = os.path.join(DRIVE, "data", "unified")
+BUNDLES     = os.path.join(DRIVE, "data", "source_train_bundles")
+SOURCE_DATA = "/content/source_train_small"
+SRC_YAML    = os.path.join(SOURCE_DATA, "data.yaml")
+CACHE_DRIVE = os.path.join(DRIVE, "data", "uda_label_caches")
+SPLITS      = ["train", "val"]
 
 
-def _bootstrap_source_train():
+def _restore_label_caches():
+    for sp in SPLITS:
+        src = os.path.join(CACHE_DRIVE, f"{sp}.cache")
+        dst = os.path.join(SOURCE_DATA, "labels", f"{sp}.cache")
+        if os.path.isfile(src) and not os.path.isfile(dst):
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src, dst)
+            print(f"restored label cache -> {dst}")
+
+
+def _save_label_caches():
+    os.makedirs(CACHE_DRIVE, exist_ok=True)
+    for sp in SPLITS:
+        src = os.path.join(SOURCE_DATA, "labels", f"{sp}.cache")
+        if os.path.isfile(src):
+            shutil.copy2(src, os.path.join(CACHE_DRIVE, f"{sp}.cache"))
+            print(f"saved label cache -> {CACHE_DRIVE}/{sp}.cache")
+
+
+def _bootstrap_source_train_small():
     if os.path.isfile(SRC_YAML):
+        _restore_label_caches()
         return
     os.makedirs(SOURCE_DATA, exist_ok=True)
     for sp in SPLITS:
         b = os.path.join(BUNDLES, f"{sp}.tar.gz")
-        assert os.path.isfile(b), f"Drive bundle missing: {b} (run 04_assemble_source.ipynb first)"
+        assert os.path.isfile(b), f"Drive bundle missing: {b}"
         with tarfile.open(b, "r:gz") as tf:
             tf.extractall(SOURCE_DATA)
         manifest = os.path.join(SOURCE_DATA, "manifests", f"{sp}.txt")
-        assert os.path.isfile(manifest), f"manifest missing in bundle: {manifest}"
         with open(manifest) as fh:
             names = [ln.strip() for ln in fh if ln.strip()]
+        if sp == "train" and len(names) > SOURCE_CAP:
+            random.seed(0)
+            names = sorted(random.sample(names, SOURCE_CAP))
+            print(f"subsampled train: {SOURCE_CAP} images")
         src_img_dir = os.path.join(UNIFIED, sp, "images")
         dst_img_dir = os.path.join(SOURCE_DATA, "images", sp)
         os.makedirs(dst_img_dir, exist_ok=True)
         for fn in names:
             dst = os.path.join(dst_img_dir, fn)
-            if os.path.exists(dst):
-                continue
-            try:
-                os.symlink(os.path.join(src_img_dir, fn), dst)
-            except OSError:
-                pass
+            if not os.path.exists(dst):
+                try:
+                    os.symlink(os.path.join(src_img_dir, fn), dst)
+                except OSError:
+                    pass
     with open(SRC_YAML, "w") as fh:
         yaml.safe_dump({"path": SOURCE_DATA, "train": "images/train", "val": "images/val",
                         "nc": len(CLASSES), "names": CLASSES}, fh, sort_keys=False)
     print(f"bootstrap done at {SOURCE_DATA}")
+    _restore_label_caches()
 
 
-_bootstrap_source_train()
-assert os.path.isdir(os.path.join(SOURCE_DATA, "images", "train")), "source_train bootstrap failed"
-
-PSEUDO_CONF = 0.30
-N_OUTER = 3
-EPOCHS_PER_ITER = 10
-IMGSZ = 640
+_bootstrap_source_train_small()
+assert os.path.isdir(os.path.join(SOURCE_DATA, "images", "train"))
 
 
 def write_pseudo_labels(model, work_dir):
@@ -1026,7 +1063,6 @@ def write_pseudo_labels(model, work_dir):
         out_lbl = os.path.join(lbl_dir, stem + ".txt")
         if not os.path.isfile(out_img):
             shutil.copy2(path, out_img)
-        H, W = r.orig_shape
         with open(out_lbl, "w") as fh:
             for cls, xyxy in zip(r.boxes.cls.tolist(), r.boxes.xyxyn.tolist()):
                 x1, y1, x2, y2 = xyxy
@@ -1038,9 +1074,6 @@ def write_pseudo_labels(model, work_dir):
 
 
 def build_mixed_yaml(target_dir, out_yaml):
-    # Source uses its own YAML; we point YOLOv8 at the source for both train and val,
-    # then UNIQUELY train on the union by listing two image roots.
-    # Ultralytics supports multi-path train via a list in the yaml.
     data = {
         "path": "/",
         "train": [
@@ -1061,9 +1094,16 @@ teacher_weights = SOURCE_WTS
 for t in range(1, N_OUTER + 1):
     print(f"\\n=== Outer iteration {t}/{N_OUTER} ===")
     work_dir = f"/content/uda_at_iter{t}"
+    done_wts = os.path.join(UDA_DIR, f"iter{t}", "weights", "best.pt")
+    if os.path.isfile(done_wts):
+        print(f"  skip training — already done: {done_wts}")
+        teacher_weights = done_wts
+        HISTORY.append({"iter": t, "weights": done_wts, "status": "skipped"})
+        continue
+
     teacher = YOLO(teacher_weights)
     n_box = write_pseudo_labels(teacher, work_dir)
-    print(f"  pseudo-labels: {n_box} / {len(TARGET_PATHS)} images had >= 1 box at conf {PSEUDO_CONF}")
+    print(f"  pseudo-labels: {n_box} / {len(TARGET_PATHS)} at conf {PSEUDO_CONF}")
 
     data_yaml = os.path.join(work_dir, "data.yaml")
     build_mixed_yaml(work_dir, data_yaml)
@@ -1074,19 +1114,24 @@ for t in range(1, N_OUTER + 1):
         data=data_yaml,
         epochs=EPOCHS_PER_ITER,
         imgsz=IMGSZ,
-        batch=8,
+        batch=BATCH,
+        device=0,
+        cache=True,
+        workers=2,
         project=UDA_DIR,
         name=f"iter{t}",
-        verbose=False,
+        verbose=True,
         plots=False,
+        exist_ok=True,
     )
     elapsed = time.time() - t0
+    _save_label_caches()
+
     new_weights = os.path.join(UDA_DIR, f"iter{t}", "weights", "best.pt")
     if not os.path.isfile(new_weights):
         new_weights = os.path.join(UDA_DIR, f"iter{t}", "weights", "last.pt")
     HISTORY.append({"iter": t, "n_pseudo_imgs": n_box, "weights": new_weights, "elapsed_s": elapsed})
     print(f"REPORT uda_at_iter | t = {t} | n_pseudo = {n_box} | elapsed_s = {elapsed:.1f}")
-
     teacher_weights = new_weights
 '''
     ))
@@ -1099,39 +1144,51 @@ The final teacher (after `N_OUTER` rounds) is evaluated against the same protoco
     ))
 
     cells.append(code(
-        '''import subprocess, tempfile, csv
+        '''import os, sys, subprocess, csv
+
+REPO_ROOT = "/content/visclick"
+TBL_DIR = os.path.join(REPO_ROOT, "reports", "tables")
+os.makedirs(TBL_DIR, exist_ok=True)
 
 final_weights = HISTORY[-1]["weights"]
 print("REPORT uda_at_final | weights =", final_weights)
 
-# Export ONNX for the eval scripts.
 onnx_out = final_weights.replace(".pt", ".onnx")
 if not os.path.isfile(onnx_out):
     YOLO(final_weights).export(format="onnx", imgsz=IMGSZ, dynamic=False, opset=12)
 
-with tempfile.TemporaryDirectory() as tmp:
-    ss_csv = os.path.join(tmp, "ss.csv")
-    subprocess.run([
-        sys.executable, "/content/visclick/scripts/run_cpv_screenspot.py",
-        "--weights", onnx_out, "--out", ss_csv,
-    ], check=True)
-    with open(ss_csv) as fh:
-        head = next(fh); ss_overall = next(fh).strip().split(",")
-    CPV_SS = float(ss_overall[-1])
+tag = "uda_at"
+ss_csv = os.path.join(TBL_DIR, f"cpv_screenspot_desktop_{tag}.csv")
+hc_csv = os.path.join(TBL_DIR, f"cpv_summary_{tag}.csv")
 
-    hc_csv = os.path.join(tmp, "hc.csv")
-    subprocess.run([
-        sys.executable, "/content/visclick/scripts/run_cpv.py",
-        "--weights", onnx_out, "--out", hc_csv,
-    ], check=True)
-    with open(hc_csv) as fh:
-        next(fh)
-        hc_overall = None
-        for line in fh:
-            parts = line.strip().split(",")
-            if parts and parts[0] == "OVERALL":
-                hc_overall = parts; break
-    CPV_HC = float(hc_overall[-1]) if hc_overall else float("nan")
+r = subprocess.run([
+    sys.executable, os.path.join(REPO_ROOT, "scripts", "run_cpv_screenspot.py"),
+    "--weights", onnx_out, "--tag", tag,
+], capture_output=True, text=True)
+if r.returncode != 0:
+    print("STDOUT:", r.stdout); print("STDERR:", r.stderr)
+    raise RuntimeError("run_cpv_screenspot failed")
+print(r.stdout)
+with open(ss_csv) as fh:
+    next(fh); ss_overall = next(fh).strip().split(",")
+CPV_SS = float(ss_overall[-1])
+
+r = subprocess.run([
+    sys.executable, os.path.join(REPO_ROOT, "scripts", "run_cpv.py"),
+    "--weights", onnx_out, "--tag", tag,
+], capture_output=True, text=True)
+if r.returncode != 0:
+    print("STDOUT:", r.stdout); print("STDERR:", r.stderr)
+    raise RuntimeError("run_cpv failed")
+print(r.stdout)
+hc_overall = None
+with open(hc_csv) as fh:
+    next(fh)
+    for line in fh:
+        parts = line.strip().split(",")
+        if parts and parts[0] == "OVERALL":
+            hc_overall = parts; break
+CPV_HC = float(hc_overall[-1]) if hc_overall else float("nan")
 
 print(f"REPORT uda_at_eval | cpv_screenspot = {CPV_SS:.2f} | cpv_handcorrected = {CPV_HC:.2f}")
 '''
@@ -1323,40 +1380,47 @@ print(f"REPORT shot_pseudo | n = {n_box}/{len(TARGET_PATHS)} | elapsed_s = {time
 
 `freeze=15` keeps YOLOv8s' top 15 modules (head + most of the neck) frozen during training, while letting the backbone adapt. This is the SHOT-spirit setup: source hypothesis (head) is preserved, feature extractor is what changes.
 
-We train for 15 epochs at batch 8, which fits a single Colab session with margin.
+We train for 8 epochs at batch 16 on GPU (`device=0`). **Requires GPU runtime.** If `shot_run/weights/best.pt` already exists on Drive, this cell skips retraining.
 """
     ))
 
     cells.append(code(
         '''import yaml
 
-EPOCHS = 15
-
-data_yaml = os.path.join(WORK, "data.yaml")
-with open(data_yaml, "w") as fh:
-    yaml.safe_dump({
-        "path": WORK, "train": "images/train", "val": "images/train",
-        "names": CLASSES, "nc": len(CLASSES),
-    }, fh)
-
-t0 = time.time()
-adapted = YOLO(SOURCE_WTS)
-adapted.train(
-    data=data_yaml,
-    epochs=EPOCHS,
-    imgsz=IMGSZ,
-    batch=8,
-    project=SHOT_DIR,
-    name="shot_run",
-    freeze=15,
-    verbose=False,
-    plots=False,
-)
-elapsed = time.time() - t0
+EPOCHS = 8
 ADAPTED_WTS = os.path.join(SHOT_DIR, "shot_run", "weights", "best.pt")
-if not os.path.isfile(ADAPTED_WTS):
-    ADAPTED_WTS = os.path.join(SHOT_DIR, "shot_run", "weights", "last.pt")
-print(f"REPORT shot_train | epochs = {EPOCHS} | elapsed_s = {elapsed:.1f} | weights = {ADAPTED_WTS}")
+
+if os.path.isfile(ADAPTED_WTS):
+    print(f"skip training — already done: {ADAPTED_WTS}")
+else:
+    data_yaml = os.path.join(WORK, "data.yaml")
+    with open(data_yaml, "w") as fh:
+        yaml.safe_dump({
+            "path": WORK, "train": "images/train", "val": "images/train",
+            "names": CLASSES, "nc": len(CLASSES),
+        }, fh)
+
+    t0 = time.time()
+    adapted = YOLO(SOURCE_WTS)
+    adapted.train(
+        data=data_yaml,
+        epochs=EPOCHS,
+        imgsz=IMGSZ,
+        batch=16,
+        device=0,
+        cache=True,
+        workers=2,
+        project=SHOT_DIR,
+        name="shot_run",
+        freeze=15,
+        verbose=True,
+        plots=False,
+        exist_ok=True,
+    )
+    elapsed = time.time() - t0
+    if not os.path.isfile(ADAPTED_WTS):
+        ADAPTED_WTS = os.path.join(SHOT_DIR, "shot_run", "weights", "last.pt")
+    print(f"REPORT shot_train | epochs = {EPOCHS} | elapsed_s = {elapsed:.1f} | weights = {ADAPTED_WTS}")
 '''
     ))
 
@@ -1365,35 +1429,48 @@ print(f"REPORT shot_train | epochs = {EPOCHS} | elapsed_s = {elapsed:.1f} | weig
     ))
 
     cells.append(code(
-        '''import subprocess, tempfile, csv
+        '''import os, sys, subprocess, csv
+
+REPO_ROOT = "/content/visclick"
+TBL_DIR = os.path.join(REPO_ROOT, "reports", "tables")
+os.makedirs(TBL_DIR, exist_ok=True)
 
 onnx_out = ADAPTED_WTS.replace(".pt", ".onnx")
 if not os.path.isfile(onnx_out):
     YOLO(ADAPTED_WTS).export(format="onnx", imgsz=IMGSZ, dynamic=False, opset=12)
 
-with tempfile.TemporaryDirectory() as tmp:
-    ss_csv = os.path.join(tmp, "ss.csv")
-    subprocess.run([
-        sys.executable, "/content/visclick/scripts/run_cpv_screenspot.py",
-        "--weights", onnx_out, "--out", ss_csv,
-    ], check=True)
-    with open(ss_csv) as fh:
-        next(fh); ss_overall = next(fh).strip().split(",")
-    CPV_SS = float(ss_overall[-1])
+tag = "uda_shot"
+ss_csv = os.path.join(TBL_DIR, f"cpv_screenspot_desktop_{tag}.csv")
+hc_csv = os.path.join(TBL_DIR, f"cpv_summary_{tag}.csv")
 
-    hc_csv = os.path.join(tmp, "hc.csv")
-    subprocess.run([
-        sys.executable, "/content/visclick/scripts/run_cpv.py",
-        "--weights", onnx_out, "--out", hc_csv,
-    ], check=True)
-    with open(hc_csv) as fh:
-        next(fh)
-        hc_overall = None
-        for line in fh:
-            parts = line.strip().split(",")
-            if parts and parts[0] == "OVERALL":
-                hc_overall = parts; break
-    CPV_HC = float(hc_overall[-1]) if hc_overall else float("nan")
+r = subprocess.run([
+    sys.executable, os.path.join(REPO_ROOT, "scripts", "run_cpv_screenspot.py"),
+    "--weights", onnx_out, "--tag", tag,
+], capture_output=True, text=True)
+if r.returncode != 0:
+    print("STDOUT:", r.stdout); print("STDERR:", r.stderr)
+    raise RuntimeError("run_cpv_screenspot failed")
+print(r.stdout)
+with open(ss_csv) as fh:
+    next(fh); ss_overall = next(fh).strip().split(",")
+CPV_SS = float(ss_overall[-1])
+
+r = subprocess.run([
+    sys.executable, os.path.join(REPO_ROOT, "scripts", "run_cpv.py"),
+    "--weights", onnx_out, "--tag", tag,
+], capture_output=True, text=True)
+if r.returncode != 0:
+    print("STDOUT:", r.stdout); print("STDERR:", r.stderr)
+    raise RuntimeError("run_cpv failed")
+print(r.stdout)
+hc_overall = None
+with open(hc_csv) as fh:
+    next(fh)
+    for line in fh:
+        parts = line.strip().split(",")
+        if parts and parts[0] == "OVERALL":
+            hc_overall = parts; break
+CPV_HC = float(hc_overall[-1]) if hc_overall else float("nan")
 
 print(f"REPORT shot_eval | cpv_screenspot = {CPV_SS:.2f} | cpv_handcorrected = {CPV_HC:.2f}")
 '''

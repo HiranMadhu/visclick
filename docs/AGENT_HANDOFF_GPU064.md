@@ -1,4 +1,4 @@
-# Agent handoff — running D-02 (SSP) on us01odc-sc4-1-gpu064
+# Agent handoff — running experiments on us01odc-sc4-1-gpu064
 
 This document is a one-shot brief for a fresh Cursor agent running on
 `us01odc-sc4-1-gpu064`. The parallel agent on `us01odcvde74870` (CPU edit
@@ -139,15 +139,42 @@ moving to the next phase.
 
 ## State of the project as of this handoff
 
-- Repo HEAD that includes the local runner: **`79fac16`** (`feat(ssp):
-  standalone Linux-GPU runner for D-02`). Pull latest before running.
-- Notebook 11 has been run on Colab once but disconnected at epoch 15/20
-  with no mid-training checkpoint, then was restructured to 10 epochs +
-  per-epoch checkpointing. The local runner mirrors the new structure.
-- D-01 (DETR-R50 target fine-tune) is DONE and committed.
-- D-03/D-04 (UDA) notebooks exist but have not been ported to local
-  runners yet. Train them on Colab after D-02, or ping the edit-host
-  agent to write `run_uda_*_local.py` files matching the same pattern.
+- **Pull latest** (`git pull --rebase origin main`) before any run.
+- **D-01** DETR — DONE.
+- **D-02** SSP — DONE (Colab; `ssp_loss_log.csv`, `ssp_few_shot.csv` in git).
+- **D-03 / D-04** — Colab GPU quota exhausted; **run on this box** via:
+  - `scripts/setup_visclick_data.sh` — wget Zenodo unified bundle
+  - `scripts/run_uda_at_local.py` — D-03 Adaptive Teacher
+  - `scripts/run_uda_shot_local.py` — D-04 SHOT
+- **Still need manually:** `best_source_v8s.pt` (~22 MB) under
+  `$VISCLICK_DATA/weights/baseline_source/` (scp from Colab Drive or laptop).
+
+## Quick start on gpu064 (D-03 then D-04)
+
+```bash
+cd /remote/edageuclidevhdlbm1/hiran/RTLAssistent/8-CodeAgent/11-AprilBuild/4-case/gui_temp/visclick
+git pull --rebase origin main
+
+export VISCLICK_DATA=$HOME/visclick_data
+bash scripts/setup_visclick_data.sh          # ~10-30 min first time (Zenodo wget)
+
+# one-time venv (if not already created):
+python3 -m venv .venv && source .venv/bin/activate
+pip install -U pip wheel
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+pip install ultralytics datasets pillow opencv-python matplotlib onnx onnxruntime onnxslim
+
+# verify GPU:
+python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+
+# place best_source_v8s.pt (see MISSING line from setup script), then:
+python scripts/run_uda_at_local.py --data-root "$VISCLICK_DATA"
+python scripts/run_uda_shot_local.py --data-root "$VISCLICK_DATA"
+
+# commit results (ask before push):
+git add reports/tables/uda_adaptive_teacher.csv reports/tables/uda_shot.csv
+git commit -m "D-03/D-04: UDA results (gpu064 run)"
+```
 
 ## Coordination ground rules
 

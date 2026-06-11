@@ -63,6 +63,8 @@ def parse_args() -> argparse.Namespace:
                    help="Delete any prior checkpoint and loss log before training.")
     p.add_argument("--max-corpus", type=int, default=0,
                    help="Cap corpus size (0 = no cap). Useful for smoke tests.")
+    p.add_argument("--tag", default="",
+                   help="Optional output tag. Empty = default 'ssp/' dir; otherwise 'ssp_<tag>/'.")
     return p.parse_args()
 
 
@@ -248,10 +250,12 @@ def main() -> None:
     model = SimSiam(backbone, feat_dim=feat_dim).to(device)
     print(f"REPORT simsiam | params = {sum(p.numel() for p in model.parameters()):,}")
 
-    ssp_dir = data_root / "weights" / "ssp"
+    ssp_subdir = "ssp" if not args.tag else f"ssp_{args.tag}"
+    ssp_dir = data_root / "weights" / ssp_subdir
     ssp_dir.mkdir(parents=True, exist_ok=True)
     ckpt_path = ssp_dir / "ssp_ckpt.pt"
-    loss_csv = ssp_dir / "ssp_loss_log.csv"
+    loss_suffix = f"_{args.tag}" if args.tag else ""
+    loss_csv = ssp_dir / f"ssp_loss_log{loss_suffix}.csv"
     backbone_out = ssp_dir / "backbone_simsiam.pt"
 
     base_lr = 0.05 * args.batch / 256.0

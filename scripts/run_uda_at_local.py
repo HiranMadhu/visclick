@@ -46,12 +46,19 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--data-root", default=os.environ.get("VISCLICK_DATA"),
                    help="Root with unified/, source_train_bundles/, weights/")
     p.add_argument("--repo-root", default=str(REPO))
-    p.add_argument("--source-cap", type=int, default=500)
-    p.add_argument("--epochs", type=int, default=5)
+    p.add_argument("--source-cap", type=int, default=500,
+                   help="Subsample source train images. 0 = use all (~8k full Zenodo).")
+    p.add_argument("--n-outer", type=int, default=1,
+                   help="Outer pseudo-label/train iterations (Adaptive Teacher protocol uses 3).")
+    p.add_argument("--epochs", type=int, default=5,
+                   help="Epochs per outer iteration.")
     p.add_argument("--batch", type=int, default=16)
+    p.add_argument("--pseudo-conf", type=float, default=0.30)
     p.add_argument("--device", default="0", help="CUDA device id, or 'cpu'")
+    p.add_argument("--tag", default="uda_at",
+                   help="Output tag. Weights -> weights/<tag>/, CSV -> reports/tables/<tag>*.csv")
     p.add_argument("--skip-train", action="store_true",
-                   help="Skip training; only run CPV eval on existing weights.")
+                   help="Skip training; only run CPV eval on existing final weights.")
     return p.parse_args()
 
 
@@ -88,10 +95,12 @@ def bootstrap_bundles_from_unified(data_root: Path) -> Path:
     return bundles
 
 
-def bootstrap_source_small(data_root: Path, source_cap: int) -> Path:
+def bootstrap_source(data_root: Path, source_cap: int) -> Path:
+    """Materialise a YOLO-format source pool. source_cap=0 means use everything."""
     unified = data_root / "unified"
     bundles = bootstrap_bundles_from_unified(data_root)
-    source_data = Path("/tmp/visclick_source_train_small")
+    suffix = "full" if source_cap == 0 else str(source_cap)
+    source_data = Path(f"/tmp/visclick_source_train_{suffix}")
     src_yaml = source_data / "data.yaml"
 
     if src_yaml.is_file():
@@ -104,11 +113,13 @@ def bootstrap_source_small(data_root: Path, source_cap: int) -> Path:
             tf.extractall(source_data)
         manifest = source_data / "manifests" / f"{sp}.txt"
         names = [ln.strip() for ln in manifest.read_text().splitlines() if ln.strip()]
-        if sp == "train" and len(names) > source_cap:
+        if sp == "train" and source_cap > 0 and len(names) > source_cap:
             random.seed(0)
             names = sorted(random.sample(names, source_cap))
             manifest.write_text("\n".join(names) + "\n")
             print(f"subsampled train: {source_cap}")
+        else:
+            print(f"{sp}: using {len(names)} images")
         src_img = unified / sp / "images"
         dst_img = source_data / "images" / sp
         dst_img.mkdir(parents=True, exist_ok=True)
@@ -123,7 +134,7 @@ def bootstrap_source_small(data_root: Path, source_cap: int) -> Path:
         "path": str(source_data), "train": "images/train", "val": "images/val",
         "nc": len(CLASSES), "names": CLASSES,
     }, sort_keys=False))
-    print(f"bootstrap source_train_small at {source_data}")
+    print(f"bootstrap source_train at {source_data}")
     return source_data
 
 
@@ -252,59 +263,86 @@ def main() -> None:
     if not source_wts.is_file():
         sys.exit(f"ERROR: missing {source_wts}")
 
-    uda_dir = data_root / "weights" / "uda_at"
+    uda_dir = data_root / "weights" / args.tag
     uda_dir.mkdir(parents=True, exist_ok=True)
-    final_wts = uda_dir / "iter1" / "weights" / "best.pt"
+    final_iter_dir = uda_dir / f"iter{args.n_outer}"
+    final_wts = final_iter_dir / "weights" / "best.pt"
 
-    n_pseudo = 0
-    elapsed = 0.0
+    history: list[dict] = []
+    teacher_weights = source_wts
+    total_pseudo = 0
+    total_elapsed = 0.0
 
-    if not args.skip_train and not final_wts.is_file():
-        source_data = bootstrap_source_small(data_root, args.source_cap)
+    if not args.skip_train:
+        source_data = bootstrap_source(data_root, args.source_cap)
         targets = collect_targets(data_root, repo_root)
-        work_dir = Path("/tmp/uda_at_iter1")
-        teacher = YOLO(str(source_wts))
-        n_pseudo = write_pseudo_labels(teacher, targets, work_dir, 0.30, 640)
-        print(f"pseudo-labels: {n_pseudo}/{len(targets)}")
-        data_yaml = work_dir / "data.yaml"
-        build_mixed_yaml(source_data, work_dir, data_yaml)
-        t0 = time.time()
-        YOLO(str(source_wts)).train(
-            data=str(data_yaml),
-            epochs=args.epochs,
-            imgsz=640,
-            batch=args.batch,
-            device=args.device,
-            cache=True,
-            workers=4,
-            project=str(uda_dir),
-            name="iter1",
-            verbose=True,
-            plots=False,
-            exist_ok=True,
-        )
-        elapsed = time.time() - t0
-        if not final_wts.is_file():
-            final_wts = uda_dir / "iter1" / "weights" / "last.pt"
-        print(f"REPORT uda_at_train | elapsed_s = {elapsed:.1f} | weights = {final_wts}")
+
+        for t in range(1, args.n_outer + 1):
+            iter_wts = uda_dir / f"iter{t}" / "weights" / "best.pt"
+            if iter_wts.is_file():
+                print(f"\n=== Outer iter {t}/{args.n_outer} — already trained, skipping ===")
+                teacher_weights = iter_wts
+                history.append({"iter": t, "n_pseudo": None, "weights": str(iter_wts), "skipped": True})
+                continue
+
+            print(f"\n=== Outer iter {t}/{args.n_outer} ===")
+            work_dir = Path(f"/tmp/uda_at_{args.tag}_iter{t}")
+            if work_dir.exists():
+                shutil.rmtree(work_dir)
+            teacher = YOLO(str(teacher_weights))
+            n_pseudo = write_pseudo_labels(teacher, targets, work_dir, args.pseudo_conf, 640)
+            print(f"  pseudo-labels: {n_pseudo}/{len(targets)} at conf {args.pseudo_conf}")
+
+            data_yaml = work_dir / "data.yaml"
+            build_mixed_yaml(source_data, work_dir, data_yaml)
+
+            t0 = time.time()
+            YOLO(str(teacher_weights)).train(
+                data=str(data_yaml),
+                epochs=args.epochs,
+                imgsz=640,
+                batch=args.batch,
+                device=args.device,
+                cache=True,
+                workers=4,
+                project=str(uda_dir),
+                name=f"iter{t}",
+                verbose=True,
+                plots=False,
+                exist_ok=True,
+            )
+            elapsed = time.time() - t0
+            new_wts = uda_dir / f"iter{t}" / "weights" / "best.pt"
+            if not new_wts.is_file():
+                new_wts = uda_dir / f"iter{t}" / "weights" / "last.pt"
+            teacher_weights = new_wts
+            total_pseudo += n_pseudo
+            total_elapsed += elapsed
+            history.append({"iter": t, "n_pseudo": n_pseudo, "weights": str(new_wts),
+                            "elapsed_s": elapsed})
+            print(f"REPORT uda_at_iter | t = {t} | n_pseudo = {n_pseudo} | elapsed_s = {elapsed:.1f}")
+
+        final_wts = teacher_weights
     elif final_wts.is_file():
         print(f"skip train — using {final_wts}")
     else:
         sys.exit(f"ERROR: no weights at {final_wts} and --skip-train not set")
 
-    cpv_ss, cpv_hc = run_cpv(final_wts, repo_root, "uda_at")
+    cpv_ss, cpv_hc = run_cpv(final_wts, repo_root, args.tag)
     print(f"REPORT uda_at_eval | cpv_screenspot = {cpv_ss:.2f} | cpv_handcorrected = {cpv_hc:.2f}")
 
-    out_csv = repo_root / "reports" / "tables" / "uda_adaptive_teacher.csv"
+    out_csv = repo_root / "reports" / "tables" / f"uda_adaptive_teacher_{args.tag}.csv"
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     with out_csv.open("w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["method", "outer_iters", "epochs_per_iter", "n_pseudo_imgs",
-                    "cpv_screenspot_%", "cpv_handcorrected_%", "elapsed_s"])
-        w.writerow(["adaptive_teacher_simplified", 1, args.epochs, n_pseudo,
-                    f"{cpv_ss:.2f}", f"{cpv_hc:.2f}", f"{elapsed:.1f}"])
+        w.writerow(["method", "outer_iters", "epochs_per_iter", "source_cap",
+                    "n_pseudo_total", "cpv_screenspot_%", "cpv_handcorrected_%", "elapsed_s"])
+        w.writerow([f"adaptive_teacher_{args.tag}", args.n_outer, args.epochs,
+                    args.source_cap or "all",
+                    total_pseudo, f"{cpv_ss:.2f}", f"{cpv_hc:.2f}", f"{total_elapsed:.1f}"])
     print(f"REPORT step = WRITE_CSV | path = {out_csv}")
-    print("REPORT step = UDA_AT | status = done")
+    print(f"REPORT step = UDA_AT | status = done | tag = {args.tag} "
+          f"| cpv_ss = {cpv_ss:.2f} | cpv_hc = {cpv_hc:.2f}")
 
 
 if __name__ == "__main__":

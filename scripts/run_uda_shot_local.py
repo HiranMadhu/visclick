@@ -32,7 +32,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--repo-root", default=str(REPO))
     p.add_argument("--epochs", type=int, default=8)
     p.add_argument("--batch", type=int, default=16)
+    p.add_argument("--freeze", type=int, default=15,
+                   help="Number of YOLOv8 modules to freeze (head+neck). 15=SHOT default; 10=lighter freeze.")
+    p.add_argument("--pseudo-conf", type=float, default=0.50)
     p.add_argument("--device", default="0")
+    p.add_argument("--tag", default="uda_shot",
+                   help="Output tag for CSVs and weights dir.")
     p.add_argument("--skip-train", action="store_true")
     return p.parse_args()
 
@@ -65,8 +70,9 @@ def collect_targets(data_root: Path, repo_root: Path) -> list[str]:
 
 
 def pseudo_label_and_train(source_wts: Path, targets: list[str], shot_dir: Path,
-                           epochs: int, batch: int, device: str) -> tuple[Path, int, float]:
-    work = Path("/tmp/uda_shot_data")
+                           epochs: int, batch: int, freeze: int, pseudo_conf: float,
+                           device: str, tag: str) -> tuple[Path, int, float]:
+    work = Path(f"/tmp/uda_shot_data_{tag}")
     img_dir = work / "images" / "train"
     lbl_dir = work / "labels" / "train"
     img_dir.mkdir(parents=True, exist_ok=True)
@@ -75,7 +81,7 @@ def pseudo_label_and_train(source_wts: Path, targets: list[str], shot_dir: Path,
     teacher = YOLO(str(source_wts))
     n_box = 0
     for path in targets:
-        r = teacher.predict(path, imgsz=640, conf=0.50, verbose=False)[0]
+        r = teacher.predict(path, imgsz=640, conf=pseudo_conf, verbose=False)[0]
         if len(r.boxes) == 0:
             continue
         stem = Path(path).stem
@@ -88,7 +94,7 @@ def pseudo_label_and_train(source_wts: Path, targets: list[str], shot_dir: Path,
                 cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
                 fh.write(f"{int(cls)} {cx:.6f} {cy:.6f} {x2-x1:.6f} {y2-y1:.6f}\n")
         n_box += 1
-    print(f"pseudo-labels: {n_box}/{len(targets)}")
+    print(f"pseudo-labels: {n_box}/{len(targets)} at conf {pseudo_conf}")
 
     import yaml
     data_yaml = work / "data.yaml"
@@ -101,7 +107,7 @@ def pseudo_label_and_train(source_wts: Path, targets: list[str], shot_dir: Path,
     YOLO(str(source_wts)).train(
         data=str(data_yaml), epochs=epochs, imgsz=640, batch=batch,
         device=device, cache=True, workers=4,
-        project=str(shot_dir), name="shot_run", freeze=15,
+        project=str(shot_dir), name="shot_run", freeze=freeze,
         verbose=True, plots=False, exist_ok=True,
     )
     elapsed = time.time() - t0
@@ -111,11 +117,10 @@ def pseudo_label_and_train(source_wts: Path, targets: list[str], shot_dir: Path,
     return wts, n_box, elapsed
 
 
-def run_cpv(weights: Path, repo_root: Path) -> tuple[float, float]:
+def run_cpv(weights: Path, repo_root: Path, tag: str) -> tuple[float, float]:
     onnx = weights.with_suffix(".onnx")
     if not onnx.is_file():
         YOLO(str(weights)).export(format="onnx", imgsz=640, dynamic=False, opset=12)
-    tag = "uda_shot"
     py = sys.executable
     tbl = repo_root / "reports" / "tables"
     for script in ("run_cpv_screenspot.py", "run_cpv.py"):
@@ -152,7 +157,7 @@ def main() -> None:
     if not source_wts.is_file():
         sys.exit(f"ERROR: missing {source_wts}")
 
-    shot_dir = data_root / "weights" / "uda_shot"
+    shot_dir = data_root / "weights" / args.tag
     shot_dir.mkdir(parents=True, exist_ok=True)
     adapted = shot_dir / "shot_run" / "weights" / "best.pt"
     n_box, elapsed = 0, 0.0
@@ -160,23 +165,27 @@ def main() -> None:
     if not args.skip_train and not adapted.is_file():
         targets = collect_targets(data_root, repo_root)
         adapted, n_box, elapsed = pseudo_label_and_train(
-            source_wts, targets, shot_dir, args.epochs, args.batch, args.device)
+            source_wts, targets, shot_dir, args.epochs, args.batch,
+            args.freeze, args.pseudo_conf, args.device, args.tag)
         print(f"REPORT shot_train | elapsed_s = {elapsed:.1f} | weights = {adapted}")
     elif adapted.is_file():
         print(f"skip train — using {adapted}")
     else:
         sys.exit(f"ERROR: no weights at {adapted}")
 
-    cpv_ss, cpv_hc = run_cpv(adapted, repo_root)
+    cpv_ss, cpv_hc = run_cpv(adapted, repo_root, args.tag)
     print(f"REPORT shot_eval | cpv_screenspot = {cpv_ss:.2f} | cpv_handcorrected = {cpv_hc:.2f}")
 
-    out_csv = repo_root / "reports" / "tables" / "uda_shot.csv"
+    out_csv = repo_root / "reports" / "tables" / f"uda_shot_{args.tag}.csv"
     with out_csv.open("w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["method", "epochs", "n_pseudo_imgs", "cpv_screenspot_%", "cpv_handcorrected_%"])
-        w.writerow(["shot_simplified", args.epochs, n_box, f"{cpv_ss:.2f}", f"{cpv_hc:.2f}"])
+        w.writerow(["method", "epochs", "freeze", "pseudo_conf",
+                    "n_pseudo_imgs", "cpv_screenspot_%", "cpv_handcorrected_%", "elapsed_s"])
+        w.writerow([f"shot_{args.tag}", args.epochs, args.freeze, args.pseudo_conf,
+                    n_box, f"{cpv_ss:.2f}", f"{cpv_hc:.2f}", f"{elapsed:.1f}"])
     print(f"REPORT step = WRITE_CSV | path = {out_csv}")
-    print("REPORT step = UDA_SHOT | status = done")
+    print(f"REPORT step = UDA_SHOT | status = done | tag = {args.tag} "
+          f"| cpv_ss = {cpv_ss:.2f} | cpv_hc = {cpv_hc:.2f}")
 
 
 if __name__ == "__main__":

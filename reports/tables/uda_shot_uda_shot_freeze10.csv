@@ -1,0 +1,2 @@
+method,epochs,freeze,pseudo_conf,n_pseudo_imgs,cpv_screenspot_%,cpv_handcorrected_%,elapsed_s
+shot_uda_shot_freeze10,8,10,0.5,224,34.13,0.00,21.6

@@ -1,0 +1,2 @@
+method,outer_iters,epochs_per_iter,source_cap,n_pseudo_total,cpv_screenspot_%,cpv_handcorrected_%,elapsed_s
+adaptive_teacher_uda_at_full,3,10,all,1042,64.67,6.74,2102.3

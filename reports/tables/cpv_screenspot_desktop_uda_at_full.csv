@@ -1,0 +1,6 @@
+slice_kind,slice_name,n_rows,hits,cpv_pct
+overall,desktop,334,216,64.67
+data_source,macos,172,119,69.19
+data_source,windows,162,97,59.88
+data_type,icon,140,54,38.57
+data_type,text,194,162,83.51

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 720" font-family="Consolas, 'Courier New', monospace" font-size="13">
+  <rect x="0" y="0" width="900" height="720" fill="#fafafa"/>
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="bold" font-family="Arial, sans-serif">Repository directory tree</text>
+
+  <g font-size="13">
+    <text x="40" y="70" font-weight="bold">visclick/</text>
+
+    <text x="40" y="100">+-- src/visclick/</text>
+    <text x="80" y="118" fill="#444">+-- capture.py</text>
+    <text x="80" y="136" fill="#444">+-- detect.py</text>
+    <text x="80" y="154" fill="#444">+-- ocr.py</text>
+    <text x="80" y="172" fill="#444">+-- match.py</text>
+    <text x="80" y="190" fill="#444">+-- act.py</text>
+    <text x="80" y="208" fill="#444">+-- bot.py</text>
+    <text x="80" y="226" fill="#444">+-- gui.py</text>
+
+    <text x="40" y="252">+-- pyproject.toml</text>
+    <text x="40" y="270">+-- requirements.txt</text>
+
+    <text x="40" y="296">+-- data/</text>
+    <text x="80" y="314" fill="#444">+-- source_zenodo_unified/  (RICO+CLAY+VINS, 6-class)</text>
+    <text x="80" y="332" fill="#444">+-- desktop_seed/           (50 author screenshots)</text>
+    <text x="80" y="350" fill="#444">+-- screenspot_desktop/     (334 images, public)</text>
+
+    <text x="40" y="376">+-- weights/</text>
+    <text x="80" y="394" fill="#444">+-- best_source_v8s.pt</text>
+    <text x="80" y="412" fill="#444">+-- visclick.onnx           (45 MB, deployed)</text>
+    <text x="80" y="430" fill="#444">+-- few_shot/, ssp/, uda_at/, uda_shot/</text>
+
+    <text x="40" y="456">+-- scripts/</text>
+    <text x="80" y="474" fill="#444">+-- run_baselines.py        (4-method eval harness)</text>
+    <text x="80" y="492" fill="#444">+-- run_cpv.py              (hand-corrected)</text>
+    <text x="80" y="510" fill="#444">+-- run_cpv_screenspot.py   (third-party scored)</text>
+
+    <text x="40" y="536">+-- notebooks/              (10-14, ipynb)</text>
+
+    <text x="40" y="562">+-- tests/                  (pytest)</text>
+
+    <text x="40" y="588">+-- reports/</text>
+    <text x="80" y="606" fill="#444">+-- tables/                 (canonical CSVs)</text>
+    <text x="80" y="624" fill="#444">+-- figures/                (PNGs / SVGs)</text>
+
+    <text x="40" y="650">+-- docs/</text>
+    <text x="80" y="668" fill="#444">+-- Final_Report_v2*.md     (this dissertation)</text>
+    <text x="80" y="686" fill="#444">+-- REPORT_STYLE_GUIDE.md</text>
+  </g>
+</svg>

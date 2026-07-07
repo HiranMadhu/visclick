@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 540" font-family="Arial, sans-serif" font-size="12">
+  <text x="500" y="28" text-anchor="middle" font-size="17" font-weight="bold">Few-shot sample-efficiency curve (k = 0, 1, 2, 4, 8)</text>
+  <text x="500" y="48" text-anchor="middle" font-size="11" fill="#555">Two protocols disagree about the best checkpoint</text>
+
+  <line x1="120" y1="450" x2="880" y2="450" stroke="#222"/>
+  <line x1="120" y1="450" x2="120" y2="80"  stroke="#c08a2c"/>
+  <line x1="880" y1="450" x2="880" y2="80"  stroke="#3a5fb5"/>
+
+  <text x="500" y="490" text-anchor="middle" font-size="13" font-weight="bold">k (number of labelled desktop images)</text>
+
+  <g font-size="11" text-anchor="middle">
+    <text x="195" y="470">0</text>
+    <text x="312" y="470">1</text>
+    <text x="430" y="470">2</text>
+    <text x="615" y="470">4</text>
+    <text x="800" y="470">8</text>
+  </g>
+
+  <g font-size="11" text-anchor="end" fill="#c08a2c">
+    <text x="110" y="454">0.00</text>
+    <text x="110" y="380">0.05</text>
+    <text x="110" y="306">0.10</text>
+    <text x="110" y="232">0.15</text>
+    <text x="110" y="158">0.20</text>
+    <text x="110" y="84">0.25</text>
+  </g>
+  <text x="60" y="265" text-anchor="middle" font-size="12" font-weight="bold" fill="#c08a2c" transform="rotate(-90 60 265)">hand-corrected mAP@0.5</text>
+
+  <g font-size="11" fill="#3a5fb5">
+    <text x="890" y="454">0%</text>
+    <text x="890" y="380">15%</text>
+    <text x="890" y="306">30%</text>
+    <text x="890" y="232">45%</text>
+    <text x="890" y="158">60%</text>
+    <text x="890" y="84">75%</text>
+  </g>
+  <text x="950" y="265" text-anchor="middle" font-size="12" font-weight="bold" fill="#3a5fb5" transform="rotate(90 950 265)">ScreenSpot CPV</text>
+
+  <g stroke="#c08a2c" stroke-width="2.5" fill="none">
+    <polyline points="195,432 312,431 430,327 615,179 800,49"/>
+  </g>
+  <g fill="#c08a2c">
+    <circle cx="195" cy="432" r="5"/>
+    <circle cx="312" cy="431" r="5"/>
+    <circle cx="430" cy="327" r="5"/>
+    <circle cx="615" cy="179" r="5"/>
+    <circle cx="800" cy="49"  r="5"/>
+    <text x="195" y="425" text-anchor="middle" font-size="10">0.012</text>
+    <text x="312" y="425" text-anchor="middle" font-size="10">0.013</text>
+    <text x="430" y="320" text-anchor="middle" font-size="10">0.083</text>
+    <text x="615" y="172" text-anchor="middle" font-size="10">0.183</text>
+    <text x="810" y="42" font-size="10" font-weight="bold">0.271</text>
+  </g>
+
+  <g stroke="#3a5fb5" stroke-width="2.5" fill="none">
+    <polyline points="195,153 312,113 430,352 615,398 800,326"/>
+  </g>
+  <g fill="#3a5fb5">
+    <circle cx="195" cy="153" r="5"/>
+    <circle cx="312" cy="113" r="5"/>
+    <circle cx="430" cy="352" r="5"/>
+    <circle cx="615" cy="398" r="5"/>
+    <circle cx="800" cy="326" r="5"/>
+    <text x="200" y="148" font-size="10">60.18%</text>
+    <text x="320" y="105" font-size="11" font-weight="bold">68.26%</text>
+    <text x="438" y="345" font-size="10">20.06%</text>
+    <text x="615" y="415" text-anchor="middle" font-size="10">10.48%</text>
+    <text x="800" y="318" text-anchor="middle" font-size="10">25.15%</text>
+  </g>
+
+  <rect x="660" y="100" width="200" height="50" fill="#fff" stroke="#888"/>
+  <line x1="670" y1="115" x2="700" y2="115" stroke="#c08a2c" stroke-width="2.5"/>
+  <circle cx="685" cy="115" r="4" fill="#c08a2c"/>
+  <text x="710" y="118" font-size="11">hand-corrected mAP@0.5</text>
+  <line x1="670" y1="138" x2="700" y2="138" stroke="#3a5fb5" stroke-width="2.5"/>
+  <circle cx="685" cy="138" r="4" fill="#3a5fb5"/>
+  <text x="710" y="141" font-size="11">ScreenSpot CPV</text>
+
+  <line x1="312" y1="113" x2="312" y2="40" stroke="#3a5fb5" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="312" y="35" text-anchor="middle" font-size="11" font-weight="bold" fill="#3a5fb5">peak (deployed)</text>
+
+  <line x1="615" y1="398" x2="615" y2="430" stroke="#3a5fb5" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="615" y="445" text-anchor="middle" font-size="10" fill="#3a5fb5" font-style="italic">catastrophic forgetting</text>
+</svg>

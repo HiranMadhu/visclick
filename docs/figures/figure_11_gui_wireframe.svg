@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 540" font-family="Arial, sans-serif" font-size="13">
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="bold">VisClick GUI wireframe (Tk)</text>
+
+  <rect x="80" y="70" width="740" height="420" rx="6" fill="#f8f8f8" stroke="#222" stroke-width="2"/>
+
+  <rect x="80" y="70" width="740" height="32" fill="#dde7fb" stroke="#3a5fb5"/>
+  <text x="100" y="92" font-weight="bold" font-size="13">VisClick</text>
+  <circle cx="800" cy="86" r="6" fill="#a74545"/>
+  <circle cx="780" cy="86" r="6" fill="#c08a2c"/>
+  <circle cx="760" cy="86" r="6" fill="#3c8a3c"/>
+
+  <text x="100" y="135" font-size="12" font-weight="bold">Monitor:</text>
+  <rect x="170" y="120" width="200" height="24" fill="white" stroke="#888"/>
+  <text x="180" y="138" font-size="12">Monitor 1 (1920x1080)</text>
+  <text x="358" y="138" font-size="12">v</text>
+  <text x="100" y="158" font-size="10" fill="#3a5fb5" font-weight="bold">(1) Monitor dropdown</text>
+
+  <text x="100" y="195" font-size="12" font-weight="bold">Instruction:</text>
+  <rect x="100" y="205" width="600" height="60" fill="white" stroke="#888"/>
+  <text x="115" y="230" font-size="12" fill="#666" font-style="italic">click Save</text>
+  <text x="100" y="280" font-size="10" fill="#3a5fb5" font-weight="bold">(2) Instruction text box</text>
+
+  <rect x="100" y="300" width="100" height="34" fill="#3c8a3c" stroke="#2a6a2a"/>
+  <text x="150" y="322" text-anchor="middle" font-size="13" font-weight="bold" fill="white">Run</text>
+
+  <rect x="220" y="300" width="100" height="34" fill="#a74545" stroke="#7a3030"/>
+  <text x="270" y="322" text-anchor="middle" font-size="13" font-weight="bold" fill="white">Stop</text>
+  <text x="100" y="350" font-size="10" fill="#3a5fb5" font-weight="bold">(3) Run / Stop buttons</text>
+
+  <rect x="100" y="375" width="600" height="28" fill="#fff5e0" stroke="#c08a2c"/>
+  <text x="115" y="394" font-size="12" font-style="italic">[run #4] PASS  | T01 click Save | score=82 | t=7.4s</text>
+  <text x="100" y="418" font-size="10" fill="#3a5fb5" font-weight="bold">(4) Live status line</text>
+
+  <rect x="540" y="430" width="160" height="40" fill="white" stroke="#888"/>
+  <text x="620" y="455" text-anchor="middle" font-size="11" fill="#666">last overlay thumbnail</text>
+  <text x="540" y="487" font-size="10" fill="#3a5fb5" font-weight="bold">(5) Last-overlay thumbnail</text>
+
+  <rect x="720" y="375" width="80" height="20" fill="white" stroke="#888"/>
+  <text x="760" y="390" text-anchor="middle" font-size="11">verbose</text>
+  <text x="720" y="412" font-size="10" fill="#3a5fb5" font-weight="bold">(6) Verbose toggle</text>
+</svg>

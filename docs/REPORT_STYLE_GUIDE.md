@@ -103,6 +103,10 @@ Tracker. Updated as each chapter is drafted.
 |---|---|---:|---:|---:|
 | 3 June 2026 | Ch 1, 2 | 6,500 | ~19 | 81 |
 | 3 June 2026 | Ch 1-5 | 15,400 | ~46-49 | 51-54 |
+| 11 June 2026 | Ch 1-6 | ~24,700 (raw `wc -w` incl. code blocks; prose-only ~21,000) | 55 (measured in Word) | 45 |
+| 11 June 2026 | Ch 6 expanded with full-protocol Adaptive Teacher and SHOT ablations from gpu064 reruns (`d309f99`) | +400 words in §6.5.4 and §6.5.5 | — | — |
+| 11 June 2026 | Ch 1-7 (Ch 7 added) | ~28,800 raw | 65 (measured in Word) | 35 |
+| 11 June 2026 | Ch 1-9 drafted (Ch 8 + Ch 9 added; Ch 9 §§9.3-9.5 scaffolded with `[AUTHOR: ...]` markers) | ~38,400 raw | ~86-87 (projected at observed 450 wpp) | ~13-14 |
 
 ### 1.7 Discipline rules to stay in budget
 
@@ -157,6 +161,8 @@ Rules to stay in budget:
 |---|---|---|---|
 | 3 June 2026 | Ch 1, Ch 2 | ~18 | 22 |
 | 3 June 2026 | Ch 1, Ch 2, Ch 3, Ch 4, Ch 5 | ~19 (added Hevner et al., 2004 for DSR) | 21 |
+| 11 June 2026 | Ch 1-6 | ~20 (added Chen and He, 2021 for SimSiam) | 20 |
+| 11 June 2026 | Ch 1-9 | ~22 (added McCloskey and Cohen, 1989 for catastrophic forgetting in §8.3.1; Sahay et al., 2023 already cited via Ch 6) | 18 |
 
 Updated as each chapter is added.
 
@@ -280,6 +286,7 @@ The following docs work together. Do not duplicate state across them.
 - `docs/Final_Report_GAPS.md` — per-ID ledger of every gap (D-01...D-12, T-01..T-04, W-01..W-04, F-01..F-12, U-01..U-08). **The status table.**
 - `docs/REPORT_STYLE_GUIDE.md` — this file. **The style and convention rulebook.**
 - `docs/Final_Report.md` — v1 draft, IEEE-numeric citations, polished AI voice. Retained for reference but not the submission source.
-- `docs/Final_Report_v2.md` — v2 draft, Harvard citations, natural-informality voice, ALL-CAPS section headings. **The submission source.**
+- `docs/Final_Report_v2.md` — v2 draft, Chapters 1-5, Harvard citations, natural-informality voice, ALL-CAPS section headings. **Submission source, Part 1.**
+- `docs/Final_Report_v2_part2.md` — v2 draft, Chapters 6-9. Same conventions; sequential figure/table numbering carries on from Part 1. **Submission source, Part 2.** Concatenated with Part 1 at submission time.
 
 When a rule in this file is updated, log the change date in §0 and the affected chapters get a re-pass.

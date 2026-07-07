@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 540" font-family="Arial, sans-serif" font-size="13">
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="bold">UML use case diagram</text>
+  <text x="450" y="48" text-anchor="middle" font-size="12" fill="#555">Actor + six use cases (UC-01 to UC-06)</text>
+
+  <rect x="280" y="80" width="340" height="430" rx="6" fill="none" stroke="#222" stroke-width="1.5"/>
+  <text x="290" y="100" font-size="12" font-weight="bold" fill="#666">VisClick prototype</text>
+
+  <g transform="translate(80,260)">
+    <circle cx="0" cy="-30" r="14" fill="none" stroke="#222" stroke-width="2"/>
+    <line x1="0" y1="-16" x2="0" y2="20" stroke="#222" stroke-width="2"/>
+    <line x1="-22" y1="-2" x2="22" y2="-2" stroke="#222" stroke-width="2"/>
+    <line x1="0" y1="20" x2="-18" y2="50" stroke="#222" stroke-width="2"/>
+    <line x1="0" y1="20" x2="18" y2="50" stroke="#222" stroke-width="2"/>
+    <text x="0" y="80" text-anchor="middle" font-weight="bold">User</text>
+  </g>
+
+  <ellipse cx="450" cy="135" rx="120" ry="28" fill="#dde7fb" stroke="#3a5fb5"/>
+  <text x="450" y="132" text-anchor="middle" font-weight="bold">UC-01</text>
+  <text x="450" y="148" text-anchor="middle" font-size="11">give text instruction</text>
+
+  <ellipse cx="450" cy="200" rx="120" ry="28" fill="#dde7fb" stroke="#3a5fb5"/>
+  <text x="450" y="197" text-anchor="middle" font-weight="bold">UC-02</text>
+  <text x="450" y="213" text-anchor="middle" font-size="11">execute single click</text>
+
+  <ellipse cx="450" cy="265" rx="120" ry="28" fill="#dde7fb" stroke="#3a5fb5"/>
+  <text x="450" y="262" text-anchor="middle" font-weight="bold">UC-03</text>
+  <text x="450" y="278" text-anchor="middle" font-size="11">view per-attempt feedback</text>
+
+  <ellipse cx="450" cy="330" rx="120" ry="28" fill="#dde7fb" stroke="#3a5fb5"/>
+  <text x="450" y="327" text-anchor="middle" font-weight="bold">UC-04</text>
+  <text x="450" y="343" text-anchor="middle" font-size="11">abort run (FAILSAFE)</text>
+
+  <ellipse cx="450" cy="400" rx="140" ry="28" fill="#fff5e0" stroke="#c08a2c"/>
+  <text x="450" y="397" text-anchor="middle" font-weight="bold">UC-05</text>
+  <text x="450" y="413" text-anchor="middle" font-size="11">run T01-T15 evaluation harness</text>
+
+  <ellipse cx="450" cy="465" rx="140" ry="28" fill="#fff5e0" stroke="#c08a2c"/>
+  <text x="450" y="462" text-anchor="middle" font-weight="bold">UC-06</text>
+  <text x="450" y="478" text-anchor="middle" font-size="11">re-train detector (offline)</text>
+
+  <line x1="135" y1="260" x2="330" y2="135" stroke="#222" stroke-width="1.2"/>
+  <line x1="135" y1="260" x2="330" y2="200" stroke="#222" stroke-width="1.2"/>
+  <line x1="135" y1="260" x2="330" y2="265" stroke="#222" stroke-width="1.2"/>
+  <line x1="135" y1="260" x2="330" y2="330" stroke="#222" stroke-width="1.2"/>
+  <line x1="135" y1="260" x2="310" y2="400" stroke="#222" stroke-width="1.2"/>
+  <line x1="135" y1="260" x2="310" y2="465" stroke="#222" stroke-width="1.2"/>
+
+  <line x1="450" y1="163" x2="450" y2="172" stroke="#888" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#useArr)"/>
+  <text x="495" y="170" font-size="10" fill="#666">&lt;&lt;include&gt;&gt;</text>
+
+  <line x1="450" y1="228" x2="450" y2="237" stroke="#888" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="495" y="235" font-size="10" fill="#666">&lt;&lt;include&gt;&gt;</text>
+
+  <text x="610" y="135" font-size="10" fill="#3a5fb5">user-facing</text>
+  <text x="610" y="200" font-size="10" fill="#3a5fb5">user-facing</text>
+  <text x="610" y="265" font-size="10" fill="#3a5fb5">user-facing</text>
+  <text x="610" y="330" font-size="10" fill="#3a5fb5">user-facing</text>
+  <text x="630" y="400" font-size="10" fill="#c08a2c">eval-only</text>
+  <text x="630" y="465" font-size="10" fill="#c08a2c">eval-only</text>
+</svg>

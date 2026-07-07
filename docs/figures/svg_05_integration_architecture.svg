@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 540" font-family="Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="iar" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#222"/>
+    </marker>
+  </defs>
+
+  <text x="490" y="28" text-anchor="middle" font-size="18" font-weight="bold">VisClick as a complement to existing automation tools</text>
+  <text x="490" y="48" text-anchor="middle" font-size="12" fill="#555">Integration patterns discussed in Section 8.7.4</text>
+
+  <rect x="60" y="80" width="220" height="60" rx="6" fill="#dde7fb" stroke="#3a5fb5"/>
+  <text x="170" y="105" text-anchor="middle" font-weight="bold">RPA platform</text>
+  <text x="170" y="125" text-anchor="middle" font-size="11">UiPath / AA / Blue Prism</text>
+
+  <rect x="380" y="80" width="220" height="60" rx="6" fill="#dde7fb" stroke="#3a5fb5"/>
+  <text x="490" y="105" text-anchor="middle" font-weight="bold">Accessibility tree</text>
+  <text x="490" y="125" text-anchor="middle" font-size="11">UIA (Win) / AT-SPI (Linux)</text>
+
+  <rect x="700" y="80" width="220" height="60" rx="6" fill="#dde7fb" stroke="#3a5fb5"/>
+  <text x="810" y="105" text-anchor="middle" font-weight="bold">Agent framework</text>
+  <text x="810" y="125" text-anchor="middle" font-size="11">LangChain / SK / agent libs</text>
+
+  <rect x="240" y="240" width="500" height="80" rx="8" fill="#fff5e0" stroke="#c08a2c" stroke-width="2"/>
+  <text x="490" y="270" text-anchor="middle" font-weight="bold" font-size="15">VisClick</text>
+  <text x="490" y="290" text-anchor="middle" font-size="11">visclick.bot.run_instruction(text) ' Verdict</text>
+  <text x="490" y="310" text-anchor="middle" font-size="11">CV-driven detection + OCR fallback + refusal rule</text>
+
+  <line x1="170" y1="140" x2="320" y2="240" stroke="#222" stroke-width="1.5" marker-end="url(#iar)"/>
+  <line x1="490" y1="140" x2="490" y2="240" stroke="#222" stroke-width="1.5" marker-end="url(#iar)"/>
+  <line x1="810" y1="140" x2="660" y2="240" stroke="#222" stroke-width="1.5" marker-end="url(#iar)"/>
+
+  <text x="225" y="190" font-size="11" fill="#666">fall-back when</text>
+  <text x="225" y="205" font-size="11" fill="#666">native engine fails</text>
+
+  <text x="430" y="190" font-size="11" fill="#666">fall-back when</text>
+  <text x="430" y="205" font-size="11" fill="#666">tree is degenerate</text>
+
+  <text x="755" y="190" font-size="11" fill="#666">"click on screen"</text>
+  <text x="755" y="205" font-size="11" fill="#666">tool call</text>
+
+  <rect x="320" y="380" width="340" height="50" rx="6" fill="#eaf6ea" stroke="#3c8a3c"/>
+  <text x="490" y="408" text-anchor="middle" font-weight="bold">weights/visclick.onnx (45 MB, CPU only)</text>
+  <line x1="490" y1="320" x2="490" y2="380" stroke="#222" stroke-width="1.5" marker-end="url(#iar)"/>
+
+  <text x="490" y="465" text-anchor="middle" font-size="12" fill="#666">Returns Verdict {pass | fail | refused | aborted} + per-attempt CSV row</text>
+  <text x="490" y="485" text-anchor="middle" font-size="12" fill="#666">No off-machine I/O; FAILSAFE on; user-visible cursor</text>
+</svg>

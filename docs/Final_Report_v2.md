@@ -480,8 +480,8 @@ The non-functional requirements are quantitative wherever possible. Each row in 
 | R-NFR-03 | Memory footprint | Peak RSS ≤ 2 GB during a 15-task run | PARTIAL | gap D-11 | PARTIAL |
 | R-NFR-04 | Reliability | Zero crashes during 60-attempt evaluation | 0 crashes | run log 6-7 May 2026 | FULL |
 | R-NFR-05 | Usability | Single-window Tk dialog; keyboard shortcuts for Pass/Fail/Skip | implemented in `scripts/run_baselines.py::_verdict_dialog_tk` | source review | FULL (single-reviewer) |
-| R-NFR-06 | Maintainability | Modular package (`visclick.{capture, detect, ocr, match, act, bot, gui}`); PEP-8 clean | 9 modules, ~1,591 LoC total, `ruff check` clean | source review | FULL |
-| R-NFR-07 | Extensibility | New baseline methods plug in by implementing `predict(image_rgb, instruction) -> BaselineResult` | Demonstrated for 4 methods | `scripts/baseline_*.py` | FULL |
+| R-NFR-06 | Maintainability | Object-oriented modular package (`visclick.{capture, detect, ocr, match, act, bot, gui}`) built around 8 substantive classes (`Capture`, `Detector`, `OCREngine`, `Matcher`, `Actor`, `Bot`, `BotResult`, `VisClickApp`) plus 2 PyTorch subclasses in the training script; composition-over-inheritance; every module PEP-8 clean | 8 pipeline / GUI classes + 2 training subclasses, ~1,850 LoC total, `ruff check` clean, class diagram in Figure 12A | source review + Figure 12A | FULL |
+| R-NFR-07 | Extensibility | Two extension seams. (i) New baseline methods plug in by implementing `predict(image_rgb, instruction) -> BaselineResult`. (ii) Any of the five pipeline collaborators can be replaced by dependency injection through `Bot.__init__(capture=, detector=, ocr=, matcher=, actor=)` without touching the orchestrator body. | 4 baseline adapters + injectable-collaborator constructor | `scripts/baseline_*.py`; `src/visclick/bot.py::Bot.__init__` | FULL |
 | R-NFR-08 | Security & Privacy | No off-machine I/O during inference; no telemetry; no credentials handled | verified by `rg 'requests|urllib|http' src/visclick/` | source review | FULL |
 | R-NFR-09 | Compatibility | Windows 11 supported; multi-monitor verified | Windows 11 + 3440×1440 + 1920×1080 PASS | live demo | PARTIAL (Windows-only by design) |
 | R-NFR-10 | Scalability | Pipeline complexity scales linearly in #candidates per screenshot | per-box OCR is O(N); ceiling ≈ 300 boxes/screenshot | analytical | PARTIAL |
@@ -702,6 +702,18 @@ scripts/
 ```
 
 The module dependency graph is intentionally a directed acyclic graph: `bot` depends on `capture, detect, ocr, match, act`; the five depended-on modules are mutually independent; `gui` depends on `bot`. The acyclic property is what lets the four baselines reuse `capture` and `act` without dragging in the detector. A circular dependency would have collapsed this composition.
+
+### 5.5.1 CLASS DIAGRAM
+
+The module view above answers "what files exist and how do they depend on each other". The class view in Figure 12A answers a different question: "which objects hold state, and what are the collaboration contracts between them". The two views are complementary and both are needed because the system is deliberately object-oriented at the pipeline seam and procedural at the leaf-utility level.
+
+[FIGURE 12A: Class diagram of the VisClick package.
+Source: `docs/figures/figure_12A_class_diagram.png` (produced from `docs/figures/figure_12A_class_diagram.svg`; UML class diagram with composition, inheritance and dependency edges).
+Caption: Class diagram. The orchestrator `Bot` composes five pipeline classes — `Capture`, `Detector`, `OCREngine`, `Matcher`, `Actor` — and returns a `BotResult` value object; the `VisClickApp` Tk GUI subclass consumes `Bot`; two training-side subclasses (`TwoViewDataset`, `SimSiam`) extend the corresponding PyTorch base classes.]
+
+Eight substantive classes are shown. Six of them realise the pipeline: `Capture` encapsulates the mss / DPI plumbing, `Detector` encapsulates the ONNX session and post-processing, `OCREngine` encapsulates the cached EasyOCR reader plus the one-shot Tesseract diagnostic, `Matcher` encapsulates the scoring policy (class bonus, verb vocabulary, class vocabulary) and the refusal rule, `Actor` encapsulates the PyAutoGUI configuration and click primitives, and `Bot` is the composer that receives instances of the five and drives one `run_instruction` call end-to-end. The GUI (`VisClickApp`) is a `tkinter.Tk` subclass and consumes a `Bot` instance. The training script contributes two more subclasses — `TwoViewDataset` extends `torch.utils.data.Dataset` for the SimSiam SSP two-view augmentation, and `SimSiam` extends `torch.nn.Module`. Composition dominates over inheritance: `Bot` does not inherit from any of the five collaborators, it *owns* them, which is what allows tests to swap any collaborator for a stub without touching the others. The design consciously follows the "prefer composition over inheritance" principle from the Gang-of-Four literature, and every collaborator is injectable through `Bot.__init__` for exactly that reason.
+
+A design decision worth surfacing. Alongside the classes, each pipeline module still exposes its public operations as module-level functions (for example `visclick.capture.grab`, `visclick.match.best_box`). These are one-line delegates to a module-scope default instance of the corresponding class. The pattern is deliberate. It keeps existing scripts, notebooks and the four baseline adapters (which were written before the refactor) working without modification, and it gives callers a choice between the classical stateless-function style and the injectable object-oriented style. Neither style is claimed as superior; the class-based style is used inside the orchestrator and inside `baseline_visclick.py`, and the function-based style is used inside the notebooks. Both styles resolve to the same instance data.
 
 ## 5.6 GUI WIREFRAMES
 

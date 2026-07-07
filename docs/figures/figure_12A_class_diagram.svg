@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 1080" width="1500" height="1080" font-family="Helvetica, Arial, sans-serif" font-size="12">
+  <style>
+    .box { fill: #ffffff; stroke: #333333; stroke-width: 1.5; }
+    .box-gui { fill: #eef7ff; stroke: #1f5aa8; stroke-width: 1.5; }
+    .box-orch { fill: #fff4e6; stroke: #c96b1a; stroke-width: 2; }
+    .box-pipeline { fill: #f0fff0; stroke: #2e7d32; stroke-width: 1.5; }
+    .box-dc { fill: #f5f5f5; stroke: #666666; stroke-width: 1.2; stroke-dasharray: 4 3; }
+    .box-training { fill: #f6f0ff; stroke: #6c4a9c; stroke-width: 1.5; }
+    .box-ext { fill: #efefef; stroke: #888888; stroke-width: 1.2; stroke-dasharray: 3 2; }
+    .title { font-weight: bold; font-size: 13px; text-anchor: middle; }
+    .stereo { font-style: italic; font-size: 10px; fill: #666666; text-anchor: middle; }
+    .attr { font-family: "Courier New", monospace; font-size: 10.5px; }
+    .method { font-family: "Courier New", monospace; font-size: 10.5px; }
+    .sep { stroke: #333333; stroke-width: 1; }
+    .compose { stroke: #333333; stroke-width: 1.4; fill: none; }
+    .inherit { stroke: #333333; stroke-width: 1.4; fill: none; stroke-dasharray: 6 4; }
+    .use { stroke: #666666; stroke-width: 1.2; fill: none; stroke-dasharray: 3 3; }
+    .diamond-open { fill: #ffffff; stroke: #333333; stroke-width: 1.4; }
+    .arrow { fill: #333333; }
+    .caption { font-size: 11px; fill: #555555; }
+  </style>
+
+  <!-- title -->
+  <text x="750" y="30" text-anchor="middle" font-size="18" font-weight="bold">VisClick  Class Diagram</text>
+  <text x="750" y="50" text-anchor="middle" font-size="12" fill="#555555">Composition (&#9671;) shows Bot assembles the five pipeline classes; dashed inheritance (&#9665;) shows PyTorch framework subclasses in training.</text>
+
+  <!-- ================= GUI layer ================= -->
+  <g id="VisClickApp">
+    <rect x="40" y="80" width="240" height="180" rx="4" class="box-gui"/>
+    <text x="160" y="98" class="stereo">&lt;&lt;tkinter.Tk&gt;&gt;</text>
+    <text x="160" y="115" class="title">VisClickApp</text>
+    <line x1="40" y1="122" x2="280" y2="122" class="sep"/>
+    <text x="50" y="138" class="attr">- weights_var: StringVar</text>
+    <text x="50" y="152" class="attr">- instruction_var: StringVar</text>
+    <text x="50" y="166" class="attr">- monitor_var: IntVar</text>
+    <text x="50" y="180" class="attr">- ocr_var: StringVar</text>
+    <text x="50" y="194" class="attr">- log_box: Text</text>
+    <line x1="40" y1="200" x2="280" y2="200" class="sep"/>
+    <text x="50" y="216" class="method">+ on_browse_weights()</text>
+    <text x="50" y="230" class="method">+ on_run()</text>
+    <text x="50" y="244" class="method">+ on_pick()</text>
+    <text x="50" y="258" class="method">+ main()</text>
+  </g>
+
+  <!-- ================= Bot orchestrator ================= -->
+  <g id="Bot">
+    <rect x="590" y="80" width="320" height="220" rx="4" class="box-orch"/>
+    <text x="750" y="98" class="stereo">&lt;&lt;orchestrator&gt;&gt;</text>
+    <text x="750" y="115" class="title">Bot</text>
+    <line x1="590" y1="122" x2="910" y2="122" class="sep"/>
+    <text x="600" y="138" class="attr">- weights_path: str</text>
+    <text x="600" y="152" class="attr">- capture: Capture</text>
+    <text x="600" y="166" class="attr">- detector: Detector</text>
+    <text x="600" y="180" class="attr">- ocr: OCREngine</text>
+    <text x="600" y="194" class="attr">- matcher: Matcher</text>
+    <text x="600" y="208" class="attr">- actor: Actor</text>
+    <line x1="590" y1="214" x2="910" y2="214" class="sep"/>
+    <text x="600" y="230" class="method">+ __init__(weights_path, capture=,</text>
+    <text x="600" y="244" class="method">           detector=, ocr=, matcher=, actor=)</text>
+    <text x="600" y="258" class="method">+ run_instruction(instruction, img_rgb=,</text>
+    <text x="600" y="272" class="method">   monitor_index=, dry_run=, ...) ' BotResult</text>
+    <text x="600" y="286" class="method">- _resolve_ocr_engine(requested) ' str</text>
+  </g>
+
+  <!-- ================= BotResult (dataclass) ================= -->
+  <g id="BotResult">
+    <rect x="1000" y="80" width="470" height="220" rx="4" class="box-dc"/>
+    <text x="1235" y="98" class="stereo">&lt;&lt;dataclass&gt;&gt;</text>
+    <text x="1235" y="115" class="title">BotResult</text>
+    <line x1="1000" y1="122" x2="1470" y2="122" class="sep"/>
+    <text x="1010" y="138" class="attr">+ verdict: str            # 'pass' | 'fail' | 'refused'</text>
+    <text x="1010" y="152" class="attr">+ instruction: str</text>
+    <text x="1010" y="166" class="attr">+ picked_index: int</text>
+    <text x="1010" y="180" class="attr">+ picked_box: (x1,y1,x2,y2) | None</text>
+    <text x="1010" y="194" class="attr">+ picked_cls: int</text>
+    <text x="1010" y="208" class="attr">+ picked_text: str</text>
+    <text x="1010" y="222" class="attr">+ match_score: float</text>
+    <text x="1010" y="236" class="attr">+ det_conf: float</text>
+    <text x="1010" y="250" class="attr">+ fallback_used: bool</text>
+    <text x="1010" y="264" class="attr">+ click_xy_abs, click_xy_local: (x,y) | None</text>
+    <text x="1010" y="278" class="attr">+ monitor_offset: (int, int)</text>
+    <text x="1010" y="292" class="attr">+ boxes_with_text: list, notes: str</text>
+  </g>
+
+  <!-- ================= Pipeline row: Capture ================= -->
+  <g id="Capture">
+    <rect x="40" y="400" width="260" height="200" rx="4" class="box-pipeline"/>
+    <text x="170" y="418" class="stereo">&lt;&lt;pipeline&gt;&gt;</text>
+    <text x="170" y="435" class="title">Capture</text>
+    <line x1="40" y1="442" x2="300" y2="442" class="sep"/>
+    <text x="50" y="458" class="attr">- _dpi_aware: bool</text>
+    <line x1="40" y1="464" x2="300" y2="464" class="sep"/>
+    <text x="50" y="480" class="method">+ set_dpi_awareness()</text>
+    <text x="50" y="494" class="method">+ list_monitors() ' list[dict]</text>
+    <text x="50" y="508" class="method">+ primary_monitor() ' dict</text>
+    <text x="50" y="522" class="method">+ find_pyautogui_primary() ' int</text>
+    <text x="50" y="536" class="method">+ grab(idx=1) ' (ndarray, l, t)</text>
+    <text x="50" y="550" class="method">+ save_screenshot(path, idx=1)</text>
+    <text x="50" y="570" class="attr" fill="#777">module delegates: grab, list_monitors,</text>
+    <text x="50" y="584" class="attr" fill="#777">save_screenshot, ...</text>
+  </g>
+
+  <!-- ================= Detector ================= -->
+  <g id="Detector">
+    <rect x="330" y="400" width="260" height="200" rx="4" class="box-pipeline"/>
+    <text x="460" y="418" class="stereo">&lt;&lt;pipeline&gt;&gt;</text>
+    <text x="460" y="435" class="title">Detector</text>
+    <line x1="330" y1="442" x2="590" y2="442" class="sep"/>
+    <text x="340" y="458" class="attr">- sess: ort.InferenceSession</text>
+    <text x="340" y="472" class="attr">- input_name, output_name: str</text>
+    <text x="340" y="486" class="attr">- imgsz: int   ( = 640 )</text>
+    <text x="340" y="500" class="attr">- providers: list[str]</text>
+    <line x1="330" y1="506" x2="590" y2="506" class="sep"/>
+    <text x="340" y="522" class="method">+ __init__(onnx_path, imgsz=640,</text>
+    <text x="340" y="536" class="method">           providers=None)</text>
+    <text x="340" y="550" class="method">+ predict(img_rgb, conf=, iou=)</text>
+    <text x="340" y="564" class="method">      ' list[(cls, xyxy, conf)]</text>
+    <text x="340" y="578" class="method">- _postprocess(out, w0, h0, ...)</text>
+  </g>
+
+  <!-- ================= OCREngine ================= -->
+  <g id="OCREngine">
+    <rect x="620" y="400" width="260" height="200" rx="4" class="box-pipeline"/>
+    <text x="750" y="418" class="stereo">&lt;&lt;pipeline&gt;&gt;</text>
+    <text x="750" y="435" class="title">OCREngine</text>
+    <line x1="620" y1="442" x2="880" y2="442" class="sep"/>
+    <text x="630" y="458" class="attr">- tesseract_cmd: str</text>
+    <text x="630" y="472" class="attr">- _reader: easyocr.Reader | None</text>
+    <text x="630" y="486" class="attr">- _tesseract_warned: bool</text>
+    <line x1="620" y1="492" x2="880" y2="492" class="sep"/>
+    <text x="630" y="508" class="method">+ status() ' dict</text>
+    <text x="630" y="522" class="method">+ ocr_box(img, xyxy, engine=) ' str</text>
+    <text x="630" y="536" class="method">+ text_ground(img, target, engine=,</text>
+    <text x="630" y="550" class="method">              min_similarity=) ' list</text>
+    <text x="630" y="564" class="method">- _tesseract(crop) / _easyocr(crop)</text>
+    <text x="630" y="578" class="method">- _ground_tesseract / _ground_easyocr</text>
+  </g>
+
+  <!-- ================= Matcher ================= -->
+  <g id="Matcher">
+    <rect x="910" y="400" width="260" height="200" rx="4" class="box-pipeline"/>
+    <text x="1040" y="418" class="stereo">&lt;&lt;pipeline&gt;&gt;</text>
+    <text x="1040" y="435" class="title">Matcher</text>
+    <line x1="910" y1="442" x2="1170" y2="442" class="sep"/>
+    <text x="920" y="458" class="attr">- class_bonus: dict[int, float]</text>
+    <text x="920" y="472" class="attr">- verbs: set[str]</text>
+    <text x="920" y="486" class="attr">- class_words: set[str]</text>
+    <line x1="910" y1="492" x2="1170" y2="492" class="sep"/>
+    <text x="920" y="508" class="method">+ target_phrase(instruction) ' str</text>
+    <text x="920" y="522" class="method">+ is_class_only_target(target) ' bool</text>
+    <text x="920" y="536" class="method">+ best_box(instruction, cands,</text>
+    <text x="920" y="550" class="method">     min_text_similarity=60)</text>
+    <text x="920" y="564" class="method">  ' (score, cls, xyxy, conf, text)</text>
+    <text x="920" y="578" class="method">  or None (refusal)</text>
+  </g>
+
+  <!-- ================= Actor ================= -->
+  <g id="Actor">
+    <rect x="1200" y="400" width="260" height="200" rx="4" class="box-pipeline"/>
+    <text x="1330" y="418" class="stereo">&lt;&lt;pipeline&gt;&gt;</text>
+    <text x="1330" y="435" class="title">Actor</text>
+    <line x1="1200" y1="442" x2="1460" y2="442" class="sep"/>
+    <text x="1210" y="458" class="attr">- failsafe: bool</text>
+    <text x="1210" y="472" class="attr">- pause: float</text>
+    <line x1="1200" y1="478" x2="1460" y2="478" class="sep"/>
+    <text x="1210" y="494" class="method">+ screen_size() ' (int, int)</text>
+    <text x="1210" y="508" class="method">+ click_xy(x, y, dwell=, button=)</text>
+    <text x="1210" y="522" class="method">+ click_box(xyxy, offset=(0,0),</text>
+    <text x="1210" y="536" class="method">            dwell=, button=) ' (cx, cy)</text>
+    <text x="1210" y="556" class="attr" fill="#777">wraps pyautogui (module scope</text>
+    <text x="1210" y="570" class="attr" fill="#777">FAILSAFE + PAUSE config)</text>
+  </g>
+
+  <!-- ================= Training subclasses ================= -->
+  <g id="TwoViewDataset">
+    <rect x="40" y="760" width="290" height="140" rx="4" class="box-training"/>
+    <text x="185" y="778" class="stereo">&lt;&lt;torch.utils.data.Dataset&gt;&gt;</text>
+    <text x="185" y="796" class="title">TwoViewDataset</text>
+    <line x1="40" y1="803" x2="330" y2="803" class="sep"/>
+    <text x="50" y="819" class="attr">- paths: list[str]</text>
+    <text x="50" y="833" class="attr">- transform: torchvision.Compose</text>
+    <line x1="40" y1="839" x2="330" y2="839" class="sep"/>
+    <text x="50" y="855" class="method">+ __len__() ' int</text>
+    <text x="50" y="869" class="method">+ __getitem__(idx) ' (view1, view2)</text>
+    <text x="50" y="885" class="attr" fill="#666">SimSiam SSP pre-training corpus</text>
+  </g>
+
+  <g id="SimSiam">
+    <rect x="360" y="760" width="290" height="140" rx="4" class="box-training"/>
+    <text x="505" y="778" class="stereo">&lt;&lt;torch.nn.Module&gt;&gt;</text>
+    <text x="505" y="796" class="title">SimSiam</text>
+    <line x1="360" y1="803" x2="650" y2="803" class="sep"/>
+    <text x="370" y="819" class="attr">- backbone: nn.Sequential</text>
+    <text x="370" y="833" class="attr">- projector, predictor: nn.Sequential</text>
+    <line x1="360" y1="839" x2="650" y2="839" class="sep"/>
+    <text x="370" y="855" class="method">+ forward(x1, x2) ' (p1, p2, z1, z2)</text>
+    <text x="370" y="869" class="method">+ D(p, z) ' float   # cosine sim loss</text>
+    <text x="370" y="885" class="attr" fill="#666">weights ' YOLOv8 backbone init</text>
+  </g>
+
+  <!-- external anchors for inheritance -->
+  <g id="ext-Tk">
+    <rect x="40" y="300" width="240" height="34" rx="4" class="box-ext"/>
+    <text x="160" y="322" text-anchor="middle" font-style="italic">tkinter.Tk</text>
+  </g>
+  <g id="ext-Dataset">
+    <rect x="40" y="920" width="290" height="34" rx="4" class="box-ext"/>
+    <text x="185" y="942" text-anchor="middle" font-style="italic">torch.utils.data.Dataset</text>
+  </g>
+  <g id="ext-Module">
+    <rect x="360" y="920" width="290" height="34" rx="4" class="box-ext"/>
+    <text x="505" y="942" text-anchor="middle" font-style="italic">torch.nn.Module</text>
+  </g>
+
+  <!-- ================= Composition edges (open diamonds on Bot) ================= -->
+  <!-- from Bot bottom -->
+  <!-- Bot to Capture -->
+  <path d="M 700 300 L 700 350 L 170 350 L 170 400" class="compose"/>
+  <polygon points="700,300 693,314 700,322 707,314" class="diamond-open"/>
+  <polygon points="170,400 164,388 170,382 176,388" class="arrow"/>
+  <!-- Bot to Detector -->
+  <path d="M 730 300 L 730 350 L 460 350 L 460 400" class="compose"/>
+  <polygon points="730,300 723,314 730,322 737,314" class="diamond-open"/>
+  <polygon points="460,400 454,388 460,382 466,388" class="arrow"/>
+  <!-- Bot to OCREngine -->
+  <path d="M 760 300 L 760 370 L 750 370 L 750 400" class="compose"/>
+  <polygon points="760,300 753,314 760,322 767,314" class="diamond-open"/>
+  <polygon points="750,400 744,388 750,382 756,388" class="arrow"/>
+  <!-- Bot to Matcher -->
+  <path d="M 790 300 L 790 350 L 1040 350 L 1040 400" class="compose"/>
+  <polygon points="790,300 783,314 790,322 797,314" class="diamond-open"/>
+  <polygon points="1040,400 1034,388 1040,382 1046,388" class="arrow"/>
+  <!-- Bot to Actor -->
+  <path d="M 820 300 L 820 350 L 1330 350 L 1330 400" class="compose"/>
+  <polygon points="820,300 813,314 820,322 827,314" class="diamond-open"/>
+  <polygon points="1330,400 1324,388 1330,382 1336,388" class="arrow"/>
+
+  <!-- Bot -&gt; BotResult (returns; dashed dependency) -->
+  <path d="M 910 190 L 1000 190" class="use"/>
+  <polygon points="1000,190 990,185 990,195" class="arrow"/>
+  <text x="955" y="182" text-anchor="middle" class="caption">&lt;&lt; returns &gt;&gt;</text>
+
+  <!-- VisClickApp -&gt; Bot (uses; dashed) -->
+  <path d="M 280 145 L 590 145" class="use"/>
+  <polygon points="590,145 580,140 580,150" class="arrow"/>
+  <text x="435" y="137" text-anchor="middle" class="caption">&lt;&lt; uses &gt;&gt;</text>
+
+  <!-- inheritance edges -->
+  <path d="M 160 260 L 160 300" class="inherit"/>
+  <polygon points="160,300 155,290 165,290" class="diamond-open"/>
+
+  <path d="M 185 900 L 185 920" class="inherit"/>
+  <polygon points="185,920 180,910 190,910" class="diamond-open"/>
+
+  <path d="M 505 900 L 505 920" class="inherit"/>
+  <polygon points="505,920 500,910 510,910" class="diamond-open"/>
+
+  <!-- Legend -->
+  <g transform="translate(720, 760)">
+    <rect x="0" y="0" width="760" height="180" fill="#fafafa" stroke="#cccccc"/>
+    <text x="10" y="20" font-weight="bold">Legend</text>
+
+    <!-- composition -->
+    <line x1="10" y1="40" x2="80" y2="40" class="compose"/>
+    <polygon points="10,40 3,45 10,50 17,45" class="diamond-open"/>
+    <polygon points="80,40 74,36 74,44" class="arrow"/>
+    <text x="90" y="44">composition (&#9671;)  Bot owns instances of the five pipeline classes</text>
+
+    <!-- inheritance -->
+    <line x1="10" y1="65" x2="80" y2="65" class="inherit"/>
+    <polygon points="80,65 74,60 80,55 86,60" class="diamond-open"/>
+    <text x="90" y="69">inheritance (dashed)  training-side subclasses of PyTorch base classes</text>
+
+    <!-- use -->
+    <line x1="10" y1="90" x2="80" y2="90" class="use"/>
+    <polygon points="80,90 74,86 74,94" class="arrow"/>
+    <text x="90" y="94">dependency (dotted)  &lt;&lt;uses&gt;&gt; or &lt;&lt;returns&gt;&gt; without ownership</text>
+
+    <!-- category colours -->
+    <rect x="10" y="105" width="18" height="12" class="box-orch"/>
+    <text x="35" y="115">Orchestrator</text>
+    <rect x="130" y="105" width="18" height="12" class="box-pipeline"/>
+    <text x="155" y="115">Pipeline class</text>
+    <rect x="250" y="105" width="18" height="12" class="box-gui"/>
+    <text x="275" y="115">GUI class</text>
+    <rect x="345" y="105" width="18" height="12" class="box-training"/>
+    <text x="370" y="115">Training subclass</text>
+    <rect x="470" y="105" width="18" height="12" class="box-dc"/>
+    <text x="495" y="115">Data class (frozen result)</text>
+    <rect x="640" y="105" width="18" height="12" class="box-ext"/>
+    <text x="665" y="115">External base</text>
+
+    <text x="10" y="150" class="caption">Every pipeline class exposes a module-level function delegate (grab, ocr_box, best_box,</text>
+    <text x="10" y="164" class="caption">click_box, ...) so existing scripts and notebooks continue to work without modification.</text>
+  </g>
+</svg>

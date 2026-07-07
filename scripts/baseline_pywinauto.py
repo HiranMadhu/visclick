@@ -20,7 +20,7 @@ EXPECTED OUTCOME for the dissertation:
   "click word hello" — UIA needs a Name string.
 
 This script demonstrates *"if accessibility worked, ML would be
-unnecessary — but it doesn't"*, which is the dissertation's
+unnecessary - but it doesn't"*, which is the dissertation's
 justification for using a vision-based approach.
 
 NOTE: ``pywinauto`` is **Windows-only** and is not in the project's
@@ -34,13 +34,20 @@ USAGE:
         --instruction "click Save" \\
         --target-uia-name Save \\
         --target-uia-role Button
+
+Object-oriented layout:
+- ``PyWinAutoBaseline(Baseline)`` — instance provides ``predict`` and
+  encapsulates the Win32-only guard plus the UIA descendant search.
+- The module-level ``predict(...)`` remains as a delegate for backward
+  compatibility with ``run_baselines.py``.
 """
 from __future__ import annotations
 
 import sys
-from typing import Optional
+from typing import Any, Optional, Tuple
 
 from baseline_common import (
+    Baseline,
     BaselineResult,
     autopick_monitor,
     baseline_argparser,
@@ -51,95 +58,122 @@ from baseline_common import (
 )
 
 
-def _can_run() -> Optional[str]:
-    if sys.platform != "win32":
-        return f"pywinauto is Windows-only; this is sys.platform={sys.platform!r}"
-    try:
-        import pywinauto  # noqa: F401
-    except Exception as e:
-        return f"pywinauto import failed: {e!r}. Try: pip install pywinauto"
-    return None
+class PyWinAutoBaseline(Baseline):
+    """Windows UIA descendant-search baseline."""
 
+    name = "pywinauto"
 
-def _find(name: str, role: str):
-    """Walk the UIA tree of every top-level window and return the first
-    descendant whose ``Name`` matches and (optionally) ``ControlType`` matches.
-
-    Returns the wrapper or ``None``.
-    """
-    from pywinauto import Desktop
-    desktop = Desktop(backend="uia")
-    try:
-        windows = desktop.windows()
-    except Exception:
-        windows = []
-
-    for w in windows:
+    def _can_run(self) -> Optional[str]:
+        if sys.platform != "win32":
+            return f"pywinauto is Windows-only; this is sys.platform={sys.platform!r}"
         try:
-            if not w.is_visible():
+            import pywinauto  # noqa: F401
+        except Exception as e:
+            return f"pywinauto import failed: {e!r}. Try: pip install pywinauto"
+        return None
+
+    def _find(self, name: str, role: str):
+        """Walk the UIA tree of every top-level window and return the
+        first descendant whose ``Name`` matches and (optionally)
+        ``ControlType`` matches. Returns the wrapper or ``None``.
+        """
+        from pywinauto import Desktop
+        desktop = Desktop(backend="uia")
+        try:
+            windows = desktop.windows()
+        except Exception:
+            windows = []
+
+        for w in windows:
+            try:
+                if not w.is_visible():
+                    continue
+            except Exception:
                 continue
-        except Exception:
-            continue
+            try:
+                kw = {"name": name}
+                if role:
+                    kw["control_type"] = role
+                elem = w.descendants(**kw)
+                if elem:
+                    return elem[0]
+            except Exception:
+                continue
+        return None
+
+    def predict(
+        self,
+        image_rgb,
+        instruction: str,
+        *,
+        offset: Tuple[int, int] = (0, 0),
+        target_uia_name: str = "",
+        target_uia_role: str = "",
+        **_: Any,
+    ) -> BaselineResult:
+        r = BaselineResult(method=self.name, found=False)
+
+        why_skip = self._can_run()
+        if why_skip:
+            r.notes = why_skip
+            return r
+
+        if not target_uia_name:
+            r.notes = ("no target_uia_name supplied; pywinauto cannot guess a UIA "
+                       "Name from a free-text instruction.")
+            return r
+
+        elem, ms = time_call(self._find, target_uia_name, target_uia_role)
+        r.elapsed_ms = ms
+
+        if elem is None:
+            role_label = f" ({target_uia_role})" if target_uia_role else ""
+            r.notes = (f"UIA element Name='{target_uia_name}'{role_label} not found "
+                       f"in any visible top-level window")
+            return r
+
         try:
-            kw = {"name": name}
-            if role:
-                kw["control_type"] = role
-            elem = w.descendants(**kw)
-            if elem:
-                return elem[0]
+            rect = elem.rectangle()
+            x1, y1, x2, y2 = int(rect.left), int(rect.top), int(rect.right), int(rect.bottom)
+        except Exception as e:
+            r.notes = f"found UIA element but rectangle() failed: {e!r}"
+            return r
+
+        cx = (x1 + x2) // 2
+        cy = (y1 + y2) // 2
+        r.found = True
+        r.confidence = 1.0
+        r.bbox = (x1, y1, x2, y2)
+        r.xy = (int(cx + offset[0]), int(cy + offset[1]))
+        try:
+            ctype = elem.element_info.control_type
         except Exception:
-            continue
-    return None
-
-
-def predict(_image_rgb,
-            instruction: str,
-            *,
-            target_uia_name: str = "",
-            target_uia_role: str = "",
-            offset: tuple[int, int] = (0, 0),
-            **_: object) -> BaselineResult:
-    r = BaselineResult(method="pywinauto", found=False)
-
-    why_skip = _can_run()
-    if why_skip:
-        r.notes = why_skip
+            ctype = "?"
+        r.notes = (f"UIA hit Name='{target_uia_name}' ControlType={ctype} "
+                   f"at virtual-desktop ({cx},{cy})")
         return r
 
-    if not target_uia_name:
-        r.notes = ("no target_uia_name supplied; pywinauto cannot guess a UIA "
-                   "Name from a free-text instruction.")
-        return r
 
-    elem, ms = time_call(_find, target_uia_name, target_uia_role)
-    r.elapsed_ms = ms
+_default = PyWinAutoBaseline()
 
-    if elem is None:
-        role_label = f" ({target_uia_role})" if target_uia_role else ""
-        r.notes = (f"UIA element Name='{target_uia_name}'{role_label} not found "
-                   f"in any visible top-level window")
-        return r
 
-    try:
-        rect = elem.rectangle()
-        x1, y1, x2, y2 = int(rect.left), int(rect.top), int(rect.right), int(rect.bottom)
-    except Exception as e:
-        r.notes = f"found UIA element but rectangle() failed: {e!r}"
-        return r
-
-    cx = (x1 + x2) // 2
-    cy = (y1 + y2) // 2
-    r.found = True
-    r.confidence = 1.0
-    r.bbox = (x1, y1, x2, y2)
-    r.xy = (int(cx + offset[0]), int(cy + offset[1]))
-    try:
-        ctype = elem.element_info.control_type
-    except Exception:
-        ctype = "?"
-    r.notes = (f"UIA hit Name='{target_uia_name}' ControlType={ctype} "
-               f"at virtual-desktop ({cx},{cy})")
-    return r
+def predict(
+    image_rgb,
+    instruction: str,
+    *,
+    target_uia_name: str = "",
+    target_uia_role: str = "",
+    offset: Tuple[int, int] = (0, 0),
+    **kwargs: Any,
+) -> BaselineResult:
+    """Module-level delegate. Kept for backward compatibility."""
+    return _default.predict(
+        image_rgb, instruction,
+        offset=offset,
+        target_uia_name=target_uia_name,
+        target_uia_role=target_uia_role,
+        **kwargs,
+    )
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -149,10 +183,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     monitor = autopick_monitor(args.monitor)
     img, offset = load_image(args.image, monitor)
 
-    r = predict(img, args.instruction,
-                target_uia_name=args.target_uia_name,
-                target_uia_role=args.target_uia_role,
-                offset=offset)
+    pb = PyWinAutoBaseline()
+    r = pb.predict(
+        img, args.instruction,
+        target_uia_name=args.target_uia_name,
+        target_uia_role=args.target_uia_role,
+        offset=offset,
+    )
     print_result(r)
 
     if r.found:

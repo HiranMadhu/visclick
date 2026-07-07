@@ -28,12 +28,13 @@ I rendered every SVG to PNG at 150 DPI. Word imports either format; PNG is the s
 | 11 | MIXED | `docs/figures/figure_11_gui_wireframe.png` (or your real `proto_2_captured.png`) | `Final_Report_v2.md` |
 | 12 | READY | `docs/figures/figure_12_repo_tree.png` | `Final_Report_v2.md` |
 | 12A | READY | `docs/figures/figure_12A_class_diagram.png` | `Final_Report_v2.md` |
+| 12B | READY | `docs/figures/figure_12B_baseline_hierarchy.png` | `Final_Report_v2.md` |
 | 13 | READY | `docs/figures/figure_13_source_backbone.png` | `Final_Report_v2_part2.md` |
 | 14 | READY | `docs/figures/figure_14_sample_efficiency.png` | `Final_Report_v2_part2.md` |
 | 15 | READY | `docs/figures/figure_15_all_methods_screenspot.png` | `Final_Report_v2_part2.md` |
 | 16 | READY | `docs/figures/figure_16_screenspot_by_slice.png` | `Final_Report_v2_part2.md` |
 
-14 of 17 done (13 originals + Figure 12A class diagram). Two require external screenshots (Figures 1, 4) and you'll see why below.
+15 of 18 done (13 originals + Figure 12A class diagram + Figure 12B baseline hierarchy). Two require external screenshots (Figures 1, 4) and you'll see why below.
 
 ---
 
@@ -183,6 +184,20 @@ I rendered every SVG to PNG at 150 DPI. Word imports either format; PNG is the s
 > Figure 12A: Class diagram. The orchestrator `Bot` composes five pipeline classes — `Capture`, `Detector`, `OCREngine`, `Matcher`, `Actor` — and returns a `BotResult` value object; the `VisClickApp` Tk GUI subclass consumes `Bot`; two training-side subclasses (`TwoViewDataset`, `SimSiam`) extend the corresponding PyTorch base classes.
 
 **Source.** The eight substantive classes and two PyTorch subclasses shown in the diagram are the exact classes present in `src/visclick/*.py` and `scripts/run_ssp_local.py` after the June 2026 OOP refactor. Verified by `grep -nE "^class " src/visclick/*.py scripts/run_ssp_local.py`. The diagram was authored as UML: open diamond for composition, dashed open triangle for inheritance, dotted arrow for `<<uses>>` and `<<returns>>` dependencies.
+
+---
+
+### Figure 12B — READY (baseline class hierarchy)
+**File.** `docs/figures/figure_12B_baseline_hierarchy.png` (source SVG: `docs/figures/figure_12B_baseline_hierarchy.svg`)
+
+**Why numbered 12B.** Inserted after Figure 12A inside a new subsection 5.5.2 "BASELINE CLASS HIERARCHY". Numbered as `12B` so no downstream figure changes.
+
+**Insert location.** `Final_Report_v2.md`, replace the placeholder block that begins `[FIGURE 12B: Baseline class hierarchy.` (inside Section 5.5.2).
+
+**Caption.**
+> Figure 12B: Baseline class hierarchy. A single `Baseline` abstract base class declares the `predict(image_rgb, instruction, **kwargs) -> BaselineResult` contract; four concrete subclasses (`TemplateBaseline`, `OCRBaseline`, `PyWinAutoBaseline`, `VisClickBaseline`) implement the contract; each returns the same `BaselineResult` value object which the evaluation runner writes to CSV.
+
+**Source.** The `Baseline` ABC lives in `scripts/baseline_common.py` (added in the June 2026 refactor). Each of the four concrete subclasses lives in its own file (`baseline_template.py`, `baseline_ocr_only.py`, `baseline_pywinauto.py`, `baseline_visclick.py`). Verified by `python3 -c "from baseline_common import Baseline; print([c.__name__ for c in Baseline.__subclasses__()])"` returning `['TemplateBaseline', 'OCRBaseline', 'PyWinAutoBaseline', 'VisClickBaseline']`.
 
 ---
 

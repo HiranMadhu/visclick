@@ -13,7 +13,7 @@ EXPECTED OUTCOME for the dissertation:
 - Succeeds well on text-labelled targets (Save, Cancel, Properties,
   Commit) when the OCR engine reads the label correctly.
 - Fails completely on icon-only clickables (close X, settings cog,
-  dropdown arrows ▼) because there is no text label to read.
+  dropdown arrows) because there is no text label to read.
 - Fails on textfield placeholders that vanish on focus (Chrome's
   omnibox, Explorer's address bar) — by the time the OCR runs there is
   no readable target.
@@ -26,19 +26,25 @@ USAGE:
     # Tesseract instead of EasyOCR (faster but more brittle)
     py -3 scripts/baseline_ocr_only.py \\
         --instruction "click Save" --engine tesseract
+
+Object-oriented layout:
+- ``OCRBaseline(Baseline)`` — instance carries the OCR engine choice
+  and the similarity threshold.
+- The module-level ``predict(...)`` remains as a delegate to a default
+  instance so ``run_baselines.py`` keeps working unchanged.
 """
 from __future__ import annotations
 
 import sys
-from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, Tuple
 
 import numpy as np
 
 from baseline_common import (
+    Baseline,
     BaselineResult,
-    autopick_monitor,
     add_repo_to_path,
+    autopick_monitor,
     baseline_argparser,
     load_image,
     maybe_click,
@@ -48,49 +54,88 @@ from baseline_common import (
 )
 
 
-def _ground(img_rgb: np.ndarray, target: str, engine: str, min_sim: int):
-    add_repo_to_path()
-    from visclick.ocr import text_ground
-    return text_ground(img_rgb, target, engine=engine, min_similarity=min_sim)
+class OCRBaseline(Baseline):
+    """Full-image OCR + fuzzy text grounding."""
 
+    name = "ocr_only"
 
-def predict(image_rgb: np.ndarray,
-            instruction: str,
-            *,
-            target_text: str = "",
-            offset: tuple[int, int] = (0, 0),
-            engine: str = "easyocr",
-            min_similarity: int = 70,
-            **_: object) -> BaselineResult:
-    r = BaselineResult(method="ocr_only", found=False)
+    def __init__(self, engine: str = "easyocr", min_similarity: int = 70) -> None:
+        self.engine: str = engine
+        self.min_similarity: int = int(min_similarity)
 
-    if target_text:
-        target = target_text
-    else:
-        words = parse_target_words(instruction)
-        target = " ".join(words) if words else ""
+    def _ground(self, img_rgb: np.ndarray, target: str, engine: str, min_sim: int):
+        add_repo_to_path()
+        from visclick.ocr import text_ground
+        return text_ground(img_rgb, target, engine=engine, min_similarity=min_sim)
 
-    if not target:
-        r.notes = f"could not parse a target from instruction '{instruction}'"
+    def predict(
+        self,
+        image_rgb: np.ndarray,
+        instruction: str,
+        *,
+        offset: Tuple[int, int] = (0, 0),
+        target_text: str = "",
+        engine: Optional[str] = None,
+        min_similarity: Optional[int] = None,
+        **_: Any,
+    ) -> BaselineResult:
+        r = BaselineResult(method=self.name, found=False)
+
+        if target_text:
+            target = target_text
+        else:
+            words = parse_target_words(instruction)
+            target = " ".join(words) if words else ""
+
+        if not target:
+            r.notes = f"could not parse a target from instruction '{instruction}'"
+            return r
+
+        eng = engine or self.engine
+        sim = self.min_similarity if min_similarity is None else int(min_similarity)
+
+        hits, ms = time_call(self._ground, image_rgb, target, eng, sim)
+        r.elapsed_ms = ms
+
+        if not hits:
+            r.notes = f"OCR found no '{target}' (engine={eng})"
+            return r
+
+        (x1, y1, x2, y2), found_text, sim_hit, ocr_conf = hits[0]
+        cx_local = (x1 + x2) // 2
+        cy_local = (y1 + y2) // 2
+        r.found = True
+        r.confidence = float(sim_hit) / 100.0
+        r.bbox = (int(x1), int(y1), int(x2), int(y2))
+        r.xy = (int(cx_local + offset[0]), int(cy_local + offset[1]))
+        r.notes = (f"OCR matched '{found_text}' (sim={sim_hit:.0f}, "
+                   f"ocr_conf={ocr_conf:.0f}) as '{target}' "
+                   f"[{len(hits)} candidate(s)]")
         return r
 
-    hits, ms = time_call(_ground, image_rgb, target, engine, min_similarity)
-    r.elapsed_ms = ms
 
-    if not hits:
-        r.notes = f"OCR found no '{target}' (engine={engine})"
-        return r
+_default = OCRBaseline()
 
-    (x1, y1, x2, y2), found_text, sim, ocr_conf = hits[0]
-    cx_local = (x1 + x2) // 2
-    cy_local = (y1 + y2) // 2
-    r.found = True
-    r.confidence = float(sim) / 100.0
-    r.bbox = (int(x1), int(y1), int(x2), int(y2))
-    r.xy = (int(cx_local + offset[0]), int(cy_local + offset[1]))
-    r.notes = (f"OCR matched '{found_text}' (sim={sim:.0f}, ocr_conf={ocr_conf:.0f}) "
-               f"as '{target}' [{len(hits)} candidate(s)]")
-    return r
+
+def predict(
+    image_rgb: np.ndarray,
+    instruction: str,
+    *,
+    target_text: str = "",
+    offset: Tuple[int, int] = (0, 0),
+    engine: str = "easyocr",
+    min_similarity: int = 70,
+    **kwargs: Any,
+) -> BaselineResult:
+    """Module-level delegate. Kept for backward compatibility."""
+    return _default.predict(
+        image_rgb, instruction,
+        offset=offset,
+        target_text=target_text,
+        engine=engine,
+        min_similarity=min_similarity,
+        **kwargs,
+    )
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -105,11 +150,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     monitor = autopick_monitor(args.monitor)
     img, offset = load_image(args.image, monitor)
 
-    r = predict(img, args.instruction,
-                target_text=args.target_text,
-                offset=offset,
-                engine=args.engine,
-                min_similarity=args.min_similarity)
+    ob = OCRBaseline(engine=args.engine, min_similarity=args.min_similarity)
+    r = ob.predict(
+        img, args.instruction,
+        target_text=args.target_text,
+        offset=offset,
+    )
     print_result(r)
 
     if r.found:

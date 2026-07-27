@@ -1,29 +1,23 @@
 """Phase 2.1 — VisClick full pipeline as a "fourth baseline" in the runner.
 
-Same ``predict(image_rgb, instruction, **kwargs) -> BaselineResult`` API
-as the three Phase-1.C baselines, so the orchestrator can run all four
-side by side on each task and the comparison CSV / chart pick up
-VisClick automatically. This is **not** a baseline - it is the headline
-approach; calling it "baseline_visclick" for code-symmetry only.
+Same ``predict(image_rgb, instruction, **kwargs) -> BaselineResult`` API as
+the three Phase-1.C baselines, so the orchestrator can run all four side
+by side on each task and the comparison CSV / chart pick up VisClick
+automatically. This is **not** a baseline — it is the headline approach;
+calling it "baseline_visclick" for code-symmetry only.
 
 Pipeline (matches ``src/visclick/bot.py``):
-  1. ONNX detector -> list of (cls, xyxy, det_conf).
-  2. EasyOCR per box -> ocr text.
+  1. ONNX detector → list of (cls, xyxy, det_conf).
+  2. EasyOCR per box → ocr text.
   3. ``match.best_box`` ranks by text similarity + class bonus + det_conf.
   4. If matcher returns None (no detection's text resembles the target),
-     fall back to ``visclick.ocr.text_ground`` - full-image OCR for the
+     fall back to ``visclick.ocr.text_ground`` — full-image OCR for the
      target keyword.
   5. Return ``BaselineResult`` with the chosen (cx, cy) + bbox.
 
-Weights live at ``weights/visclick.onnx`` (committed; ~44 MB). The
-detector is a lazy singleton on the instance so the runner pays the
-model-load cost once across all 15 tasks, not 15 times.
-
-Object-oriented layout:
-- ``VisClickBaseline(Baseline)`` — instance holds the loaded ``Detector``
-  and the OCR / matcher / min-text-similarity configuration.
-- The module-level ``predict(...)`` remains as a delegate for backward
-  compatibility with ``run_baselines.py``.
+Weights live at ``weights/visclick.onnx`` (committed; ~44 MB). Tracked
+loaded singleton so the runner pays the model load cost once across all
+15 tasks, not 15 times.
 """
 from __future__ import annotations
 
@@ -34,7 +28,6 @@ from typing import Any, List, Optional, Tuple
 import numpy as np
 
 from baseline_common import (
-    Baseline,
     BaselineResult,
     add_repo_to_path,
     autopick_monitor,
@@ -49,177 +42,118 @@ from baseline_common import (
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_WEIGHTS = REPO / "weights" / "visclick.onnx"
 
+_DETECTOR = None  # lazy singleton
 
-class VisClickBaseline(Baseline):
-    """Full VisClick pipeline behind the ``Baseline`` contract.
 
-    Holds a lazily-constructed ``visclick.detect.Detector`` so a runner
-    that predicts many instructions pays the ONNX-load cost once.
-    """
-
-    name = "visclick"
-
-    def __init__(
-        self,
-        weights: Optional[Path] = None,
-        conf: float = 0.25,
-        iou: float = 0.5,
-        ocr_engine: str = "easyocr",
-        min_text_similarity: int = 60,
-    ) -> None:
-        self.weights: Path = Path(weights) if weights else DEFAULT_WEIGHTS
-        self.conf: float = float(conf)
-        self.iou: float = float(iou)
-        self.ocr_engine: str = ocr_engine
-        self.min_text_similarity: int = int(min_text_similarity)
-        self._detector = None  # lazy
-
-    def _get_detector(self):
-        if self._detector is None:
-            add_repo_to_path()
-            from visclick.detect import Detector
-            self._detector = Detector(str(self.weights))
-        return self._detector
-
-    def _run_pipeline(
-        self,
-        image_rgb: np.ndarray,
-        instruction: str,
-        conf: float,
-        iou: float,
-        ocr_engine: str,
-        min_text_similarity: int,
-    ) -> dict:
-        """Return a dict with diagnostic fields used by predict()."""
+def _detector(weights: Path):
+    global _DETECTOR
+    if _DETECTOR is None:
         add_repo_to_path()
-        from visclick.match import best_box
-        from visclick.ocr import ocr_box, text_ground
+        from visclick.detect import Detector
+        _DETECTOR = Detector(str(weights))
+    return _DETECTOR
 
-        det = self._get_detector()
-        raw = det.predict(image_rgb, conf=conf, iou=iou)
 
-        boxes_with_text: List[Tuple[int, Tuple[float, float, float, float], float, str]] = []
-        for cls, xyxy, det_conf in raw:
-            text = ""
-            if ocr_engine != "none":
-                try:
-                    text = ocr_box(image_rgb, xyxy, engine=ocr_engine) or ""
-                except Exception:
-                    text = ""
-            boxes_with_text.append((int(cls), tuple(xyxy), float(det_conf), text))
+def _run_pipeline(image_rgb: np.ndarray,
+                  instruction: str,
+                  weights: Path,
+                  conf: float,
+                  iou: float,
+                  ocr_engine: str,
+                  min_text_similarity: int) -> dict:
+    """Return a dict with diagnostic fields used by predict() to build the
+    BaselineResult and notes string."""
+    add_repo_to_path()
+    from visclick.match import best_box
+    from visclick.ocr import ocr_box, text_ground
 
-        chosen = best_box(instruction, boxes_with_text, min_text_similarity=min_text_similarity)
-        fallback_used = False
-        if chosen is None and ocr_engine != "none":
-            words = parse_target_words(instruction)
-            target = " ".join(words) if words else ""
-            if target:
-                hits = text_ground(image_rgb, target, engine=ocr_engine,
-                                   min_similarity=min_text_similarity)
-                if hits:
-                    fallback_used = True
-                    (x1, y1, x2, y2), found_text, sim, ocr_conf = hits[0]
-                    chosen = (
-                        float(sim),
-                        1,  # cls=1 (text)
-                        (float(x1), float(y1), float(x2), float(y2)),
-                        float(ocr_conf) / 100.0,
-                        found_text,
-                    )
+    det = _detector(weights)
+    raw = det.predict(image_rgb, conf=conf, iou=iou)
 
-        return {
-            "raw_detections": raw,
-            "n_det": len(raw),
-            "chosen": chosen,
-            "fallback_used": fallback_used,
-        }
+    boxes_with_text: List[Tuple[int, Tuple[float, float, float, float], float, str]] = []
+    for cls, xyxy, det_conf in raw:
+        text = ""
+        if ocr_engine != "none":
+            try:
+                text = ocr_box(image_rgb, xyxy, engine=ocr_engine) or ""
+            except Exception:
+                text = ""
+        boxes_with_text.append((int(cls), tuple(xyxy), float(det_conf), text))
 
-    def predict(
-        self,
-        image_rgb: np.ndarray,
-        instruction: str,
-        *,
-        offset: Tuple[int, int] = (0, 0),
-        weights: Optional[Path] = None,
-        conf: Optional[float] = None,
-        iou: Optional[float] = None,
-        ocr_engine: Optional[str] = None,
-        min_text_similarity: Optional[int] = None,
-        **_: Any,
-    ) -> BaselineResult:
-        r = BaselineResult(method=self.name, found=False)
+    chosen = best_box(instruction, boxes_with_text, min_text_similarity=min_text_similarity)
+    fallback_used = False
+    if chosen is None and ocr_engine != "none":
+        words = parse_target_words(instruction)
+        target = " ".join(words) if words else ""
+        if target:
+            hits = text_ground(image_rgb, target, engine=ocr_engine,
+                               min_similarity=min_text_similarity)
+            if hits:
+                fallback_used = True
+                (x1, y1, x2, y2), found_text, sim, ocr_conf = hits[0]
+                chosen = (
+                    float(sim),
+                    1,  # treat as 'text' class for reporting
+                    (float(x1), float(y1), float(x2), float(y2)),
+                    float(ocr_conf) / 100.0,
+                    found_text,
+                )
 
-        # Late binding: caller-provided kwargs override the instance defaults.
-        if weights is not None and Path(weights) != self.weights:
-            self.weights = Path(weights)
-            self._detector = None  # force reload
-        conf = self.conf if conf is None else float(conf)
-        iou = self.iou if iou is None else float(iou)
-        engine = self.ocr_engine if ocr_engine is None else ocr_engine
-        min_sim = self.min_text_similarity if min_text_similarity is None else int(min_text_similarity)
+    return {
+        "raw_detections": raw,
+        "n_det": len(raw),
+        "chosen": chosen,
+        "fallback_used": fallback_used,
+    }
 
-        if not self.weights.is_file():
-            r.notes = f"weights not found at {self.weights}"
-            return r
 
-        out, ms = time_call(self._run_pipeline, image_rgb, instruction,
-                            conf, iou, engine, min_sim)
-        r.elapsed_ms = ms
+def predict(image_rgb: np.ndarray,
+            instruction: str,
+            *,
+            offset: Tuple[int, int] = (0, 0),
+            weights: Optional[Path] = None,
+            conf: float = 0.25,
+            iou: float = 0.5,
+            ocr_engine: str = "easyocr",
+            min_text_similarity: int = 60,
+            **_: object) -> BaselineResult:
+    r = BaselineResult(method="visclick", found=False)
 
-        chosen = out["chosen"]
-        n_det = out["n_det"]
-        if chosen is None:
-            r.notes = (f"detector returned {n_det} boxes; matcher refused "
-                       f"(no box's text >= {min_sim}% similarity to instruction; "
-                       f"text_ground fallback also empty)")
-            return r
-
-        score, cls, xyxy, det_conf, text = chosen
-        x1, y1, x2, y2 = xyxy
-        cx_local = (x1 + x2) / 2
-        cy_local = (y1 + y2) / 2
-        r.found = True
-        r.confidence = min(1.0, max(0.0, score / 100.0))
-        r.bbox = (int(x1), int(y1), int(x2), int(y2))
-        r.xy = (int(cx_local + offset[0]), int(cy_local + offset[1]))
-
-        add_repo_to_path()
-        from visclick.detect import CLASS_NAMES
-        cls_name = CLASS_NAMES[cls] if 0 <= cls < len(CLASS_NAMES) else str(cls)
-
-        src = "fallback (full-image OCR)" if out["fallback_used"] else "detector+OCR"
-        text_show = (text[:30] + "...") if text and len(text) > 30 else (text or "")
-        r.notes = (f"VisClick ({src}): {n_det} det, picked cls={cls_name} "
-                   f"det_conf={det_conf:.2f} text='{text_show}' score={score:.1f}")
+    w_path = Path(weights) if weights else DEFAULT_WEIGHTS
+    if not w_path.is_file():
+        r.notes = f"weights not found at {w_path}"
         return r
 
+    out, ms = time_call(_run_pipeline, image_rgb, instruction, w_path,
+                        conf, iou, ocr_engine, min_text_similarity)
+    r.elapsed_ms = ms
 
-_default = VisClickBaseline()
+    chosen = out["chosen"]
+    n_det = out["n_det"]
+    if chosen is None:
+        r.notes = (f"detector returned {n_det} boxes; matcher refused "
+                   f"(no box's text >= {min_text_similarity}% similarity to instruction; "
+                   f"text_ground fallback also empty)")
+        return r
 
+    score, cls, xyxy, det_conf, text = chosen
+    x1, y1, x2, y2 = xyxy
+    cx_local = (x1 + x2) / 2
+    cy_local = (y1 + y2) / 2
+    r.found = True
+    r.confidence = min(1.0, max(0.0, score / 100.0))
+    r.bbox = (int(x1), int(y1), int(x2), int(y2))
+    r.xy = (int(cx_local + offset[0]), int(cy_local + offset[1]))
 
-def predict(
-    image_rgb: np.ndarray,
-    instruction: str,
-    *,
-    offset: Tuple[int, int] = (0, 0),
-    weights: Optional[Path] = None,
-    conf: float = 0.25,
-    iou: float = 0.5,
-    ocr_engine: str = "easyocr",
-    min_text_similarity: int = 60,
-    **kwargs: Any,
-) -> BaselineResult:
-    """Module-level delegate. Kept for backward compatibility."""
-    return _default.predict(
-        image_rgb, instruction,
-        offset=offset,
-        weights=weights,
-        conf=conf,
-        iou=iou,
-        ocr_engine=ocr_engine,
-        min_text_similarity=min_text_similarity,
-        **kwargs,
-    )
+    add_repo_to_path()
+    from visclick.detect import CLASS_NAMES
+    cls_name = CLASS_NAMES[cls] if 0 <= cls < len(CLASS_NAMES) else str(cls)
+
+    src = "fallback (full-image OCR)" if out["fallback_used"] else "detector+OCR"
+    text_show = (text[:30] + "…") if text and len(text) > 30 else (text or "")
+    r.notes = (f"VisClick ({src}): {n_det} det, picked cls={cls_name} "
+               f"det_conf={det_conf:.2f} text='{text_show}' score={score:.1f}")
+    return r
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -236,14 +170,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     monitor = autopick_monitor(args.monitor)
     img, offset = load_image(args.image, monitor)
 
-    vb = VisClickBaseline(
+    r = predict(
+        img, args.instruction,
+        offset=offset,
         weights=Path(args.weights) if args.weights else None,
         conf=args.conf,
         iou=args.iou,
         ocr_engine=args.ocr_engine,
         min_text_similarity=args.min_text_similarity,
     )
-    r = vb.predict(img, args.instruction, offset=offset)
     print_result(r)
     if r.found:
         maybe_click(r, args.dry_run)

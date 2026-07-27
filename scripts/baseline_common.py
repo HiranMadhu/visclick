@@ -1,34 +1,19 @@
 """Shared utilities for the Phase 1.C classical baselines.
 
-Each baseline (template / OCR-only / pywinauto / visclick) implements the
-same ``predict(image_rgb, instruction, **task) -> BaselineResult`` API,
-so the runner can call all four on the same captured screenshot and
-produce a side-by-side comparison.
-
-Object-oriented layout (June 2026 refactor):
-- ``BaselineResult`` — the value object returned by every method.
-- ``Baseline`` — abstract base class declaring the ``predict`` contract.
-- Each concrete baseline (``TemplateBaseline``, ``OCRBaseline``,
-  ``PyWinAutoBaseline``, ``VisClickBaseline``) is a subclass in its own
-  module. Instances hold whatever per-method configuration is expensive
-  to construct (template directory, OCR engine, loaded ONNX detector).
-- Each per-method module still exposes a bare ``predict(...)`` function
-  as a delegate to a module-scope default instance, so the runner
-  (``run_baselines.py``) and any legacy caller keep working with zero
-  changes.
+Each baseline (template / OCR-only / pywinauto) implements the same
+``predict(image_rgb, instruction, **task) -> BaselineResult`` API, so the
+runner can call all three on the same captured screenshot and produce a
+side-by-side comparison.
 
 A *result* always contains:
 - ``found``: did the baseline pick anything at all?
-- ``xy``: the absolute screen coordinate it would click (already
-  includes monitor offset, so it is directly usable by
-  ``pyautogui.click``).
-- ``confidence``: method-specific score in 0..1 — for template
-  matching, this is ``cv2.matchTemplate`` correlation; for OCR, it is
-  the fuzzy similarity / 100; for pywinauto, it is 1.0 on hit, 0.0 on
-  miss.
+- ``xy``: the absolute screen coordinate it would click (already includes
+  monitor offset, so it is directly usable by ``pyautogui.click``).
+- ``confidence``: method-specific score in 0..1 — for template matching,
+  this is ``cv2.matchTemplate`` correlation; for OCR, it is the fuzzy
+  similarity / 100; for pywinauto, it is 1.0 on hit, 0.0 on miss.
 - ``elapsed_ms``: wall-clock time of just the predict call.
-- ``notes``: short free-text describing why it matched (or why it did
-  not).
+- ``notes``: short free-text describing why it matched (or why it did not).
 
 The runner judges *correctness* separately. A baseline returning
 ``found=False`` is the right answer for tasks with ``is_negative=True``
@@ -37,10 +22,10 @@ The runner judges *correctness* separately. A baseline returning
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -70,43 +55,6 @@ class BaselineResult:
             x1, y1, x2, y2 = self.bbox
             d["bbox"] = f"{x1},{y1},{x2},{y2}"
         return d
-
-
-# ---------- abstract baseline contract ----------
-
-class Baseline(ABC):
-    """Contract that every classical / neural baseline implements.
-
-    Subclasses set ``name`` (a short lowercase identifier used in the
-    ``BaselineResult.method`` field and the runner's CSV column) and
-    implement ``predict``. Per-method configuration (template directory,
-    OCR engine, ONNX detector) belongs in ``__init__`` so it is paid
-    once per instance, not once per predict call.
-
-    The contract is intentionally kwargs-flexible: the runner passes the
-    same task dictionary to every baseline, and each baseline picks out
-    the keys it cares about (``target_text`` for OCR,
-    ``target_template`` for template matching, ``target_uia_name`` for
-    pywinauto, etc.). Unknown kwargs are silently absorbed via
-    ``**kwargs``.
-    """
-
-    name: str = ""
-
-    @abstractmethod
-    def predict(
-        self,
-        image_rgb: np.ndarray,
-        instruction: str,
-        *,
-        offset: Tuple[int, int] = (0, 0),
-        **kwargs: Any,
-    ) -> BaselineResult:
-        """Predict the click coordinate for one instruction on one image.
-
-        Return a :class:`BaselineResult`; setting ``found=False`` is the
-        canonical way to signal graceful abstention.
-        """
 
 
 # ---------- screenshot helpers ----------

@@ -27,13 +27,12 @@ I rendered every SVG to PNG at 150 DPI. Word imports either format; PNG is the s
 | 10 | READY | `docs/figures/figure_10_process_flowchart.png` | `Final_Report_v2.md` |
 | 11 | MIXED | `docs/figures/figure_11_gui_wireframe.png` (or your real `proto_2_captured.png`) | `Final_Report_v2.md` |
 | 12 | READY | `docs/figures/figure_12_repo_tree.png` | `Final_Report_v2.md` |
-| 12A | READY | `docs/figures/figure_12A_class_diagram.png` | `Final_Report_v2.md` |
 | 13 | READY | `docs/figures/figure_13_source_backbone.png` | `Final_Report_v2_part2.md` |
 | 14 | READY | `docs/figures/figure_14_sample_efficiency.png` | `Final_Report_v2_part2.md` |
 | 15 | READY | `docs/figures/figure_15_all_methods_screenspot.png` | `Final_Report_v2_part2.md` |
 | 16 | READY | `docs/figures/figure_16_screenspot_by_slice.png` | `Final_Report_v2_part2.md` |
 
-14 of 17 done (13 originals + Figure 12A class diagram). Two require external screenshots (Figures 1, 4) and you'll see why below.
+13 of 16 done. Two require external screenshots (Figures 1, 4) and you'll see why below.
 
 ---
 
@@ -169,20 +168,6 @@ I rendered every SVG to PNG at 150 DPI. Word imports either format; PNG is the s
 
 **Caption.**
 > Figure 12: Repository directory tree. Top-level directories group the artefact's responsibilities: source code, dependency packaging, training data, model weights, evaluation scripts, notebooks, tests, reports, and documentation. Every path quoted elsewhere in this report is a node in this tree.
-
----
-
-### Figure 12A — READY (UML class diagram)
-**File.** `docs/figures/figure_12A_class_diagram.png` (source SVG: `docs/figures/figure_12A_class_diagram.svg`)
-
-**Why numbered 12A.** Inserted after Figure 12 (repository tree) inside a new subsection 5.5.1 "CLASS DIAGRAM". Kept as `12A` so no downstream figure number changes.
-
-**Insert location.** `Final_Report_v2.md`, replace the placeholder block that begins `[FIGURE 12A: Class diagram of the VisClick package.` (inside Section 5.5.1).
-
-**Caption.**
-> Figure 12A: Class diagram. The orchestrator `Bot` composes five pipeline classes — `Capture`, `Detector`, `OCREngine`, `Matcher`, `Actor` — and returns a `BotResult` value object; the `VisClickApp` Tk GUI subclass consumes `Bot`; two training-side subclasses (`TwoViewDataset`, `SimSiam`) extend the corresponding PyTorch base classes.
-
-**Source.** The eight substantive classes and two PyTorch subclasses shown in the diagram are the exact classes present in `src/visclick/*.py` and `scripts/run_ssp_local.py` after the June 2026 OOP refactor. Verified by `grep -nE "^class " src/visclick/*.py scripts/run_ssp_local.py`. The diagram was authored as UML: open diamond for composition, dashed open triangle for inheritance, dotted arrow for `<<uses>>` and `<<returns>>` dependencies.
 
 ---
 

@@ -99,10 +99,8 @@ class Detector:
         cls_conf = cls_conf[keep]
 
         cx, cy, w, h = boxes_xywh.T
-        x1 = cx - w / 2
-        y1 = cy - h / 2
-        x2 = cx + w / 2
-        y2 = cy + h / 2
+        x1 = cx - w / 2; y1 = cy - h / 2
+        x2 = cx + w / 2; y2 = cy + h / 2
         boxes_xyxy_lb = np.stack([x1, y1, x2, y2], axis=1)
 
         nms_input = [[float(b[0]), float(b[1]), float(b[2] - b[0]), float(b[3] - b[1])]
@@ -119,10 +117,8 @@ class Detector:
         y1 = (boxes_xyxy_lb[:, 1] - pad_y) / scale
         x2 = (boxes_xyxy_lb[:, 2] - pad_x) / scale
         y2 = (boxes_xyxy_lb[:, 3] - pad_y) / scale
-        x1 = np.clip(x1, 0, w0 - 1)
-        y1 = np.clip(y1, 0, h0 - 1)
-        x2 = np.clip(x2, 0, w0 - 1)
-        y2 = np.clip(y2, 0, h0 - 1)
+        x1 = np.clip(x1, 0, w0 - 1); y1 = np.clip(y1, 0, h0 - 1)
+        x2 = np.clip(x2, 0, w0 - 1); y2 = np.clip(y2, 0, h0 - 1)
 
         results: List[Tuple[int, Box4, float]] = []
         for i in range(len(idx)):

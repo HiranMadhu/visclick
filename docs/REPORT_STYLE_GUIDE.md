@@ -1,14 +1,14 @@
-# VisClick — Final Report Style Guide
+# VisClick - Final Report Style Guide
 
 **Purpose.** A single source of truth for the writing, formatting, and reference rules used in `Final_Report_v2.md` and the eventual Word/PDF submission. Whenever a question comes up about "how do we do X in the report?", check here first.
 
-**Last updated:** 3 June 2026.
+**Last updated:** 27 July 2026 (em-dash -> hyphen policy).
 
 ---
 
 ## 1. Template alignment
 
-The submission follows the convention used by the 2026 MSc Big Data Analytics cohort at IIT/RGU (Anushka Siriweera, supervisor Pumudu Fernando — reference PDF at `gui_temp/2425489.pdf`). The bare `MSc_Project_Report_Template.docx` is the institutional minimum; the reference report is the de facto programme convention and is what we follow.
+The submission follows the convention used by the 2026 MSc Big Data Analytics cohort at IIT/RGU (Anushka Siriweera, supervisor Pumudu Fernando - reference PDF at `gui_temp/2425489.pdf`). The bare `MSc_Project_Report_Template.docx` is the institutional minimum; the reference report is the de facto programme convention and is what we follow.
 
 ### 1.1 Chapter count and order
 
@@ -104,7 +104,7 @@ Tracker. Updated as each chapter is drafted.
 | 3 June 2026 | Ch 1, 2 | 6,500 | ~19 | 81 |
 | 3 June 2026 | Ch 1-5 | 15,400 | ~46-49 | 51-54 |
 | 11 June 2026 | Ch 1-6 | ~24,700 (raw `wc -w` incl. code blocks; prose-only ~21,000) | 55 (measured in Word) | 45 |
-| 11 June 2026 | Ch 6 expanded with full-protocol Adaptive Teacher and SHOT ablations from gpu064 reruns (`d309f99`) | +400 words in §6.5.4 and §6.5.5 | — | — |
+| 11 June 2026 | Ch 6 expanded with full-protocol Adaptive Teacher and SHOT ablations from gpu064 reruns (`d309f99`) | +400 words in §6.5.4 and §6.5.5 | - | - |
 | 11 June 2026 | Ch 1-7 (Ch 7 added) | ~28,800 raw | 65 (measured in Word) | 35 |
 | 11 June 2026 | Ch 1-9 drafted (Ch 8 + Ch 9 added; Ch 9 §§9.3-9.5 scaffolded with `[AUTHOR: ...]` markers) | ~38,400 raw | ~86-87 (projected at observed 450 wpp) | ~13-14 |
 
@@ -151,7 +151,7 @@ Rules to stay in budget:
 
 - One anchor reference per claim. Do not stack `[7, 22]` for the same thing.
 - Use survey papers to cover broad areas (one transfer-learning survey, one SSP survey, one SSOD survey if needed).
-- Drop "completeness" citations — works mentioned only to demonstrate awareness, never used as method or evidence.
+- Drop "completeness" citations - works mentioned only to demonstrate awareness, never used as method or evidence.
 - Tool documentation refs (SikuliX, PyAutoGUI, pywinauto, Ultralytics, Tesseract, EasyOCR, rapidfuzz, mss, ONNX Runtime) count toward the budget but are cheap; keep one per tool.
 - Drop placeholder/stub entries with `Co-authors` or `arXiv:2503.xxxxx` style filler unless the work genuinely needs them.
 
@@ -172,7 +172,7 @@ Updated as each chapter is added.
 
 The goal is prose that reads as a thoughtful student wrote it, supported by AI drafting. Two principles run through every chapter.
 
-**(a) Variable sentence length and rhythm.** AI prose is unnaturally uniform — sentences cluster around 18-22 words. Real writing mixes 4-word punches with 30-word complex sentences. Match the reference report's rhythm.
+**(a) Variable sentence length and rhythm.** AI prose is unnaturally uniform - sentences cluster around 18-22 words. Real writing mixes 4-word punches with 30-word complex sentences. Match the reference report's rhythm.
 
 **(b) Direct, declarative voice.** Drop AI smoothing connectives. Replace "Moreover, ..." and "Furthermore, ..." with the next sentence starting cleanly. Use "And" and "But" at sentence starts where the rhythm calls for it; both are accepted in modern academic prose.
 
@@ -186,7 +186,7 @@ The goal is prose that reads as a thoughtful student wrote it, supported by AI d
 - **Hedges in student voice.** "I think", "my reading", "I am not sure why, but ..." where natural.
 - **Concrete moments** that only the author could have written. "During the second day of running the auto-capture script, GIMP's title-bar text changed because of an autosave indicator and the corpus stopped clustering by app."
 - **Slightly loose parallelism.** Three bullets where the first two start with verbs and the third starts with a noun. AI prose is parallel to a fault.
-- **Em-dashes** for asides. `—` (not `--`, not `-`).
+- **Regular hyphens** for asides, not em-dashes. Use ` - ` (space, hyphen, space) instead of `-` or `--`. Rationale: em-dashes read as a signal of AI-produced prose to modern readers and to some AI detectors; the visual difference from a hyphen is small; and hyphens work everywhere without font quirks. Applied globally on 27 Jul 2026.
 - **Italics for emphasis** on a single word, sparingly. `*can*` not `**bold**` for emphasis.
 - **First-person where natural.** "I observed", "we evaluated", "the author tested". The reference report uses third person for the body and first person only in the Declaration. Default to third person but allow first person in Chapter 9 (Conclusion) for reflection.
 
@@ -247,15 +247,15 @@ The pragmatic split, given that Phase 4 experiments are still running:
 |---|---|---|
 | A | Write Ch 1, Ch 2 | No (done as of 3 June 2026) |
 | B | Write Ch 3, Ch 4, Ch 5, Ch 6 | No |
-| C | **Pause.** Run remaining Phase 4 experiments (D-01 target-side, D-02, D-03, D-04) | — |
+| C | **Pause.** Run remaining Phase 4 experiments (D-01 target-side, D-02, D-03, D-04) | - |
 | D | Write Ch 7, Ch 8 with real numbers | Yes |
 | E | Write Ch 9 (Conclusion) | Some |
-| F | Rebuild Harvard reference list, alphabetised | — |
-| G | Author's second-pass rewrite in own voice in Word | — |
-| H | Front matter (title page, consent, declaration, SPER) in Word | — |
-| I | Pandoc or manual MD-to-DOCX conversion | — |
-| J | Final formatting in Word (TOC, lists of figures/tables, page numbers, Turnitin check) | — |
-| K | Submit | — |
+| F | Rebuild Harvard reference list, alphabetised | - |
+| G | Author's second-pass rewrite in own voice in Word | - |
+| H | Front matter (title page, consent, declaration, SPER) in Word | - |
+| I | Pandoc or manual MD-to-DOCX conversion | - |
+| J | Final formatting in Word (TOC, lists of figures/tables, page numbers, Turnitin check) | - |
+| K | Submit | - |
 
 ### 5.1 Per-chapter sub-section conventions
 
@@ -269,10 +269,10 @@ Match the reference report's section depth.
 
 Where a number, table cell, figure, or citation depends on an experiment not yet run, use one of these explicit placeholders:
 
-- `[NUMBER]` — single metric value pending
-- `[TABLE]` — a table-shaped result pending
-- `[FIGURE N: short title. Source: path. Caption: ...]` — a figure pending
-- `[CITATION: short description]` — a reference whose canonical entry is not yet known
+- `[NUMBER]` - single metric value pending
+- `[TABLE]` - a table-shaped result pending
+- `[FIGURE N: short title. Source: path. Caption: ...]` - a figure pending
+- `[CITATION: short description]` - a reference whose canonical entry is not yet known
 
 Placeholders make second-pass review easy: a single `grep -nE '\[NUMBER\]|\[TABLE\]|\[FIGURE|\[CITATION'` finds every gap.
 
@@ -282,11 +282,11 @@ Placeholders make second-pass review easy: a single `grep -nE '\[NUMBER\]|\[TABL
 
 The following docs work together. Do not duplicate state across them.
 
-- `docs/PHASE_WORKLOG.md` — ordered phases (1-8), current state, findings log, "what's next" notes. **The canonical plan.**
-- `docs/Final_Report_GAPS.md` — per-ID ledger of every gap (D-01...D-12, T-01..T-04, W-01..W-04, F-01..F-12, U-01..U-08). **The status table.**
-- `docs/REPORT_STYLE_GUIDE.md` — this file. **The style and convention rulebook.**
-- `docs/Final_Report.md` — v1 draft, IEEE-numeric citations, polished AI voice. Retained for reference but not the submission source.
-- `docs/Final_Report_v2.md` — v2 draft, Chapters 1-5, Harvard citations, natural-informality voice, ALL-CAPS section headings. **Submission source, Part 1.**
-- `docs/Final_Report_v2_part2.md` — v2 draft, Chapters 6-9. Same conventions; sequential figure/table numbering carries on from Part 1. **Submission source, Part 2.** Concatenated with Part 1 at submission time.
+- `docs/PHASE_WORKLOG.md` - ordered phases (1-8), current state, findings log, "what's next" notes. **The canonical plan.**
+- `docs/Final_Report_GAPS.md` - per-ID ledger of every gap (D-01...D-12, T-01..T-04, W-01..W-04, F-01..F-12, U-01..U-08). **The status table.**
+- `docs/REPORT_STYLE_GUIDE.md` - this file. **The style and convention rulebook.**
+- `docs/Final_Report.md` - v1 draft, IEEE-numeric citations, polished AI voice. Retained for reference but not the submission source.
+- `docs/Final_Report_v2.md` - v2 draft, Chapters 1-5, Harvard citations, natural-informality voice, ALL-CAPS section headings. **Submission source, Part 1.**
+- `docs/Final_Report_v2_part2.md` - v2 draft, Chapters 6-9. Same conventions; sequential figure/table numbering carries on from Part 1. **Submission source, Part 2.** Concatenated with Part 1 at submission time.
 
 When a rule in this file is updated, log the change date in §0 and the affected chapters get a re-pass.

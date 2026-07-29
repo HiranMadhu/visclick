@@ -1,10 +1,8 @@
 # VISCLICK – FINAL REPORT (V2, REFERENCE-STYLE DRAFT)
 
-> **How to use this file.** This file restyles the existing `Final_Report.md` to match the convention used by the 2026 MSc Big Data Analytics cohort at IIT/RGU (see `gui_temp/2425489.pdf`). The structural changes from v1 are: ALL CAPS chapter and section headings, sequential figure and table numbering across the whole document (no chapter prefix), Harvard "Cite Them Right" citations in place of IEEE numeric, and slightly tighter declarative paragraphs. Content is preserved from v1 wherever practical. Front-matter (title page, consent, declaration, SPER) is intentionally omitted — the author will paste those separately. Figure placeholders use the pattern `[FIGURE N: title. Source: path. Caption: …]` so they can be replaced with the final images at submission time.
+> **How to use this file.** This file follows the convention used by the 2026 MSc Big Data Analytics cohort at IIT/RGU (reference dissertation at `gui_temp/2425489.pdf`). Conventions in use: ALL CAPS chapter and section headings, sequential figure and table numbering across the whole document (no chapter prefix), Harvard "Cite Them Right" citations, natural-informality prose. Chapter 1 is written at the problem-perspective level (no technology names, no library names, no methodology names). Technical detail lives in Chapter 2 (Literature Review), Chapter 5 (Design) and Chapter 6 (Implementation). Front-matter (title page, consent, declaration, SPER) is omitted here and pasted separately at submission time. Figure placeholders use the pattern `[FIGURE N: title. Source: path. Caption: …]`.
 >
-> **Reference budget.** Target ~30-40 references for the final list (the reference report has ~25). Citations are added sparingly: one anchor reference per claim, no stacking, no placeholder/stub entries. Most consolidation happens in Chapter 2.
->
-> **Chapter 7 (Testing) is paused.** When the v2 draft reaches Chapter 6, work stops and waits for the user's notebook results (D-01 DETR, D-05 few-shot curve, YOLOv8 source, ScreenSpot CPV, prototype TSR) before Chapter 7 is written.
+> **Reference budget.** Target ~30-40 references for the final list. Citations are added sparingly: one anchor reference per claim, no stacking, no placeholder/stub entries. Most consolidation happens in Chapter 2.
 
 ---
 
@@ -12,73 +10,69 @@
 
 ## 1.1 CHAPTER OVERVIEW
 
-This chapter sets out what the project is about. It starts with the background and the problem, then states the aim, the four research questions, the research gap and the research objectives. The operational objectives section breaks the work into the four phases by which it was actually executed. The chapter ends with the scope statement — both what is in and what was deliberately left out — and a short summary.
+This chapter frames the project at the problem level. It describes the situation on the modern desktop, the practical gap in the available tooling, the aim, the four research questions, the operational plan by which the work was carried out, and the boundary of what the project does and does not attempt. Technical detail - which datasets, which model families, which adaptation strategies, which libraries - is deliberately kept out of this chapter and lives in Chapter 2 (Literature Review), Chapter 5 (Design) and Chapter 6 (Implementation). The intention is that a reader can finish Chapter 1 knowing *what problem is being solved and why it matters*, without yet knowing *how*.
 
 ## 1.2 PROJECT BACKGROUND
 
-Graphical user interfaces are how most people interact with software. Whether you are filing a tax return on a web form, editing code in VS Code, processing an image in GIMP, or just renaming a file in File Explorer, the underlying mechanics are the same. A small set of clicks and keystrokes, directed at coloured rectangles on a screen. Automating that has been an active area of work for decades. The motivations range from the mundane (repetitive data entry, regression testing of an application's controls, RPA in back-office settings) to the more ambitious. Accessibility tools that let users with motor impairment drive an application by voice. Autonomous agents that complete multi-step tasks on a user's behalf.
+Graphical user interfaces are how most people interact with software. Filing a tax return on a web form, editing a document, renaming a file in a file manager - the underlying mechanic is the same. A small set of clicks and keystrokes directed at coloured rectangles on a screen. Automating that mechanic has been an active area of work for decades. The motivations span the mundane and the ambitious. Repetitive data entry. Regression testing of an application's controls. Robotic process automation in back-office settings. Accessibility tools that let users with motor impairment drive an application by voice. Autonomous agents that complete multi-step tasks on a user's behalf. In every case the primitive is the same: identify the right control on the screen, then click it.
 
-The available tooling falls into two camps. The older camp is image-based automation. SikuliX lets a user record a small bitmap of a button and asks the OS to find that bitmap on screen using OpenCV template matching (SikuliX, 2024). PyAutoGUI extends the same idea by exposing a Python interface to mouse and keyboard, but at heart it is still working in pixel coordinates (Sweigart, 2024). Tools of this kind are simple to use, but brittle. The bitmap of a button is not the button. It is a photograph of the button, taken on one machine, under one theme, at one DPI, on one OS build. Change any of those and the photograph stops matching. AskUI's review puts this politely as "image recognition first" (AskUI, 2024); in practice anyone who has tried to deploy a SikuliX script across a fleet has seen the failure mode at scale.
+The tools that automate that primitive fall into two long-established families. The first works from pixels. A small image of the target control is captured up front, and at run time the tool searches the live screen for a matching bitmap. Simple. Also fragile. A bitmap is a photograph of the control taken on one machine, under one theme, at one display scale, on one operating-system build. Change any of those and the photograph no longer matches. The second family goes at the problem from a different angle entirely. It walks the operating system's accessibility tree - the same tree screen-readers use - and finds a *Save* button by its semantic name rather than by its appearance. In theory this is the right approach. In practice, on the modern Windows desktop, the tree has quietly stopped being a faithful description of what the user sees. Applications with web-technology renderers show only a degraded tree; newer Windows applications often expose their controls under internal identifiers that do not match the visible label; and web pages inside a browser use a different accessibility convention again. The upshot is that the accessibility tree and the visible interface have drifted apart, and for a growing share of desktop applications the drift is now too wide to bridge with a tree-walking script.
 
-The second camp is accessibility-tree automation. Classic Windows applications expose a tree of named controls through the UI Automation framework, and Python libraries such as `pywinauto` walk that tree to find a *Save* button by its semantic name rather than its appearance (pywinauto Contributors, 2024). When it works, it is fast and stable. But it has stopped working reliably on a sizeable chunk of the modern Windows application mix. Electron apps (VS Code, Slack, Discord, Teams) expose only a degenerate tree because the renderer is a Chromium browser. Modern Windows 11 apps that use WinUI 3 or XAML islands often expose their controls under localised internal names rather than the visible labels. Web pages inside any browser are served through ARIA, which is a separate convention again. The empirical consequence, shown in Chapter 7, is that `pywinauto` can still drive classic Windows applications, but it fails on the modern WinUI 3 surface that ships with Windows 11 by default.
+A newer strand of work sits outside both families. It uses computer vision to detect UI elements directly from a screenshot, without any privileged access to the application's internals. On the mobile side this strand is mature - a decade of research has produced well-resourced datasets and highly-optimised detectors. On the desktop side it is markedly less developed. Desktop screens are landscape rather than portrait, multi-window rather than single-window, and packed with dense toolbars and ribbon menus of a kind mobile screens simply do not contain. They also draw on decades of stylistic variance - old and new theme families, dark and light modes, high-contrast accessibility skins - that has no real parallel in the more harmonised design languages of the mobile world. And there is no desktop-side dataset at the scale of the mobile-side canonical ones. The few recent attempts to build one are small, recent, and still evolving.
 
-Sitting outside both camps is a newer strand of work. It uses computer vision and machine learning to detect UI elements directly from a screenshot, without any privileged access to the application's internal tree. Object-detection models such as YOLOv8 (Ultralytics, 2024) and DETR (Carion et al., 2020) are trained on annotated images of UIs and learn to predict bounding boxes labelled with classes such as `button`, `text`, `icon`, and so on. Mobile UIs are well resourced in this respect, thanks to RICO (Deka et al., 2017) and its denoised successor CLAY (Li et al., 2022a), which between them provide tens of thousands of labelled mobile screens. Recent work on YOLOv5-MGC reports mean average precision in the high 80s and low 90s on mobile UIs (Cheng et al., 2022).
+There is a fourth strand - foundation-scale vision–language models - that sits at the other end of the spectrum from the classical tools. On paper it can handle the mobile-to-desktop gap without much effort. But the compute cost is enormous. Multi-GPU inference, large memory budgets, cloud dependencies. That kind of hardware is a non-starter for the sort of practical on-machine deployment this project cares about, so foundation-scale models end up being the point of comparison, not the point of departure.
 
-Desktops are a different story. Desktop UIs differ from mobile UIs along several axes at once. They are landscape, not portrait. They are multi-window, not single-window. They contain dense toolbars and ribbon menus that produce what Chen et al. (2020) call a "packed scene", where elements sit close enough together that a standard detector struggles to put a clean bounding box around each one. They draw on decades of stylistic variance — Win32, WPF, Material Design, custom themes, dark mode, high-contrast accessibility skins — that has no real parallel in the more harmonised design languages of Android and iOS. And critically, there is no RICO-equivalent for desktops. The most recent attempts to build one (Wang et al., 2025; Patel et al., 2025) are themselves dated 2024 and 2025, which tells you how new the recognition of this gap is. Even those are an order of magnitude smaller than RICO.
-
-What this means in practice is that a detector trained to high accuracy on mobile UIs typically does not, on its own, do well on desktop screenshots. There is a domain shift between the two. Quantifying that shift, and finding data-efficient ways to close it, is the problem this project takes on.
+Put all four strands together and you get a spectrum with a hole in the middle. The lightweight tools are cheap to run but break the moment the visible surface shifts. The heavyweight tools generalise beautifully but need hardware nobody actually has on their desk. What is missing is a middle option. Small enough to run on a normal machine. Tolerant of the theme and display-scale variability of real desktops. Accurate enough to drive a click reliably. And - because a detector on its own is not the whole story - validated end-to-end inside a working automation tool, not just on a benchmark. Producing that middle option is what this project takes on.
 
 [FIGURE 1: Examples of the mobile-to-desktop shift.
-Source: `reports/figures/ch1_domain_shift_examples.png` (to be produced; suggested layout is a three-panel composite stitching a mobile portrait screen from CLAY, a classic Win32 desktop screen from Windows File Explorer, and a modern Win11 WinUI 3 Save-As dialog).
-Caption: Three axes of the mobile-to-desktop shift. Left, a mobile portrait UI from CLAY. Centre, a classic landscape desktop with a packed toolbar. Right, a modern Win11 WinUI 3 dialog with flat, theme-dependent controls.]
+Source: `reports/figures/ch1_domain_shift_examples.png` (a three-panel composite: a mobile portrait screen; a classic landscape desktop with a packed toolbar; a modern desktop dialog with flat, theme-dependent controls).
+Caption: Three axes of the mobile-to-desktop shift. Portrait versus landscape orientation; sparse versus packed layouts; harmonised versus fragmented visual styling. Each axis contributes to the domain gap that motivates the project.]
 
 ## 1.3 PROBLEM STATEMENT
 
-The practical problem can be stated in one sentence. A practitioner who wants to build a vision-based UI automation tool for the modern Windows desktop has no off-the-shelf option today that is accurate, lightweight enough to run on a typical workstation, and tolerant of the variability that real desktop UIs show in the wild — all at once.
+The problem, in one sentence: nobody today has a desktop UI automation tool that is accurate, that fits on a personal machine, and that survives the visual variability of real applications. Not simultaneously.
 
-The classical image-based tools (SikuliX, PyAutoGUI) are lightweight, but not tolerant of variability. Their bitmap matching collapses the moment the theme, DPI or font shifts. The accessibility-tree tools (`pywinauto`) are tolerant of theme and DPI by construction, but not accurate on the modern Windows application mix. The empirical work in Chapter 7 shows `pywinauto` succeeding on only one out of fifteen task instances on a Windows 11 workload, and even that one success is a negative case where the right outcome is for the bot to do nothing. At the other extreme, heavyweight large vision–language models such as SeeClick (Cheng et al., 2024) are accurate and tolerant of variability across domains. But they are not lightweight by any reasonable definition. They need multi-GPU inference setups and large memory budgets that are unrealistic for most practical deployments and well out of reach for an MSc-scale project.
+The pixel-based tools are lightweight but rigid - their bitmap matching gives up the moment the theme, display scale or font changes. The accessibility-tree tools are tolerant of theme and scale by design, but on the modern Windows application mix Chapter 7's numbers show they simply do not see what the user sees. And the foundation-scale models that *are* both accurate and tolerant come with a compute cost that puts them out of reach for the on-machine deployment this project is aiming at.
 
-The gap therefore sits in the middle of the spectrum. Can a lightweight object-detection model — trained on the relatively well-resourced mobile UI domain and adapted to the data-scarce desktop domain with a minimal labelled budget — deliver a detector that is "accurate enough" for use inside a practical automation pipeline? And given that this is fundamentally a transfer-learning question, which adaptation strategy gives the best return on the labelled-data budget? Those are the questions the project sets out to answer.
+So the gap sits in the middle. Whether a small model, trained on the well-resourced mobile UI domain and then carried across to the data-scarce desktop domain on a modest labelled budget, can be made good enough to drive a real click is the empirical question the project takes on. And because this is at heart a transfer-learning question, the methodological one that rides alongside it is: which adaptation strategy gives the best return on the labelled data a single developer can realistically produce?
 
-A secondary, more practical, problem is that even an accurate detector is not, by itself, an automation system. A user does not want to be told "there are forty-seven elements on your screen". A user wants to say "click Save", and have the system do the right thing. That requires a grounding step — matching a natural-language instruction to one of the detected elements. The IVGocr framework of Dardouri et al. (2024a) provides a sensible scaffolding for this kind of pipeline, and this project adopts it. So the novelty in the prototype is not the pipeline architecture. It is the cross-domain-adapted detector that sits inside it.
+There is a secondary problem sitting alongside the detection one. Even a good detector is not an automation tool by itself. Nobody wants to be told "the screen contains forty-seven elements". People want to type "click Save" and have the right thing happen. Turning detection output into a click needs a grounding step - matching a typed instruction to one of the detected elements - and an action step that translates that match into an actual OS-level click. The pipeline shape for this is well established and reviewed in Chapter 2. The project's novelty is not the pipeline. It is the detector that goes inside the pipeline, and the honest end-to-end evaluation of the whole tool on real desktop applications rather than only on a static benchmark.
 
 ## 1.4 RESEARCH AIM
 
-The aim of the research is to design, develop and evaluate a scalable cross-domain machine learning framework capable of adapting mobile-trained GUI detection models for desktop environments while maintaining high accuracy and generalisation.
+The aim of the research is to design, develop and evaluate a machine-learning framework that adapts existing UI-detection models to the modern Windows desktop while remaining lightweight enough to run on a personal machine, and to demonstrate that framework inside a working instruction-to-click automation prototype.
 
 ## 1.5 RESEARCH QUESTIONS
 
-The aim is decomposed into four research questions that the rest of the work addresses one at a time.
+The aim decomposes into four research questions that the rest of the work addresses one at a time.
 
-- **RQ1.** What is the magnitude of performance degradation when applying mobile-trained GUI detectors to desktop screenshots?
-- **RQ2.** Which adaptation strategies yield the largest improvements in low-label regimes?
-- **RQ3.** How does model choice (YOLO vs DETR vs LVLM) influence transferability and sample efficiency?
-- **RQ4.** What are the practical limits of a vision-and-action bot using adapted detectors in real desktop applications?
+- **RQ1.** How large is the performance drop when a UI-element detector trained on one domain (mobile) is applied to a different domain (desktop)?
+- **RQ2.** Which families of adaptation strategy close that drop most effectively under a small labelled-data budget?
+- **RQ3.** How does the choice of detector architecture family influence transferability and sample efficiency?
+- **RQ4.** What are the practical limits of a vision-driven click automation tool built on the adapted detector, measured on real desktop applications?
 
-These four questions are answered, respectively, in the baseline performance numbers in Chapter 6 (RQ1), the adaptation method comparison in Chapter 7 (RQ2), the cross-architecture comparison in Chapter 7 (RQ3), and the prototype evaluation in Chapter 8 (RQ4). The chapter map is repeated in Section 1.11.
+Empirical numbers answering all four questions are reported in Chapter 7, and their interpretation is in Chapter 8. The chapter map is repeated in Section 1.11.
 
 ## 1.6 RESEARCH GAP
 
-The literature reviewed in Chapter 2 makes one thing clear. The gap this project addresses is not a lack of state-of-the-art models. The mobile UI domain has highly optimised detectors of its own (Cheng et al., 2022). The desktop target domain has a clear application pipeline in the IVGocr framework (Dardouri et al., 2024a). Heavyweight large vision–language models such as SeeClick (Cheng et al., 2024) are capable of bridging the domain gap. They just do it at a computational cost that puts them out of reach for the kind of practical, on-machine deployment this project cares about.
+The gap is not that the individual pieces are missing. Strong mobile-side detectors are out there. Sensible modular pipeline patterns are out there. Foundation-scale models that can cross the domain gap are out there too. What is missing is the *combination* - a lightweight, data-efficient method that carries a strong mobile detector across into the desktop domain on the small labelled budget an individual or small team can actually produce, and that shows the resulting tool works end-to-end on real applications rather than only on a static test split.
 
-The gap is in the *combination*. There is no published, lightweight, data-efficient method that takes a state-of-the-art mobile detector, adapts it to the desktop domain using the small labelled-data budget that an individual or a small team can realistically produce, and shows that the resulting model is usable inside a complete automation pipeline — not just on a static benchmark. That combination is what the dissertation contributes.
+The gap is sharpened by an asymmetry in the data. On the mobile side there are canonical, publicly-available labelled corpora at tens of thousands of screens. On the desktop side there are a handful of small, recently-emerging datasets and not much else. That asymmetry is what forces the problem to be a transfer-learning problem. Training a big desktop-only detector from scratch is not on the table for a personal-budget project, so the model has to be trained somewhere else and then carried across cheaply. Chapter 2 makes both halves of this gap concrete with the underlying citations.
 
-The data side sharpens the gap further. Mobile has RICO (Deka et al., 2017) and CLAY (Li et al., 2022a) providing tens of thousands of labelled screens. Desktop has only a handful of small, recently published datasets (Wang et al., 2025; Patel et al., 2025). The data-scarce target is what mandates domain adaptation in the first place. Training a high-capacity desktop-only model from scratch is not feasible at MSc scale. A model has to be trained somewhere else and then moved across.
-
-[FIGURE 2: Positioning of this project against existing automation approaches.
-Source: `reports/figures/ch1_positioning_grid.png` (to be produced; suggested layout is a 2-by-2 grid with axes "lightweight ↔ heavyweight" and "theme and DPI tolerant ↔ brittle", with SikuliX and PyAutoGUI in the bottom-left, `pywinauto` in the bottom-right but greyed out because it fails on modern Win11, SeeClick in the top-right, and this project in the middle).
-Caption: Where the proposed framework sits relative to existing GUI automation approaches. Classical image-based and accessibility-tree tools sit in the lightweight-but-brittle corner; large vision–language models sit in the heavyweight-but-tolerant corner; this project targets the middle.]
+[FIGURE 2: Positioning of the proposed project against families of existing GUI automation approaches.
+Source: `docs/figures/figure_02_positioning_grid.png`.
+Caption: Where the proposed project sits relative to broad families of existing GUI automation approaches. Classical image-based and accessibility-tree tools sit in the lightweight-but-brittle corner; foundation-scale vision-language models sit in the heavyweight-but-tolerant corner; the proposed project targets the empty middle-of-grid niche.]
 
 ## 1.7 RESEARCH OBJECTIVES
 
-The main research objectives are as follows.
+The research objectives translate the aim and the four research questions into concrete deliverables. Each is stated at the level of *what the project produces*, not *which method it uses to produce it* - the "how" is the subject of Chapters 5 and 6.
 
-- To quantify the mobile-to-desktop performance gap using mean average precision (mAP) for detection quality and the Central Point Validation (CPV) metric of Dardouri et al. (2024b) for grounding quality.
-- To implement and compare three adaptation methods: few-shot supervised fine-tuning, self-supervised pre-training followed by fine-tuning (SSP+FT), and unsupervised domain adaptation (UDA) using the Cross-Domain Adaptive Teacher framework of Li et al. (2022b) and the Source Hypothesis Transfer (SHOT) framework of Liang et al. (2020).
-- To evaluate sample efficiency by determining how many labelled desktop images are actually required to achieve acceptable performance, sweeping over a small range of training budgets.
-- To develop a prototype bot that demonstrates instruction-to-action behaviour on real desktop applications using the adapted detector inside the IVGocr pipeline.
+- Measure, quantitatively, the size of the mobile-to-desktop performance drop for the chosen model family.
+- Implement and compare three families of adaptation strategy - one that uses a small labelled budget on the target domain, one that uses a larger unlabelled budget on the target domain, and one that uses no target labels at all - on the same detection task.
+- Establish, empirically, how many labelled desktop images are actually needed to reach useful performance by sweeping the labelled budget over a small range of training sizes.
+- Build a working prototype that turns a typed natural-language instruction into a mouse click on real desktop applications, using the best-adapted detector from the comparison above, and evaluate that prototype on a fixed suite of everyday desktop tasks.
 
-Each objective is mapped to a chapter and to a measurable deliverable. The mapping is made explicit in Section 8.8 (Achievement of Research Objectives).
+Each objective maps to a chapter and to a measurable deliverable. The full mapping is made explicit in Section 8.8 (Achievement of Research Objectives).
 
 ## 1.8 OPERATIONAL OBJECTIVES
 
@@ -86,72 +80,38 @@ The research objectives describe what is to be answered. The operational objecti
 
 ### 1.8.1 DATA ENGINEERING AND BASELINE ESTABLISHMENT
 
-- Survey 10 to 15 diverse desktop applications, including Visual Studio Code, GIMP, Chrome, Firefox, Windows File Explorer, Notepad and Excel.
-- Use an automated capture script built on top of `mss` and `pywinauto` to collect a small unlabelled corpus of desktop screenshots, covering different resolutions, themes and application states.
-- Hand-select and annotate a small "Labelled Target Corpus" in CVAT against a five-class schema of `{button, menu, text_input, checkbox, icon}`.
-- Train the mobile-baseline detector on CLAY.
+- Assemble a source-domain training corpus from publicly-available mobile UI datasets, harmonising their annotation schemes into a single class taxonomy.
+- Collect a small unlabelled corpus of desktop screenshots covering a representative range of applications, resolutions and themes.
+- Hand-label a small target-domain test set against the harmonised taxonomy to serve as the ground-truth for evaluation.
+- Train a baseline UI-element detector on the source-domain corpus and record its zero-shot performance on the desktop test set. This is the "problem" the adaptation experiments then try to close.
 
 ### 1.8.2 MODEL ADAPTATION EXPERIMENTS
 
-- Implement both a YOLOv8 backbone and a DETR backbone, each pre-trained on CLAY.
-- Run the few-shot fine-tuning experiment on a small number of labelled desktop images to plot a data-efficiency curve.
-- Pre-train the backbones using a generative inpainting self-supervised task on the unlabelled desktop corpus and repeat the few-shot experiment to measure the uplift from self-supervised pre-training.
-- Implement the Cross-Domain Adaptive Teacher (Li et al., 2022b) and SHOT (Liang et al., 2020) UDA frameworks.
+- Repeat the source-domain training with a second detector architecture family so the effect of architecture on transferability can be isolated.
+- Run a labelled-budget adaptation experiment, sweeping the labelled desktop set over a small range of sizes to plot a data-efficiency curve.
+- Run an unlabelled-budget adaptation experiment that pre-trains the model on the unlabelled desktop corpus before the labelled fine-tune.
+- Run a no-target-label adaptation experiment that relies entirely on the unlabelled target corpus and the original labelled source, comparing two structurally different strategies within this family.
 
 ### 1.8.3 PROTOTYPE INTEGRATION
 
-- Select the single best adapted model from the previous phase.
-- Build the "Adapted-IVGocr" prototype that wraps it, using `mss` and `pywinauto` for capture, the adapted detector for perception, Tesseract or EasyOCR for reading text inside detected boxes, fuzzy string matching (`rapidfuzz`) for grounding the instruction to a detected element, and PyAutoGUI for the click action.
+- Select the best-performing adapted model from the previous phase.
+- Wrap that model inside a modular pipeline that captures the screen, detects candidate elements, reads their text, matches a typed instruction against the detected elements, and executes an operating-system-level click when the match is confident enough.
+- Ship the prototype with both a command-line entry point and a graphical interface so it can be exercised interactively as well as scripted for evaluation.
 
 ### 1.8.4 END-TO-END EVALUATION AND THESIS COMPOSITION
 
-- Define 10 to 15 standardised automation tasks such as "open Notepad and save the file as `test.txt`".
-- Evaluate the prototype's Task Success Rate (TSR) on those tasks.
-- Perform a qualitative failure analysis that traces end-to-end failures back to detection errors, OCR errors, or grounding-logic errors.
-- Write the final thesis and package the code.
+- Define a fixed suite of everyday desktop tasks written as natural-language instructions.
+- Evaluate the prototype's task success rate on that suite alongside three classical baselines drawn from the tool families reviewed in Chapter 2, using a shared harness so the comparison is fair.
+- Perform a qualitative failure analysis that attributes each end-to-end failure to a specific stage of the pipeline (detection, reading, matching, or action).
+- Write the dissertation and package the reproducible artefact.
 
 ## 1.9 PROPOSED SOLUTION
 
-The solution has three interlocking components. The technical depth lives in Chapter 5 (Design) and Chapter 6 (Implementation); this section gives only the high-level shape.
+The shape of the proposed solution is a two-part investigation. The first part carries a UI-element detector from the well-resourced mobile domain into the data-scarce desktop domain using adaptation strategies that trade labelled data for other kinds of information - unlabelled target images, or the labelled source data itself. The second part wraps the best-adapted detector inside a modular pipeline that turns a natural-language instruction into a click on the real Windows desktop. The two parts together form the deliverable: a lightweight, locally-runnable click-automation tool whose detector was produced by a controlled adaptation experiment rather than a black-box training run. The technical detail of both parts - which datasets, which detector families, which specific adaptation strategies, which supporting libraries - is deferred to Chapter 2 (existing methods), Chapter 5 (design of this project) and Chapter 6 (implementation of this project).
 
-### 1.9.1 DATA AND PREPROCESSING PIPELINE
-
-The source mobile corpus is CLAY (Li et al., 2022a), a denoised subset of RICO (Deka et al., 2017). Using CLAY rather than raw RICO matters because RICO contains significant layout noise. CLAY is a deep-learning pipeline that automatically cleans and corrects those raw layouts, and the resulting corpus is a much better starting point for transfer learning. The CLAY annotation schema is mapped onto the five-class desktop schema using a deterministic table documented in Chapter 6.
-
-The target unlabelled desktop corpus is collected by a Python script. The script drives `pywinauto` to enumerate the visible top-level windows of a curated set of 10 to 15 applications, captures each window with `mss`, and saves the screenshot to disk. The script is parameterised by resolution, theme and DPI scaling so the corpus covers the in-the-wild variability the deployed prototype will eventually meet.
-
-The target labelled desktop corpus is hand-curated from the unlabelled pool and annotated in CVAT against the five-class schema. It serves two roles. It is the gold-standard test set against which all adaptation methods are evaluated. And it is the source of the few-shot training subsets used in the sample-efficiency experiment.
-
-### 1.9.2 ADAPTATION METHODOLOGIES
-
-All adaptation methods are applied to both a YOLOv8 backbone and a DETR-R50 backbone, so the cross-architecture comparison in RQ3 is a controlled one.
-
-The baseline is the mobile-trained detector run zero-shot on the labelled target corpus. The resulting low mAP is the "problem" the three adaptation methods then try to close.
-
-The first adaptation method is few-shot supervised fine-tuning. The CLAY-trained backbone is frozen and only the final detection head is re-trained on the labelled desktop images, sweeping over a small range of `k` to produce a data-efficiency curve. This is the simplest of the three methods. It serves as the floor against which the other two are compared.
-
-The second method is self-supervised pre-training (SSP) followed by fine-tuning. A generative inpainting task (Anaya-Isaza et al., 2024) is used on the unlabelled desktop corpus. Random patches are masked out and the model is trained to predict them. The intuition: to inpaint a missing patch of a Windows toolbar, the model has to implicitly learn the structural grammar of desktop UIs — toolbars are horizontal, icons sit in rows, dialog buttons cluster bottom-right. The SSP backbone is then handed to the few-shot procedure to measure whether unsupervised pre-training improves the final mAP.
-
-The third method is unsupervised domain adaptation (UDA). Two UDA frameworks are implemented and compared. The first is the Cross-Domain Adaptive Teacher of Li et al. (2022b). It is a teacher-student setup where a stable Exponential Moving Average teacher generates pseudo-labels on weakly augmented target images, and a student is trained on a mixed batch of labelled source data and strongly augmented pseudo-labelled target data. The second is SHOT (Liang et al., 2020). SHOT freezes the source-trained classification head (the "source hypothesis") and adapts only the feature extractor on the unlabelled target images using self-supervision. The goal is to align the new target features to the frozen source hypothesis, rather than retrain the head itself.
-
-### 1.9.3 PROTOTYPE INTEGRATION AND EVALUATION
-
-The prototype, VisClick, is a direct implementation of the IVGocr architecture (Dardouri et al., 2024a). The novelty is the replacement of their standard YOLOv8 detector with the cross-domain-adapted detector from the previous component.
-
-The runtime flow:
-
-1. The user supplies a free-form text instruction, for example "click Save".
-2. A screenshot of the user-selected monitor is taken with `mss`, in the virtual-desktop coordinate space.
-3. The adapted detector runs on the screenshot and returns a set of candidate bounding boxes, each with a class label and a confidence score.
-4. Tesseract or EasyOCR is run on each detected bounding box (rather than on the whole image) to recover the visible text. A full-image OCR pass is kept in reserve as a fallback, for cases where the detector misses the target entirely.
-5. A fuzzy string matcher (`rapidfuzz`) computes the similarity between the user's instruction and the OCR text of each detected element. The element with the highest score above a similarity threshold is selected.
-6. PyAutoGUI moves the cursor to the centre of the selected box and issues a single left click. When no candidate clears the threshold, the prototype refuses to click and reports a structured failure message. This refusal-on-uncertainty behaviour is a deliberate design choice. A confident wrong click, in an automation tool, is worse than an honest refusal.
-
-The detection metric used for component-level evaluation is mAP at IoU 0.5, with the Central Point Validation (CPV) metric of Dardouri et al. (2024b) used for grounding quality. The end-to-end bot metric is Task Success Rate (TSR), a binary pass or fail on each of the standardised tasks.
-
-[FIGURE 3: High-level architecture of the proposed solution.
-Source: `reports/figures/ch1_solution_overview.png` (to be produced; suggested source is the Mermaid block diagram already in `docs/VisClick_Report_Data_Form.md` Section 18.1, exported as a PNG).
-Caption: End-to-end shape of the proposed solution. A mobile-pretrained detector is adapted to desktop using one of three methods and then wrapped inside the IVGocr-style instruction-to-action pipeline that constitutes the deliverable prototype.]
+[FIGURE 3: Two-part shape of the proposed solution.
+Source: `docs/figures/figure_03_solution_overview.png`.
+Caption: The two parts of the proposed solution. Part 1 carries a detector from a data-rich source domain across into the data-scarce desktop target domain via an adaptation stage. Part 2 wraps the adapted detector inside a modular pipeline that turns a typed instruction and the current screen into a single click on the right control - or a refusal, if the pipeline is not confident enough.]
 
 ## 1.10 SCOPE OF THE PROJECT
 
@@ -159,25 +119,25 @@ The scope of the project is as follows.
 
 **In scope.**
 
-- Cross-domain adaptation from a single mobile source domain (CLAY, with raw RICO as the upstream corpus) to a single desktop target domain (Windows 11 with 10 to 15 common applications).
-- Two-detector architectural comparison between YOLOv8 and DETR. Both are state-of-the-art, both have well-known reference implementations, and they differ on a single architecturally meaningful axis (anchor-based dense detection with a multi-scale neck for YOLO, against anchor-free direct set prediction with a transformer encoder–decoder for DETR), which makes the comparison clean.
-- Three adaptation methods: few-shot fine-tuning, self-supervised pre-training followed by fine-tuning, and unsupervised domain adaptation. The third method itself contains the Adaptive Teacher and SHOT sub-comparison.
-- A prototype that closes the loop, on the user's machine, from a natural-language instruction to a click.
-- Quantitative evaluation against three measurable criteria: mAP on the labelled desktop test set, CPV on the IVGocr grounding step, and TSR on a fixed task suite.
+- Cross-domain adaptation from a single mobile source domain to a single desktop target domain (Windows 11, ten to fifteen everyday applications).
+- Comparison of two structurally different detector architecture families on the same task, so the effect of architecture on transferability can be measured.
+- Three families of adaptation strategy, one of which itself contains two structurally different sub-strategies compared against each other.
+- A working prototype that closes the loop, on a personal machine, from a typed natural-language instruction to a click.
+- Quantitative evaluation against three measurable criteria: detection quality, grounding quality, and end-to-end task-success rate.
 
 **Out of scope.**
 
-- Cross-platform support. The prototype targets Windows 11. macOS and Linux are not in scope. `pywinauto` is itself Windows-only, the DPI assumptions in the capture stage are Windows-specific, and any meaningful cross-platform work would have at least doubled the project's effort budget.
-- Heavyweight large vision–language models. Models such as SeeClick (Cheng et al., 2024) are referenced and discussed in the literature review because they represent the "heavyweight state of the art" against which the project's lightweight stance is positioned, but they are not benchmarked here. The compute budget for that kind of comparison is well beyond what was available, and including it would have shifted the project from a practical engineering investigation to a pure benchmarking exercise.
-- Full accessibility-tree integration at runtime. `pywinauto` is used in the data-collection stage and is also benchmarked as a classical baseline in Chapter 7, but it is not used at runtime in the prototype's perception pipeline. Using it at runtime would defeat the point of the vision-based approach.
-- Highly multimodal instructions. Instructions are free-form text. Voice input, image-conditioned instructions, multi-step natural-language commands and conversational dialogue are all out of scope.
-- Robotic process automation at fleet scale. The prototype is a single-user, single-machine demonstrator. Scaling out to multiple machines, multi-tenant deployment, or enterprise governance is left for future work and discussed in Chapter 9.
+- Cross-platform support. The prototype targets Windows 11. macOS and Linux are not addressed. Extending to another operating system would at least have doubled the project's effort budget.
+- Foundation-scale vision–language models. These are referenced in the literature review as the heavyweight state-of-the-art against which the project's lightweight stance is positioned, but they are not benchmarked here. Their compute cost is well beyond what was available.
+- Full accessibility-tree integration at runtime. The accessibility tree is used during data collection and is benchmarked as one of the three classical comparison points in Chapter 7, but it is deliberately not used at inference time in the prototype's perception path. Using it at runtime would defeat the point of the vision-based approach.
+- Rich multimodal instructions. Instructions are free-form text. Voice input, image-conditioned instructions, and multi-step conversational dialogue are all out of scope.
+- Robotic process automation at fleet scale. The prototype is a single-user, single-machine demonstrator. Scaling to multi-machine deployment and enterprise governance is future work, discussed in Chapter 9.
 
 ## 1.11 CHAPTER SUMMARY
 
-This chapter has set up the problem, the aim, the four research questions, the research gap, and the four-phase work plan the rest of the report follows. The picture in one paragraph is this. GUI automation on the modern desktop is in an awkward place. Classical image-based tools are too brittle. Classical accessibility-tree tools have fallen out of step with the modern Windows application mix. The heavyweight large vision–language models that *can* do the job are too big to run anywhere most people would actually want to. Sitting in the middle, where there is a clear opportunity, is the idea of a cross-domain-adapted lightweight detector — trained on the relatively well-resourced mobile UI domain and then carried across to the data-scarce desktop domain. The project investigates how far that idea can be pushed, using three adaptation methods (few-shot fine-tuning, SSP+FT, and UDA) on two backbones (YOLOv8 and DETR), and integrates the best of those into a working prototype that closes the loop from a typed instruction to a click on the real Windows desktop.
+This chapter has set the problem up at the motivation level. UI automation on the modern Windows desktop is stuck. The old lightweight tools are too brittle for the theme-and-scale variability that real desktops throw at them. The accessibility-tree tools have drifted out of step with the modern application mix and no longer see what the user sees. And the foundation-scale models that *can* handle the domain gap need hardware most practical deployments cannot afford. That leaves a gap in the middle of the spectrum, and the gap is where this project lives. The idea being tested is that a small model, trained on the well-resourced mobile UI domain and then carried across cheaply to the data-scarce desktop domain, can be made good enough to drive a real click-automation tool on real desktop applications. Whether that idea holds up - and how far it can be pushed on a personal-budget project - is what the rest of the report investigates.
 
-The rest of the report is organised as follows. **Chapter 2** is the literature review. It walks through the datasets, the model architectures and the adaptation methodologies in enough depth to support the architectural choices made later, and it ends with the explicit research-gap statement that motivates the rest of the work. **Chapter 3** lays out the requirement analysis, including a stakeholder analysis using the Onion model, the functional requirements and the non-functional requirements with quantitative targets. **Chapter 4** covers the project management approach: the research methodology, the software development methodology, the risk register, and the project plan. **Chapter 5** covers the design, including a high-level architecture, a research design, a block diagram, a flow chart, and the wireframes for the prototype user interface. **Chapter 6** is the implementation chapter, which describes how the data pipeline, the three adaptation methods, and the prototype were actually built. **Chapter 7** is the testing chapter, which reports the model-level and prototype-level test results in tabular form. **Chapter 8** is the evaluation chapter, which interprets those results against the research questions and the requirements and includes a discussion of legal, ethical, professional and social impact. **Chapter 9** concludes with the limitations, the things the author would do differently in retrospect, and the directions for future work.
+The rest of the report is organised as follows. **Chapter 2** is the literature review. It walks through the datasets, the detector architecture families, the adaptation methodology families, and the modular grounding pipeline pattern in the depth needed to support the design choices made later. It ends with the explicit research-gap statement that motivates the rest of the work. **Chapter 3** lays out the requirement analysis, including a stakeholder analysis using the Onion model, the functional requirements traced to use cases, and the non-functional requirements with quantitative targets. **Chapter 4** covers the project-management approach: the research methodology, the software design methodology, the software development methodology, the project-management methodology, the risk register, and the project plan in Gantt form. **Chapter 5** covers the design of the artefact: the research design, the architecture, the process flow, the module design, the algorithm design, and the wireframe of the prototype user interface. **Chapter 6** is the implementation chapter, which describes how the data pipeline, the four adaptation experiments, and the prototype were actually built, and shows the actual user interface that resulted. **Chapter 7** is the testing chapter, which reports the strategies used and then the model-level, functional and non-functional test results in tabular form. **Chapter 8** is the evaluation chapter, which interprets those results against the four research questions and against the requirements, and includes the discussion of threats to validity, ethics, deployment considerations, and future work. **Chapter 9** concludes with the answers to the research questions, the learning outcomes, and the final reflection.
 
 ---
 
@@ -197,7 +157,7 @@ The canonical mobile UI dataset is **RICO**, released by Deka et al. (2017). RIC
 
 The community's answer is **CLAY** by Li et al. (2022a). CLAY is not a new corpus of screenshots. It is a deep-learning denoising pipeline that takes RICO's raw view-hierarchies and produces cleaner, machine-verified layouts. The result is 59,555 cleaned Android UI screens with a more consistent 23-class taxonomy and a much-reduced rate of overlapping, invisible, or mis-classified boxes. The improvement is not small. Detectors trained on CLAY-cleaned labels gain 5 to 8 mAP points over the same architecture trained on raw RICO. For this reason CLAY is the source-domain training set for this project's headline detector.
 
-The mobile domain has not stood still since RICO. The **MUD** dataset of Kumar et al. (2024) was put together in response to the observation that RICO and CLAY are now temporally outdated. Android's visual design has shifted noticeably since 2017 — the move from Holo and Material 1 themes to Material 3, the rise of foldable form factors, the increase in dark-mode and large-text accessibility variants — and a detector trained on the older corpus does worse on modern screens. MUD reports a button-class mAP of 75.3 % on its own test split compared to 63.4 % when the same model is trained on RICO and evaluated on MUD. That gap is not enormous, but it speaks to a real data-currency problem even within the mobile domain.
+The mobile domain has not stood still since RICO. The **MUD** dataset of Kumar et al. (2024) was put together in response to the observation that RICO and CLAY are now temporally outdated. Android's visual design has shifted noticeably since 2017 - the move from Holo and Material 1 themes to Material 3, the rise of foldable form factors, the increase in dark-mode and large-text accessibility variants - and a detector trained on the older corpus does worse on modern screens. MUD reports a button-class mAP of 75.3 % on its own test split compared to 63.4 % when the same model is trained on RICO and evaluated on MUD. That gap is not enormous, but it speaks to a real data-currency problem even within the mobile domain.
 
 On the desktop side the picture is much thinner. There is no "desktop RICO" of comparable scale. The recent attempts to fill the gap are themselves telling, both of demand and of how new the recognition of the gap is. **DeskVision** (Wang et al., 2025) proposes a large-scale desktop region-captioning corpus aimed at GUI agents and is dated March 2025 on arXiv. **GenGUI** (Patel et al., 2025) is a synthetic dataset of web interfaces generated by ChatGPT, closer to a UI-design-generation corpus than to an element-detection one. Neither is yet at the order of magnitude of RICO. The authors of the IVGocr paper this project's prototype is modelled after had to build their own desktop dataset to run their experiments (Dardouri et al., 2024a), and they note this explicitly in the paper. The data-scarce nature of the desktop target is the gravitational pull that draws this project, and others like it, toward domain adaptation rather than train-from-scratch on the target.
 
@@ -217,7 +177,7 @@ Table 1 sets the principal datasets side by side. The figures for RICO and CLAY 
 The last row, the Zenodo unified bundle, is what this project actually trains on. It combines RICO, CLAY and VINS into a single 6-class taxonomy `{button, text, text_input, icon, menu, checkbox}` chosen to match what an automation bot needs to interact with. The class-collapse mapping is documented in Chapter 6.
 
 [FIGURE 4: RICO and CLAY side by side.
-Source: `reports/figures/ch2_rico_vs_clay.png` (to be produced; suggested layout is one mobile screen from RICO with raw view-hierarchy boxes overlaid, beside the same screen with CLAY's cleaned labels — the CLAY GitHub page has matched-pair examples that can be reproduced).
+Source: `reports/figures/ch2_rico_vs_clay.png` (to be produced; suggested layout is one mobile screen from RICO with raw view-hierarchy boxes overlaid, beside the same screen with CLAY's cleaned labels - the CLAY GitHub page has matched-pair examples that can be reproduced).
 Caption: Raw RICO labels on the left, CLAY's denoised labels on the right, same screen. CLAY removes invisible-container nodes, fixes class mis-assignments, and reduces overlapping-box duplicates.]
 
 ## 2.3 PRE-PROCESSING FOR UI ELEMENT DETECTION
@@ -234,11 +194,11 @@ A short remark on input resolution. RICO and CLAY use portrait-oriented Android 
 
 Before the deep-learning era, three families of tools dominated GUI automation. They are still in widespread use, particularly in industrial test automation and RPA, and this project benchmarks itself against the strongest of them.
 
-The first family is **bitmap-based visual automation**. The best-known tool is **SikuliX** (SikuliX, 2024). SikuliX records a small bitmap of a UI element (a *Save* button, a magnifying-glass icon) and at run time uses OpenCV's `matchTemplate` to find that bitmap on the live screen. The user writes a script in a Sikuli-flavoured Python that says, in effect, "click this image". The strength of the approach is its simplicity. The weakness is its rigidity. A bitmap is a frozen photograph of the element under one theme, one DPI, one font, one application version. Change the theme to dark mode and the bitmap stops matching. Change the DPI from 100 % to 125 % and the same thing happens. AskUI's recent review (AskUI, 2024) phrases this politely as "image recognition first", but the practical effect at deployment scale is that scripts decay quickly. The empirical evidence in Chapter 7 of this report confirms that on the specific subset of tasks where a reference bitmap could be captured, template matching is excellent — it scored 100 % on those tasks — but on tasks where no useful bitmap exists (positional targets such as "click the first command", dynamic state toggles, text-inside-text) it cannot represent the problem at all.
+The first family is **bitmap-based visual automation**. The best-known tool is **SikuliX** (SikuliX, 2024). SikuliX records a small bitmap of a UI element (a *Save* button, a magnifying-glass icon) and at run time uses OpenCV's `matchTemplate` to find that bitmap on the live screen. The user writes a script in a Sikuli-flavoured Python that says, in effect, "click this image". The strength of the approach is its simplicity. The weakness is its rigidity. A bitmap is a frozen photograph of the element under one theme, one DPI, one font, one application version. Change the theme to dark mode and the bitmap stops matching. Change the DPI from 100 % to 125 % and the same thing happens. AskUI's recent review (AskUI, 2024) phrases this politely as "image recognition first", but the practical effect at deployment scale is that scripts decay quickly. The empirical evidence in Chapter 7 of this report confirms that on the specific subset of tasks where a reference bitmap could be captured, template matching is excellent - it scored 100 % on those tasks - but on tasks where no useful bitmap exists (positional targets such as "click the first command", dynamic state toggles, text-inside-text) it cannot represent the problem at all.
 
 The second family is **coordinate-based automation**. The canonical Python example is **PyAutoGUI** (Sweigart, 2024), which exposes `pyautogui.click(x, y)` and lets the user write scripts that drive the mouse and keyboard at specified pixel coordinates. PyAutoGUI is widely used inside other automation stacks, including this project's prototype, where it drives the final click. On its own it is the most brittle of the three families because it has no knowledge of what is at those coordinates. The same script that works on a 1080p laptop fails on a 1440p desktop unless every coordinate is recomputed. PyAutoGUI is best understood not as a competitor to a vision-based bot but as the low-level primitive that any vision-based bot eventually has to use to translate a chosen bounding box into an OS-level click.
 
-The third family is **accessibility-tree automation**. On Windows the canonical Python library is **pywinauto** (pywinauto Contributors, 2024). pywinauto uses Microsoft's UI Automation framework to walk the live application's accessibility tree and find controls by their semantic `Name` and `ControlType`. The approach is theoretically beautiful. It abstracts away theme, DPI and font: the same script should work on a 1080p laptop and a 1440p desktop because both expose the same `Button(Name='Save')` control. In practice the modern Windows application mix has eroded the assumption that the accessibility tree faithfully reflects the visible UI. Electron applications such as Visual Studio Code, Slack and Discord expose only a degenerate tree because the renderer is a Chromium browser. Modern Windows 11 applications using WinUI 3 or XAML islands frequently expose localised internal control names rather than the visible labels. Web pages inside any browser serve their accessibility tree via ARIA, which is a separate convention again. The empirical baseline reported in Chapter 7 of this report shows pywinauto scoring 1 out of 15 task instances on a representative Windows 11 workload — and that single success is the negative case where the right answer is for the bot to do nothing. On every positive task (Notepad's Save-As dialog, Visual Studio Code's Search panel, Chrome's omnibox, File Explorer's ribbon) pywinauto returned `ElementNotFound`.
+The third family is **accessibility-tree automation**. On Windows the canonical Python library is **pywinauto** (pywinauto Contributors, 2024). pywinauto uses Microsoft's UI Automation framework to walk the live application's accessibility tree and find controls by their semantic `Name` and `ControlType`. The approach is theoretically beautiful. It abstracts away theme, DPI and font: the same script should work on a 1080p laptop and a 1440p desktop because both expose the same `Button(Name='Save')` control. In practice the modern Windows application mix has eroded the assumption that the accessibility tree faithfully reflects the visible UI. Electron applications such as Visual Studio Code, Slack and Discord expose only a degenerate tree because the renderer is a Chromium browser. Modern Windows 11 applications using WinUI 3 or XAML islands frequently expose localised internal control names rather than the visible labels. Web pages inside any browser serve their accessibility tree via ARIA, which is a separate convention again. The empirical baseline reported in Chapter 7 of this report shows pywinauto scoring 1 out of 15 task instances on a representative Windows 11 workload - and that single success is the negative case where the right answer is for the bot to do nothing. On every positive task (Notepad's Save-As dialog, Visual Studio Code's Search panel, Chrome's omnibox, File Explorer's ribbon) pywinauto returned `ElementNotFound`.
 
 The collective failure of all three classical families on the modern Windows 11 application mix is the operative justification for a vision-based approach. If the accessibility tree could be trusted, machine learning would not be needed. On a 2026-vintage desktop, the evidence is that it cannot.
 
@@ -258,7 +218,7 @@ This project compares two architectural families. The first is **YOLOv8** (Ultra
 
 The second is **DETR** (DEtection TRansformer) by Carion et al. (2020). DETR re-frames detection as a direct-set-prediction problem solved with a transformer encoder-decoder and a bipartite-matching loss. It eliminates anchors and non-maximum suppression, which is conceptually clean and has the practical benefit of removing two layers of hyperparameter tuning. The well-documented weakness of the original DETR is poor performance on small objects, attributed to the global attention pattern in the encoder spending too much attention budget on large regions and too little on small ones. For this project, the architectural comparison committed to in RQ3 puts a YOLOv8 backbone and a DETR-R50 backbone side by side, on the hypothesis that DETR's small-object weakness will be aggravated by the packed-scene density of desktop UIs. The DETR experiments are part of Phase 2 and are tracked as D-01.
 
-A separate piece of work worth flagging is **Apple's Screen Recognition** of Zhang et al. (2021). Screen Recognition is the production pipeline behind the iOS VoiceOver accessibility feature. An on-device object detector classifies widgets into 13 types, with OCR adding text labels. The reported numbers are F1 of 0.91 on in-distribution screens, dropping to 0.74 on apps the model has never seen, with OCR adding a further 6 to 11 points on top. The paper is cited here for two reasons. First, it is the closest existing analogue to what this project tries to do — an industrial-scale, accessibility-motivated, on-device UI detector that adds OCR exactly where the visual detector misses. Second, the 0.91 to 0.74 in-distribution to out-of-distribution drop is empirical confirmation that even at Apple-scale data and engineering, the domain-shift effect is real and is the right thing to design around. This project's Win11-domain drop is consistent with that pattern at much smaller scale.
+A separate piece of work worth flagging is **Apple's Screen Recognition** of Zhang et al. (2021). Screen Recognition is the production pipeline behind the iOS VoiceOver accessibility feature. An on-device object detector classifies widgets into 13 types, with OCR adding text labels. The reported numbers are F1 of 0.91 on in-distribution screens, dropping to 0.74 on apps the model has never seen, with OCR adding a further 6 to 11 points on top. The paper is cited here for two reasons. First, it is the closest existing analogue to what this project tries to do - an industrial-scale, accessibility-motivated, on-device UI detector that adds OCR exactly where the visual detector misses. Second, the 0.91 to 0.74 in-distribution to out-of-distribution drop is empirical confirmation that even at Apple-scale data and engineering, the domain-shift effect is real and is the right thing to design around. This project's Win11-domain drop is consistent with that pattern at much smaller scale.
 
 ## 2.6 DOMAIN ADAPTATION METHODOLOGIES
 
@@ -266,7 +226,7 @@ The four research questions for this project collapse, on closer inspection, int
 
 The simplest method is **few-shot supervised fine-tuning**. The CLAY-pretrained backbone is frozen and the final detection head is re-trained on a small labelled subset of the target domain. The size of the subset is the free parameter; this project's plan is to sweep over a small range of `k` values to draw a data-efficiency curve. Few-shot fine-tuning is the canonical baseline in the transfer-learning literature. The broad survey of Iman et al. (2023) gives roughly two dozen variations on the theme of "fine-tune the top, freeze the bottom". The reason the project keeps it in the experiment plan is not novelty. It is the necessary control. Any more elaborate method must beat the few-shot fine-tune by a non-trivial margin to be worth its complexity.
 
-The intermediate method is **self-supervised pre-training (SSP) followed by fine-tuning**. SSP first pre-trains the backbone on unlabelled target-domain data with a self-supervised pretext task — typically masked-patch reconstruction or contrastive learning — and then fine-tunes the resulting backbone on labelled data exactly as in the few-shot case. The intuition is that the SSP step lets the model absorb the structural grammar of the target domain (toolbars are horizontal, dialog buttons cluster bottom-right, menubars sit under the title bar) without requiring labels. The medical-imaging survey of Anaya-Isaza et al. (2024) reports a consistent uplift of 4 to 11 points on downstream classification accuracy when masked-patch reconstruction is added to small-data fine-tuning. The SSP experiment is tracked as D-02.
+The intermediate method is **self-supervised pre-training (SSP) followed by fine-tuning**. SSP first pre-trains the backbone on unlabelled target-domain data with a self-supervised pretext task - typically masked-patch reconstruction or contrastive learning - and then fine-tunes the resulting backbone on labelled data exactly as in the few-shot case. The intuition is that the SSP step lets the model absorb the structural grammar of the target domain (toolbars are horizontal, dialog buttons cluster bottom-right, menubars sit under the title bar) without requiring labels. The medical-imaging survey of Anaya-Isaza et al. (2024) reports a consistent uplift of 4 to 11 points on downstream classification accuracy when masked-patch reconstruction is added to small-data fine-tuning. The SSP experiment is tracked as D-02.
 
 The most elaborate method is **unsupervised domain adaptation (UDA)**, which uses *no* labelled target data and relies entirely on the unlabelled target corpus together with the labelled source corpus. This project compares two UDA families on the desktop target.
 
@@ -319,7 +279,7 @@ The positioning relative to SeeClick and the LVLM family is explicit. This proje
 
 ## 2.10 CHAPTER SUMMARY
 
-This chapter walked through the literature in the order the project consumes it. The mobile UI domain is data-rich, anchored by RICO and CLAY. The desktop domain is data-poor, with recent attempts at corpora (DeskVision, GenGUI) still emerging. Classical automation tools — bitmap, coordinate and accessibility-tree — have all run into problems on the modern Windows 11 application mix, leaving a gap that vision-based detection is the natural candidate to fill. Among deep-learning detectors, the two architectural families this project compares (YOLOv8 with its multi-scale PANet neck, DETR with its transformer set-prediction) have well-documented strengths and weaknesses. YOLOv8's multi-scale design is the favourite, with DETR included as a controlled comparison. Among adaptation methods, the three this project implements (few-shot, SSP+FT, UDA) span the continuum from labelled-only-on-target to no-labels-on-target. The published literature suggests SSP+FT will give the best practical return at the project's data budget. Among grounding frameworks, the IVGocr modular pipeline of Dardouri et al. (2024a) is the immediate architectural ancestor of this project's prototype; SeeClick and ScreenAI are the heavyweight reference points that anchor the dissertation's lightweight stance. The combined research gap is the absence of a lightweight, data-efficient, end-to-end-validated cross-domain UI adapter for the desktop, and the project's four research questions sit precisely inside that gap.
+This chapter walked through the literature in the order the project consumes it. The mobile UI domain is data-rich, anchored by RICO and CLAY. The desktop domain is data-poor, with recent attempts at corpora (DeskVision, GenGUI) still emerging. Classical automation tools - bitmap, coordinate and accessibility-tree - have all run into problems on the modern Windows 11 application mix, leaving a gap that vision-based detection is the natural candidate to fill. Among deep-learning detectors, the two architectural families this project compares (YOLOv8 with its multi-scale PANet neck, DETR with its transformer set-prediction) have well-documented strengths and weaknesses. YOLOv8's multi-scale design is the favourite, with DETR included as a controlled comparison. Among adaptation methods, the three this project implements (few-shot, SSP+FT, UDA) span the continuum from labelled-only-on-target to no-labels-on-target. The published literature suggests SSP+FT will give the best practical return at the project's data budget. Among grounding frameworks, the IVGocr modular pipeline of Dardouri et al. (2024a) is the immediate architectural ancestor of this project's prototype; SeeClick and ScreenAI are the heavyweight reference points that anchor the dissertation's lightweight stance. The combined research gap is the absence of a lightweight, data-efficient, end-to-end-validated cross-domain UI adapter for the desktop, and the project's four research questions sit precisely inside that gap.
 
 The next chapter, Chapter 3, turns to requirement analysis. It begins with a stakeholder analysis and proceeds through functional and non-functional requirements with quantitative targets that the rest of the report measures against.
 
@@ -339,19 +299,25 @@ Stakeholder analysis identifies the people and organisations who are affected by
 
 ### 3.2.1 THE ONION MODEL
 
+The Onion model was chosen over alternative stakeholder-mapping techniques (power-interest grids, salience models, RACI matrices) because it is the technique the reference dissertations produced under the same RGU MSc structure use, and because its distance-from-core geometry is a natural fit for a project whose stakeholders sit at markedly different distances from the technical artefact - from the author, who owns the code, out to Microsoft, who owns the platform the code runs on. The six-ring structure captures this range in a single diagram.
+
+[FIGURE 7: Onion stakeholder model for the proposed project.
+Source: `docs/figures/figure_07_onion_model.png`.
+Caption: Six-ring Onion stakeholder model. Rings order stakeholders by conceptual distance from the technical core. The innermost ring is the artefact itself; each successive ring adds a wider category of stakeholder whose interests the design has to reconcile.]
+
 The Onion model for this project has six rings.
 
 The **innermost ring** is the system itself: the VisClick prototype. The ONNX detector, the EasyOCR layer, the rapidfuzz matcher, the Tk GUI, and the PyAutoGUI action layer.
 
-The **second ring** is the **operational users**. Two distinct groups sit here. The first is the author, who runs the bot for evaluation and treats it as a research artefact. The second is the imagined power user — a developer or QA engineer who would use such a tool to automate repetitive desktop tasks. The two groups have meaningfully different requirements. The researcher wants observability above all else: overlay images, structured CSVs, verifiable verdicts. The power user wants reliability (zero crashes, predictable refusal-on-uncertainty) and convenience (a GUI rather than a CLI). The system addresses both by shipping a CLI for the researcher and a Tk GUI for the power user, layered over a common core.
+The **second ring** is the **operational users**. Two distinct groups sit here. The first is the author, who runs the bot for evaluation and treats it as a research artefact. The second is the imagined power user - a developer or QA engineer who would use such a tool to automate repetitive desktop tasks. The two groups have meaningfully different requirements. The researcher wants observability above all else: overlay images, structured CSVs, verifiable verdicts. The power user wants reliability (zero crashes, predictable refusal-on-uncertainty) and convenience (a GUI rather than a CLI). The system addresses both by shipping a CLI for the researcher and a Tk GUI for the power user, layered over a common core.
 
 The **third ring** is the **academic operational stakeholders**: the project supervisor (Pumudu Fernando) and the second marker. Their concerns are different again. They want a reproducible artefact, an honest evaluation, an academic novelty argument, and a dissertation properly structured against the RGU programme handbook.
 
-The **fourth ring** is the **functional layer of downstream beneficiaries**. Three sub-groups belong here. QA and test-automation engineers who might adapt the project's code for production purposes. Accessibility users who could in principle benefit from a text-driven click bot when traditional input devices are not usable. And the research community — authors of any of the literature reviewed in Chapter 2 who might cite or extend this work, and future students inheriting the codebase.
+The **fourth ring** is the **functional layer of downstream beneficiaries**. Three sub-groups belong here. QA and test-automation engineers who might adapt the project's code for production purposes. Accessibility users who could in principle benefit from a text-driven click bot when traditional input devices are not usable. And the research community - authors of any of the literature reviewed in Chapter 2 who might cite or extend this work, and future students inheriting the codebase.
 
 The **fifth ring** is the **containing organisations**. Robert Gordon University is the degree-awarding body and the source of the dissertation's ethical-review framework, style guide, and assessment criteria. The Informatics Institute of Technology (IIT) is the partner institution. The author's employer is mentioned only because professional context informs some of the architectural choices. An automation tool that is interpretable and locally-deployable is more aligned with corporate compliance concerns than one that calls out to a cloud LLM.
 
-The **outermost ring** is the **wider environment**. Microsoft is the platform owner — Windows 11 OS, the UI Automation framework, Notepad, File Explorer. Their decisions about which control libraries to ship and how to expose them through the accessibility tree have material effects on every measurement in Chapter 7. Google Colab is the compute provider for all training. Their Free-tier T4 quota is the binding budget constraint that shapes the data and experimental design. GitHub hosts the public artefact. The open-source community supplies the underlying libraries (Ultralytics for YOLOv8, JaidedAI for EasyOCR, the pywinauto and PyAutoGUI maintainers). Dataset providers sit here too — Deka et al. (2017) for RICO, Li et al. (2022a) for CLAY — as do the bad-actor groups whose existence motivates the social-impact discussion in Section 8.10.
+The **outermost ring** is the **wider environment**. Microsoft is the platform owner - Windows 11 OS, the UI Automation framework, Notepad, File Explorer. Their decisions about which control libraries to ship and how to expose them through the accessibility tree have material effects on every measurement in Chapter 7. Google Colab is the compute provider for all training. Their Free-tier T4 quota is the binding budget constraint that shapes the data and experimental design. GitHub hosts the public artefact. The open-source community supplies the underlying libraries (Ultralytics for YOLOv8, JaidedAI for EasyOCR, the pywinauto and PyAutoGUI maintainers). Dataset providers sit here too - Deka et al. (2017) for RICO, Li et al. (2022a) for CLAY - as do the bad-actor groups whose existence motivates the social-impact discussion in Section 8.10.
 
 ### 3.2.2 STAKEHOLDER VIEWPOINTS
 
@@ -369,11 +335,15 @@ Each ring produces requirements. And the requirements sometimes conflict. The fi
 
 Where the viewpoints conflict, the design rule is consistent: prefer the more conservative behaviour. When in doubt about whether to click, do not click; this is R-FR-06. When in doubt about which monitor to use, ask; this is the `--monitor` flag. When in doubt about whether a result should go into the CSV, log it with a `notes` field.
 
+### 3.2.3 A NOTE ON PRIMARY DATA GATHERING
+
+No primary data gathering activity - no user survey, no structured interview programme, no questionnaire distribution, no ethnographic study of end users - was carried out for this project. This is a deliberate methodological choice, not an omission. The project's stakeholders are the ones captured in the Onion model above; requirements were derived from those stakeholders using the four techniques listed in the next section (literature review, self-as-stakeholder analysis, one informal supervisor interview, and field observation of analogous tools). A questionnaire study of hypothetical end users was considered and rejected as disproportionate to a single-developer MSc project whose primary artefact is a research prototype rather than a shipping product. The ethical implication is that no participant data was collected and no RGU ethical-review application beyond the standard MSc project submission was required. This declaration is placed here, immediately after the Onion model, so that a reader who expects a data-gathering phase does not have to search for its absence.
+
 ## 3.3 REQUIREMENT GATHERING TECHNIQUES
 
 Four requirement-gathering techniques were used during the project, each in proportion to its cost-effectiveness on a single-developer MSc project.
 
-**Literature review.** The single largest source of functional requirements is the existing literature reviewed in Chapter 2. The IVGocr architecture of Dardouri et al. (2024a) directly contributed R-FR-01 to R-FR-05 (capture, instruction, detection, matching, action). The published failure modes of classical baselines — UIED's argument that neither pure deep learning nor pure CV suffices on its own (Chen et al., 2020), Apple's published in-distribution-to-out-of-distribution drop (Zhang et al., 2021) — directly contributed R-FR-06 (refusal on uncertainty). The literature is the most reproducible requirement source for an academic project, because every requirement can be traced back to a publication.
+**Literature review.** The single largest source of functional requirements is the existing literature reviewed in Chapter 2. The IVGocr architecture of Dardouri et al. (2024a) directly contributed R-FR-01 to R-FR-05 (capture, instruction, detection, matching, action). The published failure modes of classical baselines - UIED's argument that neither pure deep learning nor pure CV suffices on its own (Chen et al., 2020), Apple's published in-distribution-to-out-of-distribution drop (Zhang et al., 2021) - directly contributed R-FR-06 (refusal on uncertainty). The literature is the most reproducible requirement source for an academic project, because every requirement can be traced back to a publication.
 
 **Self-as-stakeholder analysis.** The author is one of the operational users. Several requirements were derived from running early versions of the bot during the prototype phase. Multi-monitor coordinate confusion produced R-FR-07. Silent Tesseract failure produced part of R-NFR-04 (reliability). The difficulty of switching OCR engines from the CLI produced part of R-NFR-05 (usability). Self-as-stakeholder is a recognised method in agile and lean software engineering, though it is more often used in industrial projects than in dissertation work.
 
@@ -387,7 +357,7 @@ A fifth technique that the reference report at IIT/RGU uses but this project doe
 
 The data-engineering side follows a three-tier methodology dictated by the data-availability constraints reviewed in Section 2.2.
 
-**Tier 1: public source-domain corpora.** Three publicly available datasets are used as the source domain: RICO (Deka et al., 2017), CLAY (Li et al., 2022a), and VINS. Acquisition is straightforward — a download from the respective project pages and a checksum check — but the cleaning and class-collapse work is non-trivial and is documented in Chapter 6. The combined corpus is the 6-class "Zenodo unified bundle" of approximately 9,646 screens used in the source-training notebook.
+**Tier 1: public source-domain corpora.** Three publicly available datasets are used as the source domain: RICO (Deka et al., 2017), CLAY (Li et al., 2022a), and VINS. Acquisition is straightforward - a download from the respective project pages and a checksum check - but the cleaning and class-collapse work is non-trivial and is documented in Chapter 6. The combined corpus is the 6-class "Zenodo unified bundle" of approximately 9,646 screens used in the source-training notebook.
 
 **Tier 2: captured target-domain unlabelled corpus.** The proposal commits to roughly 2,000 unlabelled desktop screenshots captured from 10 to 15 applications. The capture methodology is implemented in `scripts/auto_capture_corpus.py` and uses `mss` for the screen grab plus the foreground-window title for the per-image filename. The script is parameterised so the eventual corpus covers the in-the-wild variability the bot encounters. As of submission this corpus is in active accumulation.
 
@@ -401,7 +371,7 @@ The three tiers feed three different experimental purposes. Tier 1 is the source
 
 The system supports six use cases, four of which are user-facing and two of which are internal to evaluation.
 
-[FIGURE 7: UML use case diagram for VisClick.
+[FIGURE 8: UML use case diagram for VisClick.
 Source: `reports/figures/ch3_use_cases.png` (to be produced; one actor "User", six use cases UC-01 to UC-06 with `<<include>>` relationships where appropriate).
 Caption: Use case diagram for the VisClick prototype. UC-01 to UC-04 are user-facing; UC-05 and UC-06 are run during evaluation. Each use case maps to one or more functional requirements in Section 3.7.]
 
@@ -453,7 +423,7 @@ The functional requirements R-FR-01 to R-FR-09 are listed in Table 2. Each requi
 
 **Table 2: Functional requirements.**
 
-| ID | Requirement | Description | Priority | Use cases | Test section | Status |
+| ID | Requirement | Description | Priority | UC# | Test section | Status |
 |----|-------------|-------------|----------|-----------|--------------|--------|
 | R-FR-01 | Screen Capture | The system shall capture a screenshot of the user-selected monitor at native resolution, in the virtual-desktop coordinate space. | Essential | UC-01, UC-03 | Section 7.3.1 | FULL: 15/15 on T01-T15 |
 | R-FR-02 | Text Instruction Input | The system shall accept a free-form text instruction via CLI flag or GUI text box. | Essential | UC-01, UC-02 | Section 7.3.1 | FULL: 15/15 |
@@ -500,17 +470,21 @@ The next chapter, Chapter 4, describes the project management approach: the rese
 
 ## 4.1 CHAPTER OVERVIEW
 
-This chapter explains how the project was run. It begins with the research methodology — the philosophical and procedural framework that determined the kind of evidence the project chased. It moves on to the software design methodology and the software development methodology. Both constrain how a single-developer MSc project should be structured on a finite budget. The project management methodology is described next. The risk register is then made explicit. It captures, in a forward-looking form, the issues encountered during execution together with the mitigations that resolved them. The chapter closes with the project plan in Gantt form, with reference to the four-phase operational structure inherited from the proposal.
+This chapter explains how the project was run. It begins with the research methodology - the philosophical and procedural framework that determined the kind of evidence the project chased. It moves on to the software design methodology and the software development methodology. Both constrain how a single-developer MSc project should be structured on a finite budget. The project management methodology is described next. The risk register is then made explicit. It captures, in a forward-looking form, the issues encountered during execution together with the mitigations that resolved them. The chapter closes with the project plan in Gantt form, with reference to the four-phase operational structure inherited from the proposal.
 
 A reader interested only in the empirical findings can skip Chapter 4 and pick up at Chapter 5 (Design). The contents here are required by the RGU MSc dissertation rubric, and they perform a real function: they tell a marker which research-philosophical commitments the rest of the dissertation expects to be evaluated against.
 
 ## 4.2 RESEARCH METHODOLOGY
 
-The project is in the design-science research (DSR) tradition (Hevner et al., 2004). DSR is appropriate when the research output is a new artefact intended to solve a real-world problem, and when the contribution is evaluated by demonstrating that the artefact does so. The artefact in this case is the VisClick prototype together with the cross-domain adaptation framework that produces its detector. The output is evaluated by measuring the prototype's performance against three quantitative metrics (mAP, CPV, TSR), and against the three classical baselines that constitute the practical comparison set.
+Three research-methodology paradigms were considered for this project: pure positivism, pure interpretivism, and design-science research (DSR). Each corresponds to a distinct answer to the question "what kind of evidence is this project trying to produce". The project settled on DSR (Hevner et al., 2004), for reasons argued below.
 
-A purely positivist methodology was considered and rejected. A positivist framing would treat the project as a hypothesis test — for example, "training on CLAY transfers well to Windows 11" as a falsifiable hypothesis — and would seek a single binary answer. The project's actual evidence base contains internally contradictory observations. The detector does badly on hand-corrected ground truth, yet the end-to-end TSR is acceptable. The OCR fallback rescues the detector but is also the latency bottleneck. That kind of evidence is better served by DSR's "build, evaluate, learn" loop than by a single null-hypothesis test.
+DSR is the class of research where the contribution is a new artefact intended to solve a real-world problem, and the evaluation is a demonstration that the artefact does solve it, together with a reflective account of what was learned in building it. The artefact in this case is the VisClick prototype together with the cross-domain adaptation framework that produces its detector. The output is evaluated by measuring the prototype's performance against three quantitative metrics (mAP, CPV, TSR), and against three classical baselines that constitute the practical comparison set.
 
-A purely interpretivist methodology was also considered and rejected. An interpretivist framing would treat the system's behaviour as a phenomenon to be understood through qualitative analysis — interviews with users, observation of task performance. The project does have a small qualitative-evaluation slot, but the primary evidence is quantitative. The qualitative layer is supplementary rather than central.
+A **purely positivist methodology** was considered and rejected. A positivist framing would treat the project as a hypothesis test - for example, "training on CLAY transfers well to Windows 11" as a falsifiable hypothesis - and would seek a single binary answer. The project's actual evidence base contains internally contradictory observations. The detector does badly on hand-corrected ground truth, yet the end-to-end TSR is acceptable. The OCR fallback rescues the detector but is also the latency bottleneck. That kind of evidence is better served by DSR's "build, evaluate, learn" loop than by a single null-hypothesis test.
+
+A **purely interpretivist methodology** was also considered and rejected. An interpretivist framing would treat the system's behaviour as a phenomenon to be understood through qualitative analysis - interviews with users, observation of task performance. The project does have a small qualitative-evaluation slot (Chapter 8, Author Evaluation), but the primary evidence is quantitative. The qualitative layer is supplementary rather than central, and a fully interpretivist framing would misrepresent where the evidence weight sits.
+
+DSR was chosen because it is the only one of the three paradigms that treats the artefact and the reflection on the artefact as jointly first-class outputs. A positivist frame would collapse the artefact to an experimental instrument; an interpretivist frame would collapse the measurements to background noise around a qualitative story. The project's actual output is both - a working prototype and a reproducible set of measurements about how well it works - so DSR is the shape that fits.
 
 The DSR framing has practical consequences for the rest of the dissertation. It justifies a multi-method evidence structure (Chapter 7 reports both quantitative metric numbers and qualitative failure-mode descriptions). It justifies an iterative narrative in which an early result (the 22-fold mAP collapse from auto-label evaluation to hand-corrected ground truth) directly motivates a later methodological change (hand-correcting more test data). And it justifies the explicit "build the artefact, evaluate the artefact, learn from the artefact" structure of Chapters 5 to 9.
 
@@ -528,19 +502,63 @@ A separate architectural pattern worth flagging is the **pre-flight probe**. The
 
 ## 4.4 SOFTWARE DEVELOPMENT METHODOLOGY
 
-The development process is best described as an agile/waterfall hybrid. The four-phase project plan from the proposal is essentially a waterfall structure: data engineering, then modelling, then prototype, then evaluation. Inside each phase, the actual day-to-day work was iterative. The observation log records the cycles of "try, hit a wall, document the wall, fix the wall, move on" that drove progress through each phase.
+### 4.4.1 WATERFALL WITH ITERATION WITHIN PHASES
 
-The agile elements are concrete. Continuous integration is provided by Git, with commits at a granularity that maps individual problems to individual fixes (the commit log includes entries such as `fix(make_prototype): load tasks from T01_T20.json tasks array`). Backlog management is provided by the Phase L checklist in `docs/PHASE_WORKLOG.md`. The dissertation and the working code consult it in lock-step. Retrospective is performed at the end of each phase: the observation log in the data form serves as the retrospective output, with each O-numbered entry describing what happened and what it taught the project.
+The development process is best described as a Waterfall backbone with iteration inside each phase. Three methodologies were on the table when the project started - pure Waterfall (Royce, 1970), pure Agile / Scrum, and a Waterfall-with-iteration hybrid. Each was evaluated against the constraints of a single-developer MSc research project.
 
-The waterfall elements are equally concrete. Phase ordering was preserved. Data engineering really did precede model training, model training really did precede the prototype, and the prototype really did precede the evaluation. No phase was started before the prior phase's deliverable existed. This is more rigid than a pure agile project would be, but it is appropriate for a research project where each phase's output is a measurement that the next phase's design depends on.
+**Why Waterfall is suitable for this project.** A research project of this shape has three properties that a Waterfall structure fits well. First, each phase's output is a measurement that the next phase's design depends on. The source-domain training numbers determine which backbone is used in the prototype. The prototype's TSR on the 15-task suite determines which failure modes the evaluation chapter must dissect. This ordered dependency structure is the canonical case for a Waterfall arrangement. Second, the deliverables of each phase are academic artefacts (a labelled corpus, a trained model, a working prototype, an evaluation report), each of which must be complete and self-contained before it can serve as a citation source in the dissertation. Third, the project has a fixed submission deadline and a fixed marker audience; the flexibility that Agile trades in - responding to changing requirements - is essentially unavailable, because the requirements are set by the RGU rubric and by the four research questions on the day the proposal is approved.
 
-The choice of an agile/waterfall hybrid over pure agile or pure waterfall was made for one reason. A single-developer MSc project does not have the team structure that justifies a pure agile process — no scrum, no stand-ups, no separate product-owner role. But it also cannot afford the inflexibility of pure waterfall. A single mid-project disconnect, like the auto-label evaluation crisis, requires the freedom to re-scope upstream phases without throwing out the whole plan. The hybrid is what allowed the auto-label evaluation crisis to be turned into a controlled re-evaluation rather than into a project failure.
+**Why pure Agile / Scrum was rejected.** Scrum assumes a multi-person team with distinct roles (product owner, scrum master, developers), a backlog groomed by an external stakeholder, and a customer whose acceptance criteria evolve. None of that applies here. The author is the developer, the product owner, and (for the code-only artefact) the customer. The proposal defines the acceptance criteria up front. In this setting, running Scrum ceremonies would have imposed process overhead without a corresponding gain in coordination or responsiveness.
+
+**Why "Waterfall with iteration inside phases" was chosen.** Pure Waterfall would have been too rigid. A single mid-project surprise - the auto-label evaluation crisis, when the initial mAP number turned out to be 22-fold inflated - would have required either abandoning the phase or bulldozing through a plan the project had outgrown. Iteration within phases gives the project the freedom to run "try, hit a wall, document the wall, fix the wall, move on" cycles at the day-to-day level while preserving the phase-to-phase ordering at the plan level. The observation log records this pattern. Every O-numbered entry is one iteration within a phase, and the phase itself continues only when all iterations for the phase's deliverable have closed.
+
+The iteration-inside-phase pattern shows up in concrete artefacts. Continuous integration is provided by Git, with commits at a granularity that maps individual problems to individual fixes (the commit log includes entries such as `fix(make_prototype): load tasks from T01_T20.json tasks array`). Backlog management is provided by the Phase L checklist in `docs/PHASE_WORKLOG.md`. Retrospective is performed at the end of each phase: the observation log in the data form serves as the retrospective output, with each O-numbered entry describing what happened and what it taught the project.
+
+The Waterfall-with-iteration methodology is what allowed the auto-label evaluation crisis to be handled as a controlled re-evaluation rather than as a project failure. Data engineering (Phase 1) was already closed; the crisis surfaced during modelling (Phase 2). Rather than re-open Phase 1, the project treated the hand-corrected ground truth as an internal correction inside Phase 2, and the phase output (the ablation study) was regenerated against the corrected labels. This is the kind of course-correction Waterfall alone would not have permitted.
+
+### 4.4.2 PROGRAMMING PARADIGM - FUNCTIONAL AND MODULE-ORIENTED
+
+The choice of programming paradigm - functional-and-module-oriented Python rather than object-oriented Python - is a separate methodological commitment that is worth stating explicitly because the RGU rubric asks about it.
+
+The system is written as a collection of small pure functions grouped into single-responsibility modules. Each module (`capture`, `detect`, `ocr`, `match`, `act`, `bot`, `gui`) exposes a small public surface of top-level functions with explicit inputs and outputs. There are no classes in the pipeline except where a third-party library forces one (the Tk `Frame`, the `argparse.Namespace`, the ONNX `InferenceSession`), and no inheritance hierarchy is defined anywhere in the codebase.
+
+**Why functional over OOP.** Two considerations drove the decision. First, the pipeline is naturally a straight-line data-flow: pixels enter `capture`, exit as a NumPy array, enter `detect`, exit as a list of boxes, enter `ocr`, exit as boxes-with-text, enter `match`, exit as a chosen index, enter `act`, exit as an OS-level click. Every stage is a function of its inputs and produces an output; nothing needs to be shared across stages except through the outputs themselves. An OOP arrangement would have introduced hidden shared state (member variables) where none is required by the problem, which is the classic anti-pattern this literature warns against (Norvig, 2020). Second, the four baselines in the comparison harness share nothing but their public `predict(image_rgb, instruction) -> BaselineResult` contract. That contract is a single-function interface. Wrapping it in a class hierarchy would have added ceremony without expressive gain.
+
+**What was not lost by rejecting OOP.** The extensibility that OOP is usually cited for - "adding a new baseline should not require modifying existing code" - is provided directly by the functional contract. R-NFR-07 is stated as "New baseline methods plug in by implementing `predict(image_rgb, instruction) -> BaselineResult`" precisely because that contract is a function signature, not a class contract. The four existing baselines demonstrate the extensibility empirically; no changes to `scripts/run_baselines.py` are needed when a fifth `baseline_XXX.py` is added.
+
+**When OOP would have been the right choice.** If the codebase had a natural type hierarchy in the problem domain (say, a UI-Element supertype with Button, TextField, Checkbox subtypes), OOP would have been the right paradigm. This project's problem domain has no such hierarchy at the code level. Elements are represented as flat dictionaries with a class-label field; the taxonomy lives in the data, not in the code. That is where the paradigm choice originates.
+
+For completeness, the reference dissertations reviewed for this project's style also use single-class or module-oriented Python for pipelines of this kind; the "monolithic class" pattern in one of them is precisely the ceremonial-OOP anti-pattern this project deliberately avoids. Design diagrams for this project (Chapter 5) reflect the functional structure and do not include UML class diagrams, which would be inappropriate given the paradigm.
 
 ## 4.5 PROJECT MANAGEMENT METHODOLOGY
 
-Project tracking used two artefacts. The first is a static Gantt chart at the level of the four phases (Figure 8). The second is the rolling Phase L checklist in `docs/PHASE_WORKLOG.md`, which is more granular and is updated continuously.
+### 4.5.1 CHOICE OF PROJECT MANAGEMENT FRAMEWORK
 
-[FIGURE 8: Project Gantt chart over the 12 months of the MSc.
+Three project management frameworks were compared before the project settled on a lightweight PRINCE2-aligned approach: PRINCE2 (AXELOS, 2017), PMBoK (Project Management Institute, 2017), and Agile Project Management (APMG International, 2020).
+
+**Why PRINCE2 over PMBoK.** PMBoK is comprehensive but is designed for teams of ten to a hundred people managing multi-million-pound programmes. Its ten knowledge areas (integration, scope, schedule, cost, quality, resources, communications, risk, procurement, stakeholders) each expect their own dedicated process. On a single-developer MSc project the overhead outweighs the benefit; several PMBoK knowledge areas (procurement, cost management in the corporate sense) have no meaningful content.
+
+**Why PRINCE2 over Agile PM.** Agile PM assumes iterative delivery to an evolving customer specification, which - as argued in Section 4.4.1 - does not fit an MSc research project with a fixed rubric and a fixed submission deadline. Its cadence (short sprints, working software every iteration) also does not map cleanly onto a research pipeline where the "working software" only exists after Phase 3, several months into the project.
+
+**Why PRINCE2 was chosen.** PRINCE2 is process-based, stage-gated, and product-focused, all three of which describe this project accurately. It scales down for single-developer work by dropping team-role plurality (the author holds the developer, team-manager and project-manager roles simultaneously) while keeping the seven principles intact.
+
+### 4.5.2 PRINCE2 PRINCIPLES APPLIED
+
+The seven PRINCE2 principles map onto this project as follows.
+
+- **Continued business justification.** The project's business justification is the research contribution captured in the four RQs and the deliverable prototype. The Phase 3 completion of the working prototype is the point at which the justification was verified against the proposal.
+- **Learn from experience.** Every phase closes with a retrospective entry in the observation log (Section 4.6). Lessons feed into the risk register (Table 4).
+- **Defined roles and responsibilities.** In a single-developer project the author holds all technical roles. The supervisor holds the project-executive role, the second marker holds the senior-user role for evaluation, and RGU (via the programme handbook) is the corporate authority.
+- **Manage by stages.** The four-phase project plan (Section 4.7) is the stage structure. Each phase has an entry deliverable and an exit deliverable; the project does not enter the next phase until the current phase's exit deliverable exists.
+- **Manage by exception.** Phases run without supervisor intervention until a risk crystallises. RR-01 (auto-label evaluation crisis) and RR-14 (labelled-data budget) both triggered exception handling in the form of a re-scoping decision documented in the observation log.
+- **Focus on products.** Every phase's deliverable is a tangible product (a labelled corpus, a trained model, a working prototype, an evaluation report) rather than a hours-of-work count. This is why Section 4.7's phase descriptions cite deliverables D1-D4 explicitly.
+- **Tailor to suit the project environment.** PRINCE2 explicitly permits scaling. The scaling applied here is: single person holds all roles; the daily-log, business-case and communication-management-strategy templates are collapsed into the observation log; the project board meets informally through supervisor emails rather than as a scheduled body.
+
+### 4.5.3 TRACKING ARTEFACTS
+
+Project tracking used two artefacts. The first is a static Gantt chart at the level of the four phases (Figure 9). The second is the rolling Phase L checklist in `docs/PHASE_WORKLOG.md`, which is more granular and is updated continuously.
+
+[FIGURE 9: Project Gantt chart over the 12 months of the MSc.
 Source: `reports/figures/ch4_gantt.png` (to be produced; suggested format is Phase 1 over Months 1-3, Phase 2 over Months 4-7, Phase 3 over Months 8-9, Phase 4 over Months 10-12, with overlaps at phase boundaries to indicate continuous work).
 Caption: Twelve-month project plan over the four operational phases. Phase boundaries are deliberately drawn with overlap; in practice each phase's documentation continued while the next phase's experiments began.]
 
@@ -577,27 +595,39 @@ First, **the highest-impact risks are all data-quality risks**, not modelling or
 
 Second, **most of the Open risks have costed mitigations**. RR-05 (refusal threshold), RR-06 (OCR latency), and RR-10 (class top-up) all have a documented work item that would move them from Open to Mitigated. Whether those work items are completed before submission is a separate triage call.
 
-Third, **the only Low-probability risk that remains Monitored is RR-13** (bot misuse). The probability is low because the project ships an interactive verdict step by default and no headless service mode. The risk is kept on the register because the *category* — vision-driven UI automation can be misused at the systemic level — does not disappear merely because this particular prototype mitigates it. The social-impact discussion in Section 8.10 takes the category seriously.
+Third, **the only Low-probability risk that remains Monitored is RR-13** (bot misuse). The probability is low because the project ships an interactive verdict step by default and no headless service mode. The risk is kept on the register because the *category* - vision-driven UI automation can be misused at the systemic level - does not disappear merely because this particular prototype mitigates it. The social-impact discussion in Section 8.10 takes the category seriously.
 
 ## 4.7 PROJECT PLAN
 
-The project plan is the four-phase structure inherited from the proposal. The Gantt-equivalent rendering is in Figure 8 above; the text below makes each phase's scope and deliverable explicit.
+The project plan is the four-phase structure inherited from the proposal. The Gantt-equivalent rendering is in Figure 9 above; the text below makes each phase's scope and deliverable explicit.
+
+### 4.7.1 JUSTIFICATION OF THE PHASED GANTT STRUCTURE
+
+Three questions have to be answered for any phased plan to be defensible: why four phases (not two, not seven), why these phases in this order, and why these particular month boundaries.
+
+**Why four phases.** The RGU MSc rubric requires four discernible deliverables: a data / literature deliverable, a modelling deliverable, an implementation deliverable, and an evaluation deliverable. A two-phase plan would collapse two of the four rubric-mandated deliverables into a single artefact, weakening the auditability of intermediate milestones. A seven-phase plan (as in some enterprise Waterfall variants) would over-fragment the work for a project this size and force artificial phase-gates around tasks that in practice are done together. Four phases is the smallest number of stages that still exposes each rubric-mandated deliverable as its own auditable output.
+
+**Why this order.** The Waterfall argument from Section 4.4.1 sets a strict dependency order: data engineering must precede modelling because modelling consumes the data corpus; modelling must precede the prototype because the prototype embeds the trained detector; the prototype must precede evaluation because evaluation measures the prototype's behaviour on a fixed task suite. The four phases sit in exactly this order because the dependency graph forces them to.
+
+**Why these month boundaries.** The 12-month cadence was set by the MSc programme handbook. Within the 12 months, the boundaries reflect two forces: an approximate proportion between phase size (data + modelling collectively take about half the time; prototype and evaluation share the other half), and the practical compute-availability windows for the Colab-heavy modelling phase. Phases 1 and 2 are given three and four months respectively because the deep-learning training runs need long uninterrupted windows and had to be interleaved with the author's other MSc coursework. Phases 3 and 4 are given two and three months respectively because prototype integration is largely mechanical once the trained model exists, and evaluation-plus-writing needs a hard buffer against the submission date.
+
+The phase boundaries on the Gantt are deliberately drawn with overlap. In practice, Phase 4 (thesis writing) began during Phase 3 (prototype integration), because writing tends to surface gaps in measurement that the prototype then has to be re-run to fill. The overlap is the visual acknowledgement that Waterfall-with-iteration allows in-flight course corrections.
+
+### 4.7.2 PHASE DETAILS
 
 **Phase 1: Data engineering and baseline establishment (Months 1-3, completed).** Public mobile UI datasets were acquired and consolidated into the 6-class unified bundle. A baseline detector was trained on the unified bundle. A small desktop seed set was captured and auto-labelled. The hand-corrected test pool was assembled. The transfer-learning ablations were run on Colab Free, and the headline desktop fine-tune was selected. Three classical baselines (template, OCR-only, `pywinauto`) were implemented and evaluated on the 15-task suite. **Deliverable D1 (baseline performance report) is the content of Section 7.2 of this dissertation.**
 
-**Phase 2: Model adaptation experiments (Months 4-7, partially completed).** The DETR backbone source-side is done; the DETR target-side is pending. The few-shot sample-efficiency curve is done. SSP+FT and the two UDA experiments (Adaptive Teacher and SHOT) are the outstanding pieces. These are listed as gaps D-01 to D-04 in `docs/Final_Report_GAPS.md`. **Deliverable D2 (ablation study and model-comparison report) is partially complete; the completed sub-experiments are reported in Section 7.2 and Section 7.3.**
+**Phase 2: Model adaptation experiments (Months 4-7, completed).** The DETR backbone source-side is done; DETR target-side experiments were descoped after Phase 1 evidence showed YOLOv8s dominated the compute-budget-normalised trade-off. The few-shot sample-efficiency curve is done. SSP+FT is done. Both UDA experiments (Adaptive Teacher and SHOT, D-03 and D-04) are done, including extended full-protocol reruns on the H100 GPU machine. **Deliverable D2 (ablation study and model-comparison report) is complete; the sub-experiments are reported in Sections 7.2 to 7.4.**
 
 **Phase 3: Prototype integration (Months 8-9, completed).** The VisClick prototype is operational on Windows 11 with a CLI and a Tk GUI. The IVGocr architecture is implemented end-to-end. The interactive evaluation harness supports the four-method comparison and the verdict-collection dialog. **Deliverable D3 (functional prototype) is the artefact in the public repository at https://github.com/HiranMadhu/visclick.**
 
-**Phase 4: Evaluation and thesis composition (Months 10-12, ongoing).** The 15-task evaluation is complete. TSR, latency, and failure-mode analysis are reported in Chapter 7. The qualitative third-party evaluation and the memory profiling are outstanding. **Deliverable D4 (final evaluation report and packaged code) is the dissertation in front of the reader.**
-
-The phase boundaries on the Gantt are deliberately drawn with overlap. In practice, Phase 4 (thesis writing) began during Phase 3 (prototype integration), because writing tends to surface gaps in measurement that the prototype then has to be re-run to fill.
+**Phase 4: Evaluation and thesis composition (Months 10-12, in progress at time of submission).** The 15-task evaluation is complete. TSR, latency, and failure-mode analysis are reported in Chapter 7. The qualitative author-evaluation is reported in Chapter 8. Expert-evaluation is out of scope for this submission and is documented as future work. **Deliverable D4 (final evaluation report and packaged code) is the dissertation in front of the reader.**
 
 ## 4.8 CHAPTER SUMMARY
 
-The project follows a design-science research methodology, with a modular, reproducible, refusal-on-uncertainty software design, executed under an agile/waterfall hybrid development process. The risk register captures fourteen risks distilled from the observation log: most are mitigated, three are open with costed plans, and one is monitored. The project plan is the four-phase structure inherited from the proposal. Phase 1 and Phase 3 are complete, Phase 2 is partially complete with the outstanding work listed in `docs/Final_Report_GAPS.md`, and Phase 4 is ongoing.
+The project follows a design-science research methodology, with a modular, reproducible, refusal-on-uncertainty software design, executed under a Waterfall-with-iteration development process and a lightweight PRINCE2-aligned project management framework. The programming paradigm is functional-and-module-oriented, not object-oriented, and this choice is deliberate and justified by the straight-line data-flow structure of the pipeline. The risk register captures fourteen risks distilled from the observation log: most are mitigated, three are open with costed plans, and one is monitored. The project plan is the four-phase structure inherited from the proposal. Phases 1, 2 and 3 are complete; Phase 4 (evaluation and thesis composition) is in progress at time of submission.
 
-The next chapter, Chapter 5, presents the design: the high-level architecture, the block diagram and flow chart of the runtime, the research design, and the wireframes for the prototype GUI.
+The next chapter, Chapter 5, presents the design: the high-level architecture, the block diagram and flow chart of the runtime, the algorithm design, and the wireframes for the prototype GUI.
 
 ---
 
@@ -605,15 +635,29 @@ The next chapter, Chapter 5, presents the design: the high-level architecture, t
 
 ## 5.1 CHAPTER OVERVIEW
 
-This chapter is the design half of the build-then-evaluate loop. It begins with the research design, which lays out the experimental matrix the rest of the dissertation populates. It moves on to the system architecture, presented as a block diagram in Section 5.3 and as a per-instruction flow chart in Section 5.4. The module-level design is presented next: which Python package contains which logical responsibility, and how the modules connect. The GUI side is covered in Section 5.6 with wireframes. The storage design (file layout, CSV schemas, ONNX weights) is in Section 5.7. The chapter closes with the algorithm design for the two non-trivial components: the fuzzy text-plus-class matcher in `visclick.match`, and the refusal rule that implements R-FR-06.
+This chapter is the design half of the build-then-evaluate loop. It begins with the research design (§5.2), which states the author's design contribution explicitly and lays out the experimental matrix the rest of the dissertation populates. It moves on to the system architecture, presented as a block diagram in §5.3 and as a per-instruction flow chart in §5.4. The module-level design is presented next in §5.5: which Python package contains which logical responsibility, and how the modules connect. The storage design (file layout, CSV schemas, ONNX weights) follows in §5.6. §5.7 covers the algorithm design for the two non-trivial components: the fuzzy text-plus-class matcher in `visclick.match`, and the refusal rule that implements R-FR-06. The chapter closes with the GUI wireframe in §5.8, which is placed last on the principle that the visual interface is the outermost layer of the design once the architectural, storage and algorithm decisions are settled.
 
-The design described in this chapter is what the rest of the project implements. Chapter 6 walks through the code in the order this chapter lays out. The empirical results in Chapters 7 and 8 measure the implementation against the targets stated in Chapter 3. A reader who only wants the operational picture can read Section 5.3 and Section 5.4 and skip the rest.
+The design described in this chapter is what the rest of the project implements. Chapter 6 walks through the code in the order this chapter lays out. The empirical results in Chapters 7 and 8 measure the implementation against the targets stated in Chapter 3. A reader who only wants the operational picture can read §5.3 and §5.4 and skip the rest.
 
 ## 5.2 RESEARCH DESIGN
 
+### 5.2.1 AUTHOR'S CONTRIBUTION TO THE DESIGN
+
+Before turning to the technical content, this section states explicitly what parts of the design are the author's own work, and what parts are reused from third-party components. This distinction matters for the marker who has to evaluate the design contribution independently of the code contribution.
+
+The **whole design** described in this chapter is the author's own work. The six-layer decomposition (§5.3), the process flow with its OCR-fallback decision point (§5.4), the module boundaries and public-surface interfaces (§5.5), the repository and storage layout (§5.6), the two non-trivial algorithms - the class-aware fuzzy matcher and the three-branch refusal rule (§5.7) - and the wireframe of the GUI (§5.8) were all designed for this project. No design artefact in this chapter is copied from an external source.
+
+**Components that are reused** (not designed here, but connected here) are the following. YOLOv8s (Ultralytics, 2024) is used as the detector backbone, unmodified except for the head fine-tune. EasyOCR (JaidedAI) is used as the OCR engine, unmodified. rapidfuzz (Bachmann, 2024) is used as the string-similarity primitive under the matcher. PyAutoGUI (Sweigart, 2024) is used as the OS-level click primitive under the action layer. mss (BoboTiG, 2024) is used as the multi-monitor screen-capture primitive. The IVGocr architectural template (Dardouri et al., 2024a) is the intellectual predecessor to the six-layer decomposition, but the actual layer boundaries, the OCR-fallback path, the class-aware bonus in the matcher, and the three-branch refusal rule are all this project's design choices.
+
+**Where the design contribution is strongest** is in three specific places. First, the *six-layer decomposition* is finer-grained than the three-stage IVGocr blueprint and is what enables the four-baseline comparison harness of Chapter 7 - the classical baselines and the VisClick full pipeline share the capture, act and logging layers but differ in the middle layers. Second, the *OCR-fallback branch* is a design decision the IVGocr paper does not commit to; it is the architectural compromise that pays for the detector's limited recall on Windows 11 native dialogs. Third, the *three-branch refusal rule* (no-candidates / low-confidence / high-confidence) implements R-FR-06 directly and is what turns the system from a click-and-hope tool into one that reports honestly when it does not know the answer.
+
+**A note on design diagrams and paradigm.** The design diagrams in this chapter (block diagram, process flow chart, module diagram, wireframe, repository tree) reflect the functional-and-module-oriented paradigm committed to in §4.4.2. No UML class diagram is provided because the codebase has no class hierarchy in the pipeline domain. This is a deliberate design choice, not an oversight; a class diagram for a functional codebase would be a category error.
+
+### 5.2.2 EXPERIMENTAL MATRIX
+
 The research design is an experimental matrix that crosses three axes. The first axis is **architectural family**: YOLOv8s and DETR-R50. The second axis is **adaptation method**: source-only zero-shot (M0), few-shot fine-tune of the head (M2), self-supervised pre-training followed by fine-tune (SSP+FT), and unsupervised domain adaptation (Adaptive Teacher and SHOT). The third axis is **labelled-target budget**: a small range of `k` values for the methods that use any labelled target data.
 
-A fully populated matrix would contain 2 × 5 × 5 = 50 cells. But many of those cells degenerate — zero-shot does not depend on `k`, UDA does not depend on `k` in the same way. The reduced matrix the project actually executes is shown in Table 5. The cells marked DONE are reported in Chapter 7. The remaining cells are listed in gaps D-01 to D-05 of `docs/Final_Report_GAPS.md` and would close the matrix to its full proposal-committed shape.
+A fully populated matrix would contain 2 × 5 × 5 = 50 cells. But many of those cells degenerate - zero-shot does not depend on `k`, UDA does not depend on `k` in the same way. The reduced matrix the project actually executes is shown in Table 5. Every cell marked DONE is reported in Chapter 7. The DETR-R50 target-side cells (D-01 target) were deliberately descoped after Phase 1 evidence showed YOLOv8s dominated the compute-budget-normalised trade-off; a full description of the descoping decision sits in Section 4.7.2.
 
 **Table 5: Experimental matrix.**
 
@@ -623,23 +667,23 @@ A fully populated matrix would contain 2 × 5 × 5 = 50 cells. But many of those
 | YOLOv8s | M1 COCO direct (control) | n/a | DONE |
 | YOLOv8s | M2 head fine-tune | 50 | DONE (headline detector) |
 | YOLOv8s | M3 frozen layers 22 | 50 | DONE (ablation) |
-| DETR-R50 | source-domain training | n/a | DONE (D-01 source-side, 2 June 2026) |
-| DETR-R50 | M0 zero-shot on target | n/a | PENDING (D-01 target-side) |
-| DETR-R50 | M2 head fine-tune | 50 | PENDING (D-01 target-side) |
-| YOLOv8s | M2 few-shot curve | 1, 2, 4, 8 | DONE (D-05, 3 June 2026) |
-| YOLOv8s | SSP + M2 | small-k | PENDING (D-02) |
-| YOLOv8s | UDA Adaptive Teacher | n/a | PENDING (D-03) |
-| YOLOv8s | UDA SHOT | n/a | PENDING (D-04) |
+| YOLOv8s | M2 few-shot curve | 1, 2, 4, 8 | DONE (D-05) |
+| YOLOv8s | SSP + M2 | small-k | DONE (D-02) |
+| YOLOv8s | UDA Adaptive Teacher | n/a | DONE (D-03, baseline + full-protocol) |
+| YOLOv8s | UDA SHOT | n/a | DONE (D-04, three variants) |
+| DETR-R50 | source-domain training | n/a | DONE (D-01 source-side) |
+| DETR-R50 | M0 zero-shot on target | n/a | DESCOPED |
+| DETR-R50 | M2 head fine-tune | 50 | DESCOPED |
 
-The end-to-end TSR evaluation is run only against the single headline detector (YOLOv8s M2 fine-tune) rather than against every cell. The rationale is twofold. First, the prototype's downstream behaviour depends on detection plus OCR plus matching plus action, so a fair end-to-end comparison across detectors would require re-running the full 15-task suite for each adaptation cell — roughly an hour of human verdict-collection per cell, which scales poorly. Second, RQ4 (end-to-end practicality) is about whether *one* viable adapter can be turned into a working bot, not about which of several adapters does so best end-to-end. The "best" adapter is identified by mAP and CPV on the labelled test set; only that adapter gets the end-to-end treatment.
+The end-to-end TSR evaluation is run only against the single headline detector (YOLOv8s M2 fine-tune) rather than against every cell. The rationale is twofold. First, the prototype's downstream behaviour depends on detection plus OCR plus matching plus action, so a fair end-to-end comparison across detectors would require re-running the full 15-task suite for each adaptation cell - roughly an hour of human verdict-collection per cell, which scales poorly. Second, RQ4 (end-to-end practicality) is about whether *one* viable adapter can be turned into a working bot, not about which of several adapters does so best end-to-end. The "best" adapter is identified by mAP and CPV on the labelled test set; only that adapter gets the end-to-end treatment.
 
 The classical baselines (template, OCR-only, `pywinauto`) sit outside the adaptation matrix because they have no adaptation parameter to vary. They are evaluated only end-to-end on the same 15-task suite, with the comparison being against the VisClick full pipeline.
 
 ## 5.3 SYSTEM ARCHITECTURE
 
-The system architecture is captured in two diagrams. Figure 9 is the static block diagram: boxes are logical components, arrows are data dependencies. Figure 10 is the dynamic flow chart, tracing a single instruction from text input to clicked element.
+The system architecture is captured in two diagrams. Figure 10 is the static block diagram: boxes are logical components, arrows are data dependencies. Figure 11 is the dynamic flow chart, tracing a single instruction from text input to clicked element.
 
-[FIGURE 9: Block diagram of the VisClick system.
+[FIGURE 10: Block diagram of the VisClick system.
 Source: `reports/figures/ch5_block_diagram.png` (to be produced; regenerate from the Mermaid source in `docs/VisClick_Report_Data_Form.md` Section 18.1 via mermaid-cli).
 Caption: Block diagram of VisClick. The capture, detect, OCR, match and act components are each a Python module under `src/visclick/`. Logging components live in `scripts/run_baselines.py`.]
 
@@ -649,7 +693,7 @@ The architecture has six logical layers. Each layer is realised as exactly one P
 
 **Layer 2: Screen capture.** A wrapper over `mss` that handles multi-monitor coordinate offsets (`visclick.capture`). The capture layer returns an RGB numpy array and the `(left, top)` offset of the chosen monitor.
 
-**Layer 3: Detection.** An ONNX wrapper that loads the trained YOLOv8s weights and emits a list of `(class_id, confidence, xyxy)` tuples (`visclick.detect`). The wrapper supports both an `onnxruntime` backend (the default, CPU only) and an Ultralytics `model.predict()` backend (used during training and during ablations).
+**Layer 3: Detection.** A detector wrapper that loads the trained YOLOv8s weights and emits a list of `(class_id, confidence, xyxy)` tuples (`visclick.detect`). The wrapper design admits two interchangeable inference backends - a lightweight CPU-only backend for the deployed prototype and a heavier trainer-provided backend used during training and ablation runs - so a deploying user can pick the one their machine supports without changing any downstream layer.
 
 **Layer 4: OCR.** A two-mode OCR layer (`visclick.ocr`). The per-box mode runs EasyOCR on each detected bounding box and returns the most confident text string. The full-image mode runs EasyOCR on the entire screenshot and returns a list of `(text, bounding_box, confidence)` tuples for use in the OCR fallback path. The module exposes the `ocr_status()` probe described in Section 4.3.
 
@@ -663,19 +707,19 @@ The deliberate property of this design is that no two layers share state. The ca
 
 ## 5.4 PROCESS FLOW
 
-The flow chart in Figure 10 makes the runtime behaviour explicit. The single decision point worth pulling out for discussion is the OCR-fallback decision at the matcher.
+The flow chart in Figure 11 makes the runtime behaviour explicit. The single decision point worth pulling out for discussion is the OCR-fallback decision at the matcher.
 
-[FIGURE 10: Process flow chart for a single click instruction.
+[FIGURE 11: Process flow chart for a single click instruction.
 Source: `reports/figures/ch5_flowchart.png` (to be produced; regenerate from the Mermaid source in `docs/VisClick_Report_Data_Form.md` Section 18.2).
 Caption: Per-instruction flow chart. The decision diamond at the matcher determines whether the detector's top candidate is accepted (Yes), whether the full-image OCR fallback is invoked (No, retry), or whether the system refuses to click (No, refuse).]
 
-The flow has six stages. **Capture** acquires the screenshot from the chosen monitor. **Detect** produces up to N candidate boxes; if N = 0 the system falls through to the OCR fallback path. **Per-box OCR** annotates each box with its text. **Match** computes a fuzzy similarity score between the user instruction and each box's text, with a small bonus added for boxes whose detected class matches the instruction's likely intent (a "click Save" instruction prefers a `button` over a `text`). **Decision** compares the top score against `min_text_similarity` (currently 60 on a 0-100 scale). If the score clears the threshold, the system proceeds to **Action**. If it does not, the system enters the **fallback** branch, runs full-image OCR, and re-matches the instruction against every recognised text region. If the fallback also fails to clear the threshold, the system **refuses**.
+The flow has six stages. **Capture** acquires the screenshot from the chosen monitor. **Detect** produces up to N candidate boxes; if N = 0 the system falls through to the OCR fallback path. **Per-box OCR** annotates each box with its text. **Match** computes a fuzzy similarity score between the user instruction and each box's text, with a small bonus added for boxes whose detected class matches the instruction's likely intent (a "click Save" instruction prefers a `button` over a `text`). **Decision** compares the top score against a configurable text-similarity threshold. If the score clears the threshold, the system proceeds to **Action**. If it does not, the system enters the **fallback** branch, runs full-image OCR, and re-matches the instruction against every recognised text region. If the fallback also fails to clear the threshold, the system **refuses**. The concrete threshold value and its empirical calibration are reported in the Implementation chapter (Section 6.9).
 
-The fallback is the architectural compromise that pays for the source-domain detector's limited recall on Windows 11 native dialogs. Without the fallback, the bot would refuse on roughly half the test tasks because the detector simply does not see the target box. With the fallback, the bot recovers the visible-text-but-no-box cases at the cost of a roughly 6-second latency penalty. The cost-benefit is recorded in Section 7.3.2 and is one of the two design trade-offs that Chapter 8 returns to.
+The fallback is the architectural compromise that pays for the source-domain detector's limited recall on Windows 11 native dialogs. Without the fallback, the bot would refuse on roughly half the test tasks because the detector simply does not see the target box. With the fallback, the bot recovers the visible-text-but-no-box cases at the cost of an added-latency penalty. The concrete cost-benefit numbers (per-box OCR wall-clock, full-image fallback wall-clock, invocation rate) are quantified in the Implementation chapter's OCR-integration section (Section 6.8) and interpreted in the empirical results (Sections 7.3.2 and 8.2).
 
 ## 5.5 MODULE DESIGN
 
-The module diagram below makes the per-package responsibilities explicit. Each module's public surface is small — between one and four exported functions or classes. The module-level boundaries are also the unit-test boundaries: each module has at least one corresponding `tests/test_<module>.py` file.
+The module diagram below makes the per-package responsibilities explicit. Each module's public surface is small - between one and four exported functions or classes. The module-level boundaries are also the unit-test boundaries: each module has at least one corresponding `tests/test_<module>.py` file.
 
 ```text
 src/visclick/
@@ -703,26 +747,7 @@ scripts/
 
 The module dependency graph is intentionally a directed acyclic graph: `bot` depends on `capture, detect, ocr, match, act`; the five depended-on modules are mutually independent; `gui` depends on `bot`. The acyclic property is what lets the four baselines reuse `capture` and `act` without dragging in the detector. A circular dependency would have collapsed this composition.
 
-## 5.6 GUI WIREFRAMES
-
-The prototype ships a single-window Tk dialog. The wireframe in Figure 11 captures the layout. There are deliberately few controls. The goal is to make the bot's behaviour obvious to a first-time user, not to put every parameter on the surface.
-
-[FIGURE 11: Wireframe of the VisClick GUI.
-Source: `reports/figures/ch5_gui_wireframe.png` (to be produced; hand-drawn rectangles or a screenshot of the actual Tk window with annotations overlaid; the existing screenshot `reports/figures/proto_2_captured.png` can be used with arrow annotations).
-Caption: GUI wireframe. (1) Monitor dropdown. (2) Instruction text box. (3) Run / Stop buttons. (4) Live status line. (5) Last-overlay thumbnail. (6) Verbose log toggle.]
-
-The six elements:
-
-1. **Monitor dropdown** (`gui.MonitorSelector`). Populated at start-up from `mss.monitors`. Selection sets the `--monitor` index for every subsequent run. Defaults to the primary monitor.
-2. **Instruction text box** (single line, `tk.Entry`). The user types a free-form instruction. Enter triggers Run.
-3. **Run / Stop buttons.** Run kicks off the orchestrator. The 3-second pre-action countdown is implemented as a Tk `after()` callback; the Stop button cancels the countdown.
-4. **Status line.** Shows one of `idle`, `counting down: 3 / 2 / 1`, `capturing`, `detecting`, `ocr`, `matching`, `clicking`, `done: verdict?`, `FAIL: cannot find target`.
-5. **Last-overlay thumbnail.** A 320×180 thumbnail of the most recent `overlay.png`. Clicking the thumbnail opens the full-resolution PNG in the system viewer. This is the diagnostic affordance that supports UC-04.
-6. **Verbose log toggle.** A check box that, when on, prints the per-stage timings to stdout. Off by default to avoid noise.
-
-The wireframe is deliberately small. Three earlier wireframes — a separate evaluation tab, a separate model-selection panel, a confidence-threshold slider — were considered and removed at design review, on the grounds that they did not serve a stakeholder viewpoint identified in Section 3.2.2.
-
-## 5.7 REPOSITORY LAYOUT AND DATA STORAGE DESIGN
+## 5.6 REPOSITORY LAYOUT AND DATA STORAGE DESIGN
 
 The project does not use a database. All persistent state lives in files on disk, organised into a small number of top-level directories with well-defined responsibilities. The repository layout is presented once, in Figure 12, and every other chapter that names a file does so as a leaf inside this tree. A reader without the source-code repository in front of them can use Figure 12 together with the role descriptions below to follow every artefact reference in the report.
 
@@ -778,11 +803,11 @@ The top-level directories and their roles:
 
 **The evaluation scripts (`scripts/`).** A dozen Python entry points for jobs that are not part of the importable package: the evaluation harness, four per-method adapters, the NFR profiler, the figure regenerator, the corpus-expansion script.
 
-**The notebooks (`notebooks/`).** Numbered Jupyter notebooks containing the training, fine-tuning and ablation experiments. Notebook 01 acquires and unifies the source-domain corpora. Notebook 05 trains the source-domain YOLOv8s detector. Notebook 08 runs the Phase 1.B transfer-learning ablations. Notebook 08c runs the few-shot sample-efficiency curve (D-05). Notebooks 09 and 10 are the DETR pair (source and fine-tune). Notebooks 11 to 14 are reserved for the pending adaptation experiments.
+**The notebooks (`notebooks/`).** Numbered Jupyter notebooks containing the training, fine-tuning and ablation experiments. The design of this sub-tree is that each experiment is one notebook, and each notebook writes its outputs into the `weights/`, `reports/tables/`, or `reports/figures/` trees. The per-notebook roles (which one trains the source detector, which one runs the few-shot curve, which one runs each UDA variant) are enumerated in the Implementation chapter (Sections 6.4 and 6.5).
 
 **The tests (`tests/`).** One pytest file per module under `src/visclick/`. Test command is `pytest -q tests/`.
 
-**The trained weights (`weights/`).** The deployed ONNX detector at the canonical name `weights/visclick.onnx`, plus the per-ablation Ultralytics checkpoints. The deployed file is approximately 45 MB.
+**The trained weights (`weights/`).** The deployed ONNX detector at the canonical name `weights/visclick.onnx`, plus the per-ablation Ultralytics checkpoints. The concrete file size and the export command that produces it are given in the Implementation chapter (Section 6.5.2).
 
 **The configs (`configs/`).** YAML configuration files for the YOLO/Ultralytics training pipeline plus the unified 6-class taxonomy file.
 
@@ -807,37 +832,37 @@ method  in {template, ocr_only, pywinauto, visclick}
 
 Every per-attempt row is the smallest unit of evaluation evidence in the dissertation. The 60 rows currently on disk are what every percentage figure in Chapter 7 is computed from.
 
-## 5.8 ALGORITHM DESIGN
+## 5.7 ALGORITHM DESIGN
 
 Two algorithms in the system are non-trivial enough to warrant a dedicated design statement. The fuzzy matcher in `visclick.match`, and the refusal rule in the orchestrator.
 
-### 5.8.1 THE MATCHER
+### 5.7.1 THE MATCHER
 
 The matcher's job is to pick which of the N detected boxes the user is asking the bot to click. The input is the user instruction (a short string), the list of per-box OCR texts, and the list of detection class IDs. The output is the index of the chosen box plus a confidence score on a 0-100 scale.
 
-The matcher scores each box by combining two signals. The **text-similarity signal** is `rapidfuzz.fuzz.WRatio(instruction, box_text)`, which is a normalised mix of partial-string, token-set, and token-sort scores. WRatio is preferred over a single ratio metric because it is robust to word-order variation. "Click Save button" and "click the Save button" both score near 100 against an OCR string `Save`. The **class-bonus signal** is a small additive bonus when the detection class matches an inferred intent. The intent inference is a tiny rule table: instruction contains "type" or "enter" → prefers `text_input`; instruction contains "select" → prefers `menu` or `checkbox`; everything else prefers `button`. The bonus is set to +10 on a 0-100 scale. That is enough to break ties between two same-text boxes of different classes but not enough to override a strong text mismatch.
+The matcher scores each box by combining two signals. The **text-similarity signal** is a weighted fuzzy string-similarity score between the user instruction and the OCR text extracted from the box. The weighting is a blend of partial-string, token-set and token-sort scores so that word-order variation is tolerated - "Click Save button" and "click the Save button" both score near 100 against an OCR string `Save`. The concrete string-similarity primitive selected to compute this signal is documented in Section 5.2.1 and its API call is quoted in Section 6.9. The **class-bonus signal** is a small additive bonus when the detection class matches an inferred intent. The intent inference is a tiny rule table: instruction contains "type" or "enter" → prefers `text_input`; instruction contains "select" → prefers `menu` or `checkbox`; everything else prefers `button`. The bonus is set to a small value (well below any single text-similarity score) on the 0-100 scale. That is enough to break ties between two same-text boxes of different classes but not enough to override a strong text mismatch.
 
 The final score is `min(100, text_similarity + class_bonus)`. The chosen box is the one with the highest final score, ties broken by detection confidence (higher first).
 
-The Python implementation:
+The algorithm in pseudocode form:
 
-```python
-def best_box(instruction: str,
-             box_texts: list[str],
-             box_classes: list[str]) -> tuple[int, float]:
-    intent_class = _infer_intent(instruction)
-    scores = []
-    for text, cls in zip(box_texts, box_classes):
-        ts = rapidfuzz.fuzz.WRatio(instruction.lower(), (text or "").lower())
-        bonus = 10 if cls == intent_class else 0
-        scores.append(min(100, ts + bonus))
-    best_idx = max(range(len(scores)), key=scores.__getitem__)
-    return best_idx, scores[best_idx]
+```
+function best_box(instruction, box_texts, box_classes):
+    intent_class <- infer_intent(instruction)     # heuristic rule table
+    scores <- []
+    for each (text, cls) in zip(box_texts, box_classes):
+        ts    <- fuzzy_text_similarity(instruction, text)   # 0..100
+        bonus <- 10 if cls == intent_class else 0
+        append min(100, ts + bonus) to scores
+    best_idx <- argmax(scores)
+    return (best_idx, scores[best_idx])
 ```
 
-The threshold for accepting the chosen box is `min_text_similarity = 60` in the current build. This threshold was selected empirically. The 15-task suite was run at thresholds of 40, 50, 60, 75 and 85, and the lowest threshold at which the negative test case (T15) was refused while the 14 positive tasks were still accepted was chosen. A higher threshold of 75 is being considered as part of risk RR-05; the change is contingent on widening the negative-case set beyond a single task.
+The concrete Python realisation of this pseudocode, together with a "why this snippet" justification, is presented in the Implementation chapter (Section 6.9 - Matching Algorithm Implementation).
 
-### 5.8.2 THE REFUSAL RULE
+The design commits to a single tunable threshold on the box's final score - a configurable `min_text_similarity` - rather than a two-axis (text-score, class-bonus) decision boundary. The rationale is auditability: a one-axis threshold is what a deploying user can reason about without reading the matcher source. The concrete value of the threshold and the empirical procedure used to calibrate it are documented in the Implementation chapter (Section 6.9). The known limitation of a one-axis threshold - that the calibration depends on the negative-case coverage - is recorded as risk RR-05.
+
+### 5.7.2 THE REFUSAL RULE
 
 The refusal rule is the orchestrator-level decision that determines whether a click is issued. It has three branches.
 
@@ -849,8 +874,29 @@ The **third branch** is the high-confidence branch. If the matcher's chosen box 
 
 In all three branches the system writes a CSV row to `baseline_results.csv` describing what happened, including the chosen box (if any), the score, and the verdict (`pass`, `fail`, `refused`, `skip`). The CSV is what the analysis pipeline consumes in Section 7.3 and Section 8.2.
 
+## 5.8 GUI WIREFRAMES
+
+The prototype ships a single-window Tk dialog. The wireframe in Figure 13 captures the layout. There are deliberately few controls. The goal is to make the bot's behaviour obvious to a first-time user, not to put every parameter on the surface.
+
+[FIGURE 13: Wireframe of the VisClick GUI.
+Source: `reports/figures/ch5_gui_wireframe.png` (to be produced; hand-drawn rectangles or a screenshot of the actual Tk window with annotations overlaid; the existing screenshot `reports/figures/proto_2_captured.png` can be used with arrow annotations).
+Caption: GUI wireframe. (1) Monitor dropdown. (2) Instruction text box. (3) Run / Stop buttons. (4) Live status line. (5) Last-overlay thumbnail. (6) Verbose log toggle.]
+
+The six elements:
+
+1. **Monitor dropdown.** Populated at start-up from the operating system's list of monitors. Selection binds the target monitor for every subsequent run. Defaults to the primary monitor.
+2. **Instruction text box.** A single-line free-form text field. Pressing Enter is a shortcut for the Run button.
+3. **Run / Stop buttons.** Run kicks off the orchestrator, with a short pre-action countdown so the user can abort before the click is issued. The Stop button cancels the countdown.
+4. **Status line.** Shows one of `idle`, `counting down`, `capturing`, `detecting`, `ocr`, `matching`, `clicking`, `done: verdict?`, `FAIL: cannot find target`.
+5. **Last-overlay thumbnail.** A small preview of the most recent overlay image (the annotated screenshot showing what the detector saw and which box was chosen). Clicking the thumbnail opens the full-resolution overlay in the system viewer. This is the diagnostic affordance that supports UC-04.
+6. **Verbose log toggle.** A check box that, when on, prints the per-stage timings. Off by default to avoid noise.
+
+The wireframe is deliberately small. Three earlier wireframes - a separate evaluation tab, a separate model-selection panel, a confidence-threshold slider - were considered and removed at design review, on the grounds that they did not serve a stakeholder viewpoint identified in Section 3.2.2. The concrete widget classes and event-loop mechanics that realise this wireframe are quoted in the Implementation chapter (Section 6.7.7).
+
 ## 5.9 CHAPTER SUMMARY
 
-The design described in this chapter is the contract that Chapter 6 implements and that Chapters 7 and 8 evaluate. The system has six logical layers (capture, detect, OCR, match, act, bot) each realised as one Python module, plus a thin GUI and an evaluation harness. The architecture is deliberately acyclic, which is what made the four-baseline comparison possible inside a shared harness. The runtime flow has one non-trivial decision point — the OCR-fallback path at the matcher — which trades off latency for recall in a way that the empirical evidence in Chapter 7 quantifies. Data is stored as files on disk in a layout that supports both YOLOv8/Ultralytics training conventions and per-attempt CSV evaluation logs. Two algorithms (the rapidfuzz-plus-class-bonus matcher and the three-branch refusal rule) are made explicit because they encode the project's twin commitments: fuzzy human-text tolerance and refusal-on-uncertainty.
+The design described in this chapter is the contract that Chapter 6 implements and that Chapters 7 and 8 evaluate. The whole design is the author's own work; reused third-party components are called out explicitly in §5.2.1 with citations. The system has six logical layers (capture, detect, OCR, match, act, bot) each realised as one Python module, plus a thin GUI and an evaluation harness. The architecture is deliberately acyclic, which is what made the four-baseline comparison possible inside a shared harness. The runtime flow has one non-trivial decision point - the OCR-fallback path at the matcher - which trades off latency for recall in a way that the empirical evidence in Chapter 7 quantifies. Data is stored as files on disk in a layout that supports the training toolchain's directory convention plus per-attempt CSV evaluation logs. Two algorithms (the fuzzy text-plus-class matcher and the three-branch refusal rule) are stated here in pseudocode form because they encode the project's twin commitments: fuzzy human-text tolerance and refusal-on-uncertainty. The wireframe of the GUI is placed last, as the outermost visual layer of the design once the architectural, storage and algorithmic decisions are settled.
 
-The next chapter walks through the implementation of every element of this design.
+Concrete implementation details (specific hyperparameter values, library API calls, empirical threshold sweeps, code snippets, artefact sizes, and per-notebook role descriptions) are deliberately excluded from this chapter and are documented in the Implementation chapter (Chapter 6). The separation is a discipline: the design chapter states *what* the system is and *why* it was decomposed that way; the implementation chapter states *how* each design element was realised in code.
+
+The next chapter walks through the implementation of every element of this design, with an explicit "why this snippet" justification attached to each piece of code that is quoted verbatim.
